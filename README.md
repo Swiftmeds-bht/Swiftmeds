@@ -72,9 +72,9 @@ make test               # unit tests in every Go module
 make lint               # golangci-lint in every Go module
 ```
 
-### Adding a service module
+### Adding a service
 
-Create `services/<name>/go.mod` with the module path `github.com/Swiftmeds-bht/Swiftmeds/services/<name>`, then add `./services/<name>` to the `use` block in `go.work`.
+Copy `services/pricing`, the reference template. Step-by-step instructions are in [docs/new-service.md](docs/new-service.md).
 
 ## Branch rules
 
