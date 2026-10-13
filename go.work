@@ -1,0 +1,7 @@
+go 1.25
+
+use (
+	./pkg
+	// Add each service here as soon as it has a go.mod, e.g.:
+	// ./services/inventory
+)
