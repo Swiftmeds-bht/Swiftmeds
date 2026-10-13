@@ -1,0 +1,49 @@
+# Code owners are requested as reviewers automatically on every PR.
+# The LAST matching pattern wins. Ownership follows proposal section 4F.
+#
+# Team:
+#   @PemaLoselMaurer   Pema Losel Maurer       Architecture lead
+#   @JigmeZ            Jigme Ngawang Chogyal   Scrum Master
+#   @nimas854          Sherab Nima Rigzin      Product Owner
+#   @Zhennue           Yeshey Zhennue          QA lead
+
+# Default: anything not matched below needs any team member
+*                               @PemaLoselMaurer @JigmeZ @nimas854 @Zhennue
+
+# Contracts (frozen after Sprint 1; changes need the architecture lead)
+/proto/                         @PemaLoselMaurer
+
+# Identity and platform: Yeshey
+/services/gateway/              @Zhennue
+/services/auth/                 @Zhennue
+/services/user-profile/         @Zhennue
+/services/pharmacy-registry/    @Zhennue
+/services/notification/         @Zhennue
+
+# Catalog and inventory: Jigme
+/services/catalog/              @JigmeZ
+/services/inventory/            @JigmeZ
+/services/stock-sync/           @JigmeZ
+/services/substitution/         @JigmeZ
+/services/analytics/            @JigmeZ
+
+# Discovery: Pema
+/services/search/               @PemaLoselMaurer
+/services/ranking/              @PemaLoselMaurer
+/services/geo/                  @PemaLoselMaurer
+/services/pricing/              @PemaLoselMaurer
+/services/watchlist/            @PemaLoselMaurer
+
+# Transactions and trust: Sherab
+/services/holds/                @nimas854
+/services/expiry/               @nimas854
+/services/feedback/             @nimas854
+/services/trust/                @nimas854
+/services/freshness/            @nimas854
+/workers/hold-expiry/           @nimas854
+/workers/freshness-decay/       @nimas854
+
+# Quality gates and test suites: QA lead
+/.github/                       @Zhennue
+/tests/                         @Zhennue
+/docs/test-plan.md              @Zhennue
