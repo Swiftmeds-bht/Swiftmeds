@@ -46,9 +46,9 @@ jobs:
             echo "::group::Checks for ${module_dir}"
             pushd "${module_dir}" >/dev/null
 
-            if packages="$(go list ./...)" && [[ -n "${packages}" ]]; then
-              go vet ./...
-              golangci-lint run ./...
+            if packages="$(GOWORK=off go list ./...)" && [[ -n "${packages}" ]]; then
+              GOWORK=off go vet ./...
+              GOWORK=off golangci-lint run ./...
             else
               echo "No Go packages found; skipping vet and golangci-lint."
             fi
@@ -63,13 +63,13 @@ jobs:
           set -euo pipefail
 
           while IFS= read -r module_dir; do
-            module_name="$(go -C "${module_dir}" list -m -f '{{.Path}}')"
+            module_name="${module_dir#${GITHUB_WORKSPACE}/}"
             coverage_file="${GITHUB_WORKSPACE}/coverage/${module_name//\//_}.out"
             echo "::group::Tests for ${module_name}"
             pushd "${module_dir}" >/dev/null
 
-            if packages="$(go list ./...)" && [[ -n "${packages}" ]]; then
-              go test ./... -covermode=atomic -coverprofile="${coverage_file}"
+            if packages="$(GOWORK=off go list ./...)" && [[ -n "${packages}" ]]; then
+              GOWORK=off go test ./... -covermode=atomic -coverprofile="${coverage_file}"
             else
               echo "No Go packages found in ${module_name}; writing an empty coverage profile."
               printf 'mode: atomic\n' > "${coverage_file}"
