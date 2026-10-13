@@ -82,11 +82,14 @@ Create `services/<name>/go.mod` with the module path `github.com/Swiftmeds-bht/S
 |---|---|---|
 | `main` | Demo-ready. Tagged at the end of each sprint (`v0.1.0` = Sprint 1). | Release PR from `develop` only |
 | `develop` | Integration branch. Default target for all PRs. | Via reviewed PR |
-| `feat/SM-<n>-short-name` | New feature for Jira ticket SM-n | — |
-| `fix/SM-<n>-short-name` | Bug fix | — |
-| `chore/SM-<n>-short-name` | Tooling, config, docs | — |
+| `feature/SM-<n>-short-name` | New feature for Jira ticket SM-n | Via PR into `develop` |
+| `fix/SM-<n>-short-name` | Bug fix found during the sprint | Via PR into `develop` |
+| `test/SM-<n>-short-name` | New or improved tests only | Via PR into `develop` |
+| `docs/SM-<n>-short-name` | Documentation only (SRS, ADRs, test plan) | Via PR into `develop` |
+| `chore/SM-<n>-short-name` | Tooling, config, CI, dependencies | Via PR into `develop` |
+| `hotfix/SM-<n>-short-name` | Urgent fix to the demo build on `main` | Via PR into `main`, then merged back into `develop` |
 
-1. Branch off `develop`, never off `main`.
+1. Branch off `develop`. The only exception is `hotfix/`, which branches off `main`.
 2. Open a PR into `develop`. CODEOWNERS requests the right reviewer automatically.
 3. Merge needs **1 approval** and **green CI** (lint, unit and integration tests, coverage gate).
 4. Never push directly to `main` or `develop`.
@@ -99,3 +102,5 @@ feat(inventory): reserve stock for a hold (SM-12)
 fix(search): handle empty radius (SM-31)
 chore(repo): add Makefile (SM-1)
 ```
+
+Branch prefixes and commit types are separate. A `feature/SM-12-reserve-stock` branch still uses `feat(...)` in its commit and PR titles, because `feat` is the Conventional Commits type.
