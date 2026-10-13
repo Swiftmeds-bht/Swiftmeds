@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Go checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Install golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare coverage output
+        run: mkdir -p coverage
+
+      - name: Run go vet and golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r module_dir; do
+            echo "::group::Checks for ${module_dir}"
+            pushd "${module_dir}" >/dev/null
+
+            if packages="$(go list ./...)" && [[ -n "${packages}" ]]; then
+              go vet ./...
+              golangci-lint run ./...
+            else
+              echo "No Go packages found; skipping vet and golangci-lint."
+            fi
+
+            popd >/dev/null
+            echo "::endgroup::"
+          done < <(go list -m -f '{{.Dir}}')
+
+      - name: Run tests with coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r module_dir; do
+            module_name="$(go -C "${module_dir}" list -m -f '{{.Path}}')"
+            coverage_file="${GITHUB_WORKSPACE}/coverage/${module_name//\//_}.out"
+            echo "::group::Tests for ${module_name}"
+            pushd "${module_dir}" >/dev/null
+
+            if packages="$(go list ./...)" && [[ -n "${packages}" ]]; then
+              go test ./... -covermode=atomic -coverprofile="${coverage_file}"
+            else
+              echo "No Go packages found in ${module_name}; writing an empty coverage profile."
+              printf 'mode: atomic\n' > "${coverage_file}"
+            fi
+
+            popd >/dev/null
+            echo "::endgroup::"
+          done < <(go list -m -f '{{.Dir}}')
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage/
+          if-no-files-found: error
