@@ -1,7 +1,8 @@
-go 1.25
+go 1.25.0
 
 use (
 	./pkg
+	./proto/gen/go
 	// Add each service here as soon as it has a go.mod, e.g.:
 	// ./services/inventory
 )

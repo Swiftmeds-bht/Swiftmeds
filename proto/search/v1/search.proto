@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+// Search: the patient's "who has this medicine near me?" query. Owner: Pema. Core service.
+// Owns no data. Orchestrates:
+//   Catalog.ResolveName -> Geo.FindNearbyPharmacies -> Inventory.BatchGetStock
+//   -> Pricing.BatchGetPrices + Freshness.GetFreshness + Trust.GetTrustScores
+//   -> Ranking.RankOffers -> (if nothing found) Substitution.GetSubstitutes
+// Target: p95 < 2 s at 100 concurrent users.
+package swiftmed.search.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1;searchv1";
+
+service SearchService {
+  rpc SearchMedicine(SearchMedicineRequest) returns (SearchMedicineResponse);
+  // Name suggestions while the patient types.
+  rpc Autocomplete(AutocompleteRequest) returns (AutocompleteResponse);
+}
+
+// One pharmacy that has the product, with everything the result card shows.
+message PharmacyOffer {
+  string pharmacy_id = 1;
+  string pharmacy_name = 2;
+  string address = 3;
+  swiftmed.common.v1.GeoPoint location = 4;
+  int32 distance_m = 5;
+  int32 quantity_available = 6;
+  // 0 when the pharmacy has not set a price.
+  int64 price_chhertum = 7;
+  double freshness_score = 8;
+  double trust_score = 9;
+  double rank_score = 10;
+  google.protobuf.Timestamp stock_confirmed_at = 11;
+}
+
+message ProductResult {
+  string product_id = 1;
+  string brand_name = 2;
+  string generic_name = 3;
+  string strength = 4;
+  // Best first.
+  repeated PharmacyOffer offers = 5;
+}
+
+message SearchMedicineRequest {
+  // Brand or generic name as typed.
+  string query = 1;
+  swiftmed.common.v1.GeoPoint location = 2;
+  // 500–50000. Defaults to 5000 when 0.
+  int32 radius_m = 3;
+  // Max offers per product. Defaults to 10 when 0.
+  int32 max_offers = 4;
+}
+
+message SearchMedicineResponse {
+  // Identifies this search in logs and analytics.
+  string search_id = 1;
+  repeated ProductResult results = 2;
+  // Filled only when no offer was found for the matched products.
+  repeated ProductResult substitutes = 3;
+}
+
+message AutocompleteRequest {
+  string prefix = 1;
+  int32 limit = 2;
+}
+
+message Suggestion {
+  string product_id = 1;
+  // e.g. "Napa 500mg (paracetamol)".
+  string display_name = 2;
+}
+
+message AutocompleteResponse {
+  repeated Suggestion suggestions = 1;
+}
