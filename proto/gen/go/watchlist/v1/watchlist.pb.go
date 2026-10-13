@@ -5,8 +5,9 @@
 // source: watchlist/v1/watchlist.proto
 
 // Watchlist: "tell me when this is back in stock near me". Owner: Pema. Supporting service.
-// Consumes StockIncreased; for each matching subscription within radius it calls
-// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK) and marks the subscription notified.
+// Consumes StockIncreased; for each matching subscription within radius it pushes a
+// StockAlert to the user's open StreamAlerts stream (if any), calls
+// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK), and marks the subscription notified.
 
 package watchlistv1
 
@@ -409,6 +410,126 @@ func (x *ListSubscriptionsResponse) GetSubscriptions() []*Subscription {
 	return nil
 }
 
+type StreamAlertsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamAlertsRequest) Reset() {
+	*x = StreamAlertsRequest{}
+	mi := &file_watchlist_v1_watchlist_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamAlertsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamAlertsRequest) ProtoMessage() {}
+
+func (x *StreamAlertsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_watchlist_v1_watchlist_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamAlertsRequest.ProtoReflect.Descriptor instead.
+func (*StreamAlertsRequest) Descriptor() ([]byte, []int) {
+	return file_watchlist_v1_watchlist_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *StreamAlertsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type StockAlert struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	SubscriptionId    string                 `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	ProductId         string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	PharmacyId        string                 `protobuf:"bytes,3,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	QuantityAvailable int32                  `protobuf:"varint,4,opt,name=quantity_available,json=quantityAvailable,proto3" json:"quantity_available,omitempty"`
+	OccurredAt        *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *StockAlert) Reset() {
+	*x = StockAlert{}
+	mi := &file_watchlist_v1_watchlist_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StockAlert) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StockAlert) ProtoMessage() {}
+
+func (x *StockAlert) ProtoReflect() protoreflect.Message {
+	mi := &file_watchlist_v1_watchlist_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StockAlert.ProtoReflect.Descriptor instead.
+func (*StockAlert) Descriptor() ([]byte, []int) {
+	return file_watchlist_v1_watchlist_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *StockAlert) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *StockAlert) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *StockAlert) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+func (x *StockAlert) GetQuantityAvailable() int32 {
+	if x != nil {
+		return x.QuantityAvailable
+	}
+	return 0
+}
+
+func (x *StockAlert) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
 var File_watchlist_v1_watchlist_proto protoreflect.FileDescriptor
 
 const file_watchlist_v1_watchlist_proto_rawDesc = "" +
@@ -440,11 +561,24 @@ const file_watchlist_v1_watchlist_proto_rawDesc = "" +
 	"\x18ListSubscriptionsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"f\n" +
 	"\x19ListSubscriptionsResponse\x12I\n" +
-	"\rsubscriptions\x18\x01 \x03(\v2#.swiftmed.watchlist.v1.SubscriptionR\rsubscriptions2\xd0\x02\n" +
+	"\rsubscriptions\x18\x01 \x03(\v2#.swiftmed.watchlist.v1.SubscriptionR\rsubscriptions\".\n" +
+	"\x13StreamAlertsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xe1\x01\n" +
+	"\n" +
+	"StockAlert\x12'\n" +
+	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\tR\tproductId\x12\x1f\n" +
+	"\vpharmacy_id\x18\x03 \x01(\tR\n" +
+	"pharmacyId\x12-\n" +
+	"\x12quantity_available\x18\x04 \x01(\x05R\x11quantityAvailable\x12;\n" +
+	"\voccurred_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt2\xb1\x03\n" +
 	"\x10WatchlistService\x12^\n" +
 	"\tSubscribe\x12'.swiftmed.watchlist.v1.SubscribeRequest\x1a(.swiftmed.watchlist.v1.SubscribeResponse\x12d\n" +
 	"\vUnsubscribe\x12).swiftmed.watchlist.v1.UnsubscribeRequest\x1a*.swiftmed.watchlist.v1.UnsubscribeResponse\x12v\n" +
-	"\x11ListSubscriptions\x12/.swiftmed.watchlist.v1.ListSubscriptionsRequest\x1a0.swiftmed.watchlist.v1.ListSubscriptionsResponseBJZHgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1;watchlistv1b\x06proto3"
+	"\x11ListSubscriptions\x12/.swiftmed.watchlist.v1.ListSubscriptionsRequest\x1a0.swiftmed.watchlist.v1.ListSubscriptionsResponse\x12_\n" +
+	"\fStreamAlerts\x12*.swiftmed.watchlist.v1.StreamAlertsRequest\x1a!.swiftmed.watchlist.v1.StockAlert0\x01BJZHgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1;watchlistv1b\x06proto3"
 
 var (
 	file_watchlist_v1_watchlist_proto_rawDescOnce sync.Once
@@ -458,7 +592,7 @@ func file_watchlist_v1_watchlist_proto_rawDescGZIP() []byte {
 	return file_watchlist_v1_watchlist_proto_rawDescData
 }
 
-var file_watchlist_v1_watchlist_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_watchlist_v1_watchlist_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_watchlist_v1_watchlist_proto_goTypes = []any{
 	(*Subscription)(nil),              // 0: swiftmed.watchlist.v1.Subscription
 	(*SubscribeRequest)(nil),          // 1: swiftmed.watchlist.v1.SubscribeRequest
@@ -467,27 +601,32 @@ var file_watchlist_v1_watchlist_proto_goTypes = []any{
 	(*UnsubscribeResponse)(nil),       // 4: swiftmed.watchlist.v1.UnsubscribeResponse
 	(*ListSubscriptionsRequest)(nil),  // 5: swiftmed.watchlist.v1.ListSubscriptionsRequest
 	(*ListSubscriptionsResponse)(nil), // 6: swiftmed.watchlist.v1.ListSubscriptionsResponse
-	(*v1.GeoPoint)(nil),               // 7: swiftmed.common.v1.GeoPoint
-	(*timestamppb.Timestamp)(nil),     // 8: google.protobuf.Timestamp
+	(*StreamAlertsRequest)(nil),       // 7: swiftmed.watchlist.v1.StreamAlertsRequest
+	(*StockAlert)(nil),                // 8: swiftmed.watchlist.v1.StockAlert
+	(*v1.GeoPoint)(nil),               // 9: swiftmed.common.v1.GeoPoint
+	(*timestamppb.Timestamp)(nil),     // 10: google.protobuf.Timestamp
 }
 var file_watchlist_v1_watchlist_proto_depIdxs = []int32{
-	7, // 0: swiftmed.watchlist.v1.Subscription.location:type_name -> swiftmed.common.v1.GeoPoint
-	8, // 1: swiftmed.watchlist.v1.Subscription.created_at:type_name -> google.protobuf.Timestamp
-	8, // 2: swiftmed.watchlist.v1.Subscription.notified_at:type_name -> google.protobuf.Timestamp
-	7, // 3: swiftmed.watchlist.v1.SubscribeRequest.location:type_name -> swiftmed.common.v1.GeoPoint
-	0, // 4: swiftmed.watchlist.v1.SubscribeResponse.subscription:type_name -> swiftmed.watchlist.v1.Subscription
-	0, // 5: swiftmed.watchlist.v1.ListSubscriptionsResponse.subscriptions:type_name -> swiftmed.watchlist.v1.Subscription
-	1, // 6: swiftmed.watchlist.v1.WatchlistService.Subscribe:input_type -> swiftmed.watchlist.v1.SubscribeRequest
-	3, // 7: swiftmed.watchlist.v1.WatchlistService.Unsubscribe:input_type -> swiftmed.watchlist.v1.UnsubscribeRequest
-	5, // 8: swiftmed.watchlist.v1.WatchlistService.ListSubscriptions:input_type -> swiftmed.watchlist.v1.ListSubscriptionsRequest
-	2, // 9: swiftmed.watchlist.v1.WatchlistService.Subscribe:output_type -> swiftmed.watchlist.v1.SubscribeResponse
-	4, // 10: swiftmed.watchlist.v1.WatchlistService.Unsubscribe:output_type -> swiftmed.watchlist.v1.UnsubscribeResponse
-	6, // 11: swiftmed.watchlist.v1.WatchlistService.ListSubscriptions:output_type -> swiftmed.watchlist.v1.ListSubscriptionsResponse
-	9, // [9:12] is the sub-list for method output_type
-	6, // [6:9] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	9,  // 0: swiftmed.watchlist.v1.Subscription.location:type_name -> swiftmed.common.v1.GeoPoint
+	10, // 1: swiftmed.watchlist.v1.Subscription.created_at:type_name -> google.protobuf.Timestamp
+	10, // 2: swiftmed.watchlist.v1.Subscription.notified_at:type_name -> google.protobuf.Timestamp
+	9,  // 3: swiftmed.watchlist.v1.SubscribeRequest.location:type_name -> swiftmed.common.v1.GeoPoint
+	0,  // 4: swiftmed.watchlist.v1.SubscribeResponse.subscription:type_name -> swiftmed.watchlist.v1.Subscription
+	0,  // 5: swiftmed.watchlist.v1.ListSubscriptionsResponse.subscriptions:type_name -> swiftmed.watchlist.v1.Subscription
+	10, // 6: swiftmed.watchlist.v1.StockAlert.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 7: swiftmed.watchlist.v1.WatchlistService.Subscribe:input_type -> swiftmed.watchlist.v1.SubscribeRequest
+	3,  // 8: swiftmed.watchlist.v1.WatchlistService.Unsubscribe:input_type -> swiftmed.watchlist.v1.UnsubscribeRequest
+	5,  // 9: swiftmed.watchlist.v1.WatchlistService.ListSubscriptions:input_type -> swiftmed.watchlist.v1.ListSubscriptionsRequest
+	7,  // 10: swiftmed.watchlist.v1.WatchlistService.StreamAlerts:input_type -> swiftmed.watchlist.v1.StreamAlertsRequest
+	2,  // 11: swiftmed.watchlist.v1.WatchlistService.Subscribe:output_type -> swiftmed.watchlist.v1.SubscribeResponse
+	4,  // 12: swiftmed.watchlist.v1.WatchlistService.Unsubscribe:output_type -> swiftmed.watchlist.v1.UnsubscribeResponse
+	6,  // 13: swiftmed.watchlist.v1.WatchlistService.ListSubscriptions:output_type -> swiftmed.watchlist.v1.ListSubscriptionsResponse
+	8,  // 14: swiftmed.watchlist.v1.WatchlistService.StreamAlerts:output_type -> swiftmed.watchlist.v1.StockAlert
+	11, // [11:15] is the sub-list for method output_type
+	7,  // [7:11] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_watchlist_v1_watchlist_proto_init() }
@@ -501,7 +640,7 @@ func file_watchlist_v1_watchlist_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_watchlist_v1_watchlist_proto_rawDesc), len(file_watchlist_v1_watchlist_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

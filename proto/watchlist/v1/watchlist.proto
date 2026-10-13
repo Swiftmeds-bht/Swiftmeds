@@ -1,8 +1,9 @@
 syntax = "proto3";
 
 // Watchlist: "tell me when this is back in stock near me". Owner: Pema. Supporting service.
-// Consumes StockIncreased; for each matching subscription within radius it calls
-// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK) and marks the subscription notified.
+// Consumes StockIncreased; for each matching subscription within radius it pushes a
+// StockAlert to the user's open StreamAlerts stream (if any), calls
+// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK), and marks the subscription notified.
 package swiftmed.watchlist.v1;
 
 import "common/v1/common.proto";
@@ -14,6 +15,9 @@ service WatchlistService {
   rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
   rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
   rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
+  // Server streaming: the patient app keeps this open and receives an alert
+  // whenever a watched product comes back in stock nearby.
+  rpc StreamAlerts(StreamAlertsRequest) returns (stream StockAlert);
 }
 
 message Subscription {
@@ -52,4 +56,16 @@ message ListSubscriptionsRequest {
 
 message ListSubscriptionsResponse {
   repeated Subscription subscriptions = 1;
+}
+
+message StreamAlertsRequest {
+  string user_id = 1;
+}
+
+message StockAlert {
+  string subscription_id = 1;
+  string product_id = 2;
+  string pharmacy_id = 3;
+  int32 quantity_available = 4;
+  google.protobuf.Timestamp occurred_at = 5;
 }

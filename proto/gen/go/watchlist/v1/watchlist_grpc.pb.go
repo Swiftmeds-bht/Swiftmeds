@@ -5,8 +5,9 @@
 // source: watchlist/v1/watchlist.proto
 
 // Watchlist: "tell me when this is back in stock near me". Owner: Pema. Supporting service.
-// Consumes StockIncreased; for each matching subscription within radius it calls
-// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK) and marks the subscription notified.
+// Consumes StockIncreased; for each matching subscription within radius it pushes a
+// StockAlert to the user's open StreamAlerts stream (if any), calls
+// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK), and marks the subscription notified.
 
 package watchlistv1
 
@@ -26,6 +27,7 @@ const (
 	WatchlistService_Subscribe_FullMethodName         = "/swiftmed.watchlist.v1.WatchlistService/Subscribe"
 	WatchlistService_Unsubscribe_FullMethodName       = "/swiftmed.watchlist.v1.WatchlistService/Unsubscribe"
 	WatchlistService_ListSubscriptions_FullMethodName = "/swiftmed.watchlist.v1.WatchlistService/ListSubscriptions"
+	WatchlistService_StreamAlerts_FullMethodName      = "/swiftmed.watchlist.v1.WatchlistService/StreamAlerts"
 )
 
 // WatchlistServiceClient is the client API for WatchlistService service.
@@ -35,6 +37,9 @@ type WatchlistServiceClient interface {
 	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (*SubscribeResponse, error)
 	Unsubscribe(ctx context.Context, in *UnsubscribeRequest, opts ...grpc.CallOption) (*UnsubscribeResponse, error)
 	ListSubscriptions(ctx context.Context, in *ListSubscriptionsRequest, opts ...grpc.CallOption) (*ListSubscriptionsResponse, error)
+	// Server streaming: the patient app keeps this open and receives an alert
+	// whenever a watched product comes back in stock nearby.
+	StreamAlerts(ctx context.Context, in *StreamAlertsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StockAlert], error)
 }
 
 type watchlistServiceClient struct {
@@ -75,6 +80,25 @@ func (c *watchlistServiceClient) ListSubscriptions(ctx context.Context, in *List
 	return out, nil
 }
 
+func (c *watchlistServiceClient) StreamAlerts(ctx context.Context, in *StreamAlertsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StockAlert], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &WatchlistService_ServiceDesc.Streams[0], WatchlistService_StreamAlerts_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamAlertsRequest, StockAlert]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WatchlistService_StreamAlertsClient = grpc.ServerStreamingClient[StockAlert]
+
 // WatchlistServiceServer is the server API for WatchlistService service.
 // All implementations must embed UnimplementedWatchlistServiceServer
 // for forward compatibility.
@@ -82,6 +106,9 @@ type WatchlistServiceServer interface {
 	Subscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error)
 	Unsubscribe(context.Context, *UnsubscribeRequest) (*UnsubscribeResponse, error)
 	ListSubscriptions(context.Context, *ListSubscriptionsRequest) (*ListSubscriptionsResponse, error)
+	// Server streaming: the patient app keeps this open and receives an alert
+	// whenever a watched product comes back in stock nearby.
+	StreamAlerts(*StreamAlertsRequest, grpc.ServerStreamingServer[StockAlert]) error
 	mustEmbedUnimplementedWatchlistServiceServer()
 }
 
@@ -100,6 +127,9 @@ func (UnimplementedWatchlistServiceServer) Unsubscribe(context.Context, *Unsubsc
 }
 func (UnimplementedWatchlistServiceServer) ListSubscriptions(context.Context, *ListSubscriptionsRequest) (*ListSubscriptionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSubscriptions not implemented")
+}
+func (UnimplementedWatchlistServiceServer) StreamAlerts(*StreamAlertsRequest, grpc.ServerStreamingServer[StockAlert]) error {
+	return status.Error(codes.Unimplemented, "method StreamAlerts not implemented")
 }
 func (UnimplementedWatchlistServiceServer) mustEmbedUnimplementedWatchlistServiceServer() {}
 func (UnimplementedWatchlistServiceServer) testEmbeddedByValue()                          {}
@@ -176,6 +206,17 @@ func _WatchlistService_ListSubscriptions_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WatchlistService_StreamAlerts_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamAlertsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(WatchlistServiceServer).StreamAlerts(m, &grpc.GenericServerStream[StreamAlertsRequest, StockAlert]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WatchlistService_StreamAlertsServer = grpc.ServerStreamingServer[StockAlert]
+
 // WatchlistService_ServiceDesc is the grpc.ServiceDesc for WatchlistService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,6 +237,12 @@ var WatchlistService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _WatchlistService_ListSubscriptions_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamAlerts",
+			Handler:       _WatchlistService_StreamAlerts_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "watchlist/v1/watchlist.proto",
 }
