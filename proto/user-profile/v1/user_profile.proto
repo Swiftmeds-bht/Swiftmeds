@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+// User Profile: display details for a user. Owner: Yeshey. Supporting service (minimal).
+// Holds only what the flows need; no medical data (risk R8).
+package swiftmed.userprofile.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1;userprofilev1";
+
+service UserProfileService {
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+  // Creates the profile if it does not exist yet.
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+}
+
+message Profile {
+  string user_id = 1;
+  string display_name = 2;
+  string phone = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message GetProfileRequest {
+  string user_id = 1;
+}
+
+message GetProfileResponse {
+  Profile profile = 1;
+}
+
+message UpdateProfileRequest {
+  string user_id = 1;
+  string display_name = 2;
+  string phone = 3;
+}
+
+message UpdateProfileResponse {
+  Profile profile = 1;
+}
