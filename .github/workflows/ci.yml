@@ -5,6 +5,9 @@ on:
     branches:
       - develop
       - main
+  push:
+    branches:
+      - develop
 
 permissions:
   contents: read
@@ -82,4 +85,4 @@ jobs:
         with:
           name: coverage-reports
           path: coverage/
-          if-no-files-found: error
+          if-no-files-found: ignore
