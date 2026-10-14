@@ -149,7 +149,9 @@ func TestServeReportsHealthAndShutsDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// Serve sets SERVING just after starting; allow a moment for that.
 	client := healthpb.NewHealthClient(conn)
