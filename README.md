@@ -63,7 +63,20 @@ make up                 # start all services, Postgres, RabbitMQ and Traefik
 make down               # stop everything
 ```
 
-The gateway listens on `http://localhost:8080`. Run `make help` to list all targets.
+The Traefik dashboard is available at `http://localhost:8080/dashboard/`, and the
+RabbitMQ management UI is available at `http://localhost:15672`. Run `make help`
+to list all targets.
+
+On Windows PowerShell, if `make` is not installed, use Docker Compose directly:
+
+```powershell
+docker compose -f deploy/docker-compose.yml up -d
+docker compose -f deploy/docker-compose.yml ps
+docker compose -f deploy/docker-compose.yml down
+```
+
+Do not add `-v` to the `down` command unless you intentionally want to delete the
+local PostgreSQL and RabbitMQ data volumes.
 
 ### Tests
 
@@ -104,3 +117,4 @@ chore(repo): add Makefile (SM-1)
 ```
 
 Branch prefixes and commit types are separate. A `feature/SM-12-reserve-stock` branch still uses `feat(...)` in its commit and PR titles, because `feat` is the Conventional Commits type.
+
