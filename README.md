@@ -85,9 +85,9 @@ make test               # unit tests in every Go module
 make lint               # golangci-lint in every Go module
 ```
 
-### Adding a service module
+### Adding a service
 
-Create `services/<name>/go.mod` with the module path `github.com/Swiftmeds-bht/Swiftmeds/services/<name>`, then add `./services/<name>` to the `use` block in `go.work`.
+Copy `services/pricing`, the reference template. Step-by-step instructions are in [docs/new-service.md](docs/new-service.md).
 
 ## Branch rules
 
@@ -95,12 +95,14 @@ Create `services/<name>/go.mod` with the module path `github.com/Swiftmeds-bht/S
 |---|---|---|
 | `main` | Demo-ready. Tagged at the end of each sprint (`v0.1.0` = Sprint 1). | Release PR from `develop` only |
 | `develop` | Integration branch. Default target for all PRs. | Via reviewed PR |
-| `feature/SM-<n>-short-name` | New feature for Jira ticket SM-n | Via PR into `develop` |
-| `fix/SM-<n>-short-name` | Bug fix found during the sprint | Via PR into `develop` |
-| `test/SM-<n>-short-name` | New or improved tests only | Via PR into `develop` |
-| `docs/SM-<n>-short-name` | Documentation only (SRS, ADRs, test plan) | Via PR into `develop` |
-| `chore/SM-<n>-short-name` | Tooling, config, CI, dependencies | Via PR into `develop` |
-| `hotfix/SM-<n>-short-name` | Urgent fix to the demo build on `main` | Via PR into `main`, then merged back into `develop` |
+| `feature/SCRUM-<n>-short-name` | New feature for Jira ticket SCRUM-n | Via PR into `develop` |
+| `fix/SCRUM-<n>-short-name` | Bug fix found during the sprint | Via PR into `develop` |
+| `test/SCRUM-<n>-short-name` | New or improved tests only | Via PR into `develop` |
+| `docs/SCRUM-<n>-short-name` | Documentation only (SRS, ADRs, test plan) | Via PR into `develop` |
+| `chore/SCRUM-<n>-short-name` | Tooling, config, CI, dependencies | Via PR into `develop` |
+| `hotfix/SCRUM-<n>-short-name` | Urgent fix to the demo build on `main` | Via PR into `main`, then merged back into `develop` |
+
+SM-1 to SM-8 in early history are pre-Jira labels. Mapping: SM-1→SCRUM-90, SM-2→SCRUM-10, SM-3→SCRUM-20, SM-4→SCRUM-19, SM-5→SCRUM-43, SM-6→SCRUM-31, SM-7→SCRUM-24, SM-8→SCRUM-26.
 
 1. Branch off `develop`. The only exception is `hotfix/`, which branches off `main`.
 2. Open a PR into `develop`. CODEOWNERS requests the right reviewer automatically.
@@ -111,10 +113,9 @@ Create `services/<name>/go.mod` with the module path `github.com/Swiftmeds-bht/S
 **Commit and PR titles** follow [Conventional Commits](https://www.conventionalcommits.org/) with the Jira key:
 
 ```
-feat(inventory): reserve stock for a hold (SM-12)
-fix(search): handle empty radius (SM-31)
-chore(repo): add Makefile (SM-1)
+feat(inventory): add atomic stock reservation (SCRUM-36)
+fix(search): handle empty radius (SCRUM-49)
+chore(repo): add Makefile (SCRUM-90)
 ```
 
-Branch prefixes and commit types are separate. A `feature/SM-12-reserve-stock` branch still uses `feat(...)` in its commit and PR titles, because `feat` is the Conventional Commits type.
-
+Branch prefixes and commit types are separate. A `feature/SCRUM-36-reserve-stock` branch still uses `feat(...)` in its commit and PR titles, because `feat` is the Conventional Commits type.

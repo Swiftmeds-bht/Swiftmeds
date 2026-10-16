@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+// Pharmacy Registry: pharmacy registration and admin verification. Owner: Yeshey.
+// Only VERIFIED pharmacies appear in search. On verify/suspend this service calls
+// geo.v1.GeoService.UpsertPharmacyLocation / RemovePharmacyLocation.
+package swiftmed.pharmacyregistry.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1;pharmacyregistryv1";
+
+service PharmacyRegistryService {
+  rpc RegisterPharmacy(RegisterPharmacyRequest) returns (RegisterPharmacyResponse);
+  rpc GetPharmacy(GetPharmacyRequest) returns (GetPharmacyResponse);
+  rpc BatchGetPharmacies(BatchGetPharmaciesRequest) returns (BatchGetPharmaciesResponse);
+  rpc ListPharmacies(ListPharmaciesRequest) returns (ListPharmaciesResponse);
+  // Admin only: approve, reject or suspend a pharmacy.
+  rpc SetVerificationStatus(SetVerificationStatusRequest) returns (SetVerificationStatusResponse);
+}
+
+enum VerificationStatus {
+  VERIFICATION_STATUS_UNSPECIFIED = 0;
+  VERIFICATION_STATUS_PENDING = 1;
+  VERIFICATION_STATUS_VERIFIED = 2;
+  VERIFICATION_STATUS_REJECTED = 3;
+  VERIFICATION_STATUS_SUSPENDED = 4;
+}
+
+message Pharmacy {
+  string pharmacy_id = 1;
+  string owner_user_id = 2;
+  string name = 3;
+  string license_number = 4;
+  string phone = 5;
+  string address = 6;
+  string dzongkhag = 7;
+  swiftmed.common.v1.GeoPoint location = 8;
+  VerificationStatus status = 9;
+  // Set when status is REJECTED or SUSPENDED.
+  string status_reason = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp verified_at = 12;
+}
+
+message RegisterPharmacyRequest {
+  string owner_user_id = 1;
+  string name = 2;
+  string license_number = 3;
+  string phone = 4;
+  string address = 5;
+  string dzongkhag = 6;
+  swiftmed.common.v1.GeoPoint location = 7;
+}
+
+message RegisterPharmacyResponse {
+  // Always starts as VERIFICATION_STATUS_PENDING.
+  Pharmacy pharmacy = 1;
+}
+
+message GetPharmacyRequest {
+  string pharmacy_id = 1;
+}
+
+message GetPharmacyResponse {
+  Pharmacy pharmacy = 1;
+}
+
+message BatchGetPharmaciesRequest {
+  repeated string pharmacy_ids = 1;
+}
+
+message BatchGetPharmaciesResponse {
+  // Unknown IDs are omitted, not errors.
+  repeated Pharmacy pharmacies = 1;
+}
+
+message ListPharmaciesRequest {
+  // UNSPECIFIED lists all statuses.
+  VerificationStatus status = 1;
+  swiftmed.common.v1.PageRequest page = 2;
+}
+
+message ListPharmaciesResponse {
+  repeated Pharmacy pharmacies = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}
+
+message SetVerificationStatusRequest {
+  string pharmacy_id = 1;
+  string admin_user_id = 2;
+  VerificationStatus status = 3;
+  string reason = 4;
+}
+
+message SetVerificationStatusResponse {
+  Pharmacy pharmacy = 1;
+}

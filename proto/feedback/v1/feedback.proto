@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+// Feedback: "was the medicine actually there?" after a hold. Owner: Sherab.
+// SubmitFeedback publishes FeedbackSubmitted, which Trust and Analytics consume.
+package swiftmed.feedback.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1;feedbackv1";
+
+service FeedbackService {
+  // One feedback per hold. A second submission returns ALREADY_EXISTS.
+  rpc SubmitFeedback(SubmitFeedbackRequest) returns (SubmitFeedbackResponse);
+  rpc ListPharmacyFeedback(ListPharmacyFeedbackRequest) returns (ListPharmacyFeedbackResponse);
+}
+
+message Feedback {
+  string feedback_id = 1;
+  string hold_id = 2;
+  string pharmacy_id = 3;
+  string product_id = 4;
+  bool was_in_stock = 5;
+  // 1–5, or 0 if not given.
+  int32 rating = 6;
+  string comment = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message SubmitFeedbackRequest {
+  string hold_id = 1;
+  // Must own the hold.
+  string user_id = 2;
+  bool was_in_stock = 3;
+  int32 rating = 4;
+  // Max 500 characters.
+  string comment = 5;
+}
+
+message SubmitFeedbackResponse {
+  Feedback feedback = 1;
+}
+
+message ListPharmacyFeedbackRequest {
+  string pharmacy_id = 1;
+  swiftmed.common.v1.PageRequest page = 2;
+}
+
+message ListPharmacyFeedbackResponse {
+  repeated Feedback feedback = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}

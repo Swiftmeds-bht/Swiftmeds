@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+// Analytics: aggregated, anonymised reports. Owner: Jigme. Supporting service (minimal).
+// Builds its data by consuming events; never reads other services' databases.
+package swiftmed.analytics.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/analytics/v1;analyticsv1";
+
+service AnalyticsService {
+  // Medicines people searched for and could not find, most-searched first.
+  rpc GetUnmetDemand(GetUnmetDemandRequest) returns (GetUnmetDemandResponse);
+  rpc GetPharmacyStats(GetPharmacyStatsRequest) returns (GetPharmacyStatsResponse);
+}
+
+message TimeRange {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+}
+
+message UnmetDemandItem {
+  string product_id = 1;
+  string product_name = 2;
+  int32 search_count = 3;
+  int32 unmet_count = 4;
+}
+
+message GetUnmetDemandRequest {
+  TimeRange range = 1;
+  // Empty means the whole country.
+  string dzongkhag = 2;
+  int32 limit = 3;
+}
+
+message GetUnmetDemandResponse {
+  repeated UnmetDemandItem items = 1;
+}
+
+message GetPharmacyStatsRequest {
+  string pharmacy_id = 1;
+  TimeRange range = 2;
+}
+
+message GetPharmacyStatsResponse {
+  int32 holds_requested = 1;
+  int32 holds_confirmed = 2;
+  int32 holds_unavailable = 3;
+  int32 feedback_count = 4;
+  int32 feedback_in_stock_count = 5;
+}

@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+// Inventory: stock levels per pharmacy and product. Owner: Jigme. Core service.
+//
+// Reservation saga (choreography, see events/v1/events.proto):
+//   HoldRequested -> Inventory reserves -> StockReserved | StockUnavailable
+// Holds then calls CommitReservation (collected) or ReleaseReservation
+// (cancelled/expired) over gRPC. Both are idempotent per hold_id.
+//
+// Invariant: quantity_available = quantity_on_hand - quantity_reserved, never negative.
+package swiftmed.inventory.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/inventory/v1;inventoryv1";
+
+service InventoryService {
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  // Stock for every (pharmacy, product) pair in the request. Used by Search.
+  rpc BatchGetStock(BatchGetStockRequest) returns (BatchGetStockResponse);
+  // Pharmacy dashboard view of all its stock.
+  rpc ListPharmacyStock(ListPharmacyStockRequest) returns (ListPharmacyStockResponse);
+  // Sets quantity_on_hand. Setting the same quantity still counts as a confirmation
+  // (refreshes confirmed_at). Publishes StockIncreased when the quantity goes up.
+  rpc SetStock(SetStockRequest) returns (SetStockResponse);
+  // Same as SetStock for many products at once. Used by Stock Sync (CSV upload).
+  rpc BulkSetStock(BulkSetStockRequest) returns (BulkSetStockResponse);
+  // Hold collected: reserved units leave on_hand for good.
+  rpc CommitReservation(CommitReservationRequest) returns (CommitReservationResponse);
+  // Hold cancelled or expired: reserved units go back to available (saga compensation).
+  rpc ReleaseReservation(ReleaseReservationRequest) returns (ReleaseReservationResponse);
+}
+
+message StockLevel {
+  string pharmacy_id = 1;
+  string product_id = 2;
+  int32 quantity_on_hand = 3;
+  int32 quantity_reserved = 4;
+  int32 quantity_available = 5;
+  // Last time the pharmacy set or confirmed this stock. Feeds Freshness.
+  google.protobuf.Timestamp confirmed_at = 6;
+}
+
+message GetStockRequest {
+  string pharmacy_id = 1;
+  string product_id = 2;
+}
+
+message GetStockResponse {
+  StockLevel stock = 1;
+}
+
+message BatchGetStockRequest {
+  repeated string pharmacy_ids = 1;
+  repeated string product_ids = 2;
+  // When true, pairs with quantity_available == 0 are left out.
+  bool only_available = 3;
+}
+
+message BatchGetStockResponse {
+  repeated StockLevel stock = 1;
+}
+
+message ListPharmacyStockRequest {
+  string pharmacy_id = 1;
+  swiftmed.common.v1.PageRequest page = 2;
+}
+
+message ListPharmacyStockResponse {
+  repeated StockLevel stock = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}
+
+message SetStockRequest {
+  string pharmacy_id = 1;
+  string product_id = 2;
+  // Must be >= 0 and >= the currently reserved quantity.
+  int32 quantity_on_hand = 3;
+  string updated_by_user_id = 4;
+}
+
+message SetStockResponse {
+  StockLevel stock = 1;
+}
+
+message StockUpdate {
+  string product_id = 1;
+  int32 quantity_on_hand = 2;
+}
+
+message BulkSetStockRequest {
+  string pharmacy_id = 1;
+  repeated StockUpdate updates = 2;
+  string updated_by_user_id = 3;
+}
+
+message StockUpdateError {
+  string product_id = 1;
+  string message = 2;
+}
+
+message BulkSetStockResponse {
+  int32 updated_count = 1;
+  // Rows that failed; the others are still applied.
+  repeated StockUpdateError errors = 2;
+}
+
+message CommitReservationRequest {
+  string hold_id = 1;
+}
+
+message CommitReservationResponse {
+  StockLevel stock = 1;
+}
+
+message ReleaseReservationRequest {
+  string hold_id = 1;
+}
+
+message ReleaseReservationResponse {
+  StockLevel stock = 1;
+}
