@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+// Expiry: hold durations and deadlines. Owner: Sherab. Supporting service.
+// - Holds asks GetHoldDuration when creating a hold.
+// - Expiry consumes HoldConfirmed and stores each hold's deadline.
+// - The hold-expiry Cloudflare Worker calls RunSweep on a schedule (via the gateway);
+//   Expiry then calls Holds.ExpireHold for every deadline that has passed.
+package swiftmed.expiry.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1;expiryv1";
+
+service ExpiryService {
+  rpc GetHoldDuration(GetHoldDurationRequest) returns (GetHoldDurationResponse);
+  // Expires every hold whose deadline is <= as_of. Idempotent.
+  rpc RunSweep(RunSweepRequest) returns (RunSweepResponse);
+}
+
+message GetHoldDurationRequest {
+  string pharmacy_id = 1;
+  string product_id = 2;
+}
+
+message GetHoldDurationResponse {
+  google.protobuf.Duration duration = 1;
+}
+
+message RunSweepRequest {
+  // The "now" to sweep up to. Passed in so tests can use a fake clock.
+  google.protobuf.Timestamp as_of = 1;
+}
+
+message RunSweepResponse {
+  repeated string expired_hold_ids = 1;
+}

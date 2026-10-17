@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+// Catalog: the medicine master list (brands, generics, molecules). Owner: Jigme.
+// Resolves what a patient typed into products and their molecule.
+package swiftmed.catalog.v1;
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/catalog/v1;catalogv1";
+
+service CatalogService {
+  // Matches brand or generic names (case-insensitive, prefix and fuzzy).
+  // Controlled medicines are never returned.
+  rpc ResolveName(ResolveNameRequest) returns (ResolveNameResponse);
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse);
+  rpc BatchGetProducts(BatchGetProductsRequest) returns (BatchGetProductsResponse);
+  // All products with the given molecule, optionally the same strength. Used by Substitution.
+  rpc ListProductsByMolecule(ListProductsByMoleculeRequest) returns (ListProductsByMoleculeResponse);
+  // Admin / seed data only.
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+}
+
+enum DosageForm {
+  DOSAGE_FORM_UNSPECIFIED = 0;
+  DOSAGE_FORM_TABLET = 1;
+  DOSAGE_FORM_CAPSULE = 2;
+  DOSAGE_FORM_SYRUP = 3;
+  DOSAGE_FORM_SUSPENSION = 4;
+  DOSAGE_FORM_INJECTION = 5;
+  DOSAGE_FORM_CREAM = 6;
+  DOSAGE_FORM_OINTMENT = 7;
+  DOSAGE_FORM_DROPS = 8;
+  DOSAGE_FORM_INHALER = 9;
+  DOSAGE_FORM_OTHER = 10;
+}
+
+message Product {
+  string product_id = 1;
+  string brand_name = 2;
+  string generic_name = 3;
+  string molecule_id = 4;
+  string molecule_name = 5;
+  // Normalised, lower-case, no spaces, e.g. "500mg", "125mg/5ml". Compared by exact match.
+  string strength = 6;
+  DosageForm dosage_form = 7;
+  // Units per pack, e.g. 10 tablets.
+  int32 pack_size = 8;
+  string manufacturer = 9;
+  bool requires_prescription = 10;
+  // Narcotic/psychotropic. Excluded from search and substitution.
+  bool controlled = 11;
+}
+
+message ResolveNameRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message ResolveNameResponse {
+  // Best match first.
+  repeated Product products = 1;
+}
+
+message GetProductRequest {
+  string product_id = 1;
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+message BatchGetProductsRequest {
+  repeated string product_ids = 1;
+}
+
+message BatchGetProductsResponse {
+  // Unknown IDs are omitted, not errors.
+  repeated Product products = 1;
+}
+
+message ListProductsByMoleculeRequest {
+  string molecule_id = 1;
+  // Empty matches any strength.
+  string strength = 2;
+}
+
+message ListProductsByMoleculeResponse {
+  repeated Product products = 1;
+}
+
+message CreateProductRequest {
+  string brand_name = 1;
+  string generic_name = 2;
+  string molecule_id = 3;
+  string molecule_name = 4;
+  string strength = 5;
+  DosageForm dosage_form = 6;
+  int32 pack_size = 7;
+  string manufacturer = 8;
+  bool requires_prescription = 9;
+  bool controlled = 10;
+}
+
+message CreateProductResponse {
+  Product product = 1;
+}

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+// Notification: sends messages to users. Owner: Yeshey. Supporting service.
+// Mostly event-driven: consumes HoldConfirmed (pickup code). Watchlist calls
+// SendNotification directly when stock returns.
+package swiftmed.notification.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1;notificationv1";
+
+service NotificationService {
+  rpc SendNotification(SendNotificationRequest) returns (SendNotificationResponse);
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+}
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  CHANNEL_IN_APP = 1;
+  CHANNEL_EMAIL = 2;
+  CHANNEL_SMS = 3;
+}
+
+enum Template {
+  TEMPLATE_UNSPECIFIED = 0;
+  TEMPLATE_HOLD_CONFIRMED = 1;
+  TEMPLATE_HOLD_EXPIRING_SOON = 2;
+  TEMPLATE_HOLD_EXPIRED = 3;
+  TEMPLATE_BACK_IN_STOCK = 4;
+  TEMPLATE_FEEDBACK_REQUEST = 5;
+  TEMPLATE_PHARMACY_VERIFIED = 6;
+}
+
+message Notification {
+  string notification_id = 1;
+  string user_id = 2;
+  Channel channel = 3;
+  Template template = 4;
+  // Values substituted into the template, e.g. {"pickup_code": "4821"}.
+  map<string, string> params = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp read_at = 7;
+}
+
+message SendNotificationRequest {
+  string user_id = 1;
+  Channel channel = 2;
+  Template template = 3;
+  map<string, string> params = 4;
+}
+
+message SendNotificationResponse {
+  string notification_id = 1;
+}
+
+message ListNotificationsRequest {
+  string user_id = 1;
+  swiftmed.common.v1.PageRequest page = 2;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}

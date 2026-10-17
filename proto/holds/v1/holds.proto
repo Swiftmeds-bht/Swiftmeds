@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+// Holds: short reservations a patient collects with a pickup code. Owner: Sherab. Core service.
+//
+// Lifecycle (state transition tests cover every arrow):
+//   PENDING --StockReserved-->    ACTIVE --CollectHold-->  COLLECTED
+//   PENDING --StockUnavailable--> REJECTED
+//   ACTIVE  --CancelHold-->       CANCELLED   (calls Inventory.ReleaseReservation)
+//   ACTIVE  --ExpireHold-->       EXPIRED     (calls Inventory.ReleaseReservation)
+// COLLECTED calls Inventory.CommitReservation. All terminal states are final.
+//
+// CreateHold publishes HoldRequested. On StockReserved the hold becomes ACTIVE, a
+// pickup code is generated, and HoldConfirmed is published.
+package swiftmed.holds.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1;holdsv1";
+
+service HoldsService {
+  rpc CreateHold(CreateHoldRequest) returns (CreateHoldResponse);
+  rpc GetHold(GetHoldRequest) returns (GetHoldResponse);
+  // By patient (user_id) or by pharmacy (pharmacy_id); exactly one must be set.
+  rpc ListHolds(ListHoldsRequest) returns (ListHoldsResponse);
+  // Patient cancels an ACTIVE hold.
+  rpc CancelHold(CancelHoldRequest) returns (CancelHoldResponse);
+  // Pharmacy staff hand over the medicine after checking the pickup code.
+  rpc CollectHold(CollectHoldRequest) returns (CollectHoldResponse);
+  // Called by Expiry when expires_at has passed. No-op unless the hold is ACTIVE.
+  rpc ExpireHold(ExpireHoldRequest) returns (ExpireHoldResponse);
+}
+
+enum HoldStatus {
+  HOLD_STATUS_UNSPECIFIED = 0;
+  HOLD_STATUS_PENDING = 1;
+  HOLD_STATUS_ACTIVE = 2;
+  HOLD_STATUS_COLLECTED = 3;
+  HOLD_STATUS_EXPIRED = 4;
+  HOLD_STATUS_CANCELLED = 5;
+  HOLD_STATUS_REJECTED = 6;
+}
+
+message Hold {
+  string hold_id = 1;
+  string user_id = 2;
+  string pharmacy_id = 3;
+  string product_id = 4;
+  int32 quantity = 5;
+  HoldStatus status = 6;
+  // Set once ACTIVE. Shown to the patient only; pharmacy staff enter it at the counter.
+  string pickup_code = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  // When the hold reached its current status.
+  google.protobuf.Timestamp status_changed_at = 10;
+  // Set for REJECTED and CANCELLED.
+  string status_reason = 11;
+}
+
+message CreateHoldRequest {
+  string user_id = 1;
+  string pharmacy_id = 2;
+  string product_id = 3;
+  // 1–5.
+  int32 quantity = 4;
+}
+
+message CreateHoldResponse {
+  // Status is PENDING until Inventory answers. Poll GetHold for the result.
+  Hold hold = 1;
+}
+
+message GetHoldRequest {
+  string hold_id = 1;
+}
+
+message GetHoldResponse {
+  Hold hold = 1;
+}
+
+message ListHoldsRequest {
+  string user_id = 1;
+  string pharmacy_id = 2;
+  // UNSPECIFIED lists all statuses.
+  HoldStatus status = 3;
+  swiftmed.common.v1.PageRequest page = 4;
+}
+
+message ListHoldsResponse {
+  repeated Hold holds = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}
+
+message CancelHoldRequest {
+  string hold_id = 1;
+  string user_id = 2;
+  string reason = 3;
+}
+
+message CancelHoldResponse {
+  Hold hold = 1;
+}
+
+message CollectHoldRequest {
+  string hold_id = 1;
+  string pharmacy_id = 2;
+  string pickup_code = 3;
+}
+
+message CollectHoldResponse {
+  Hold hold = 1;
+}
+
+message ExpireHoldRequest {
+  string hold_id = 1;
+}
+
+message ExpireHoldResponse {
+  Hold hold = 1;
+}

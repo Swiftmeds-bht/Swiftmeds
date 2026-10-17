@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+// Trust: each pharmacy's accuracy record. Owner: Sherab.
+// Consumes FeedbackSubmitted; "was in stock" raises the score, "not in stock" lowers it.
+// New pharmacies start at a neutral score until they have enough feedback.
+package swiftmed.trust.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/trust/v1;trustv1";
+
+service TrustService {
+  rpc GetTrustScores(GetTrustScoresRequest) returns (GetTrustScoresResponse);
+}
+
+message TrustScore {
+  string pharmacy_id = 1;
+  double score = 2;
+  int32 feedback_count = 3;
+  int32 in_stock_count = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message GetTrustScoresRequest {
+  repeated string pharmacy_ids = 1;
+}
+
+message GetTrustScoresResponse {
+  // Every requested ID is returned; unknown pharmacies get the neutral score.
+  repeated TrustScore scores = 1;
+}

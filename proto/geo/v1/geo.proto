@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+// Geo: where verified pharmacies are, and which are near a point. Owner: Pema.
+// Pharmacy Registry pushes locations here when a pharmacy is verified or suspended,
+// so only verified pharmacies are ever returned.
+package swiftmed.geo.v1;
+
+import "common/v1/common.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1;geov1";
+
+service GeoService {
+  rpc FindNearbyPharmacies(FindNearbyPharmaciesRequest) returns (FindNearbyPharmaciesResponse);
+  rpc UpsertPharmacyLocation(UpsertPharmacyLocationRequest) returns (UpsertPharmacyLocationResponse);
+  rpc RemovePharmacyLocation(RemovePharmacyLocationRequest) returns (RemovePharmacyLocationResponse);
+}
+
+message NearbyPharmacy {
+  string pharmacy_id = 1;
+  // Straight-line (great-circle) distance.
+  int32 distance_m = 2;
+}
+
+message FindNearbyPharmaciesRequest {
+  swiftmed.common.v1.GeoPoint location = 1;
+  int32 radius_m = 2;
+  int32 limit = 3;
+}
+
+message FindNearbyPharmaciesResponse {
+  // Nearest first.
+  repeated NearbyPharmacy pharmacies = 1;
+}
+
+message UpsertPharmacyLocationRequest {
+  string pharmacy_id = 1;
+  swiftmed.common.v1.GeoPoint location = 2;
+}
+
+message UpsertPharmacyLocationResponse {}
+
+message RemovePharmacyLocationRequest {
+  string pharmacy_id = 1;
+}
+
+message RemovePharmacyLocationResponse {}

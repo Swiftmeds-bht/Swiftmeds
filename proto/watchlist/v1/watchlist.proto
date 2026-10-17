@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+// Watchlist: "tell me when this is back in stock near me". Owner: Pema. Supporting service.
+// Consumes StockIncreased; for each matching subscription within radius it pushes a
+// StockAlert to the user's open StreamAlerts stream (if any), calls
+// Notification.SendNotification (TEMPLATE_BACK_IN_STOCK), and marks the subscription notified.
+package swiftmed.watchlist.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1;watchlistv1";
+
+service WatchlistService {
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
+  rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
+  // Server streaming: the patient app keeps this open and receives an alert
+  // whenever a watched product comes back in stock nearby.
+  rpc StreamAlerts(StreamAlertsRequest) returns (stream StockAlert);
+}
+
+message Subscription {
+  string subscription_id = 1;
+  string user_id = 2;
+  string product_id = 3;
+  swiftmed.common.v1.GeoPoint location = 4;
+  int32 radius_m = 5;
+  google.protobuf.Timestamp created_at = 6;
+  // Set once the user has been notified. A notified subscription does not fire again.
+  google.protobuf.Timestamp notified_at = 7;
+}
+
+message SubscribeRequest {
+  string user_id = 1;
+  string product_id = 2;
+  swiftmed.common.v1.GeoPoint location = 3;
+  int32 radius_m = 4;
+}
+
+message SubscribeResponse {
+  Subscription subscription = 1;
+}
+
+message UnsubscribeRequest {
+  string subscription_id = 1;
+  // Must own the subscription.
+  string user_id = 2;
+}
+
+message UnsubscribeResponse {}
+
+message ListSubscriptionsRequest {
+  string user_id = 1;
+}
+
+message ListSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
+}
+
+message StreamAlertsRequest {
+  string user_id = 1;
+}
+
+message StockAlert {
+  string subscription_id = 1;
+  string product_id = 2;
+  string pharmacy_id = 3;
+  int32 quantity_available = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+}
