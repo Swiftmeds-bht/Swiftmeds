@@ -63,7 +63,8 @@ make up                 # start all services, Postgres, RabbitMQ and Traefik
 make down               # stop everything
 ```
 
-The gateway listens on `http://localhost:8080`. Run `make help` to list all targets.
+The gateway listens on `http://localhost:8080`; its health check is available at
+`http://localhost:8080/healthz`. Run `make help` to list all targets.
 
 ### Tests
 
