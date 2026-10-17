@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+// RabbitMQ event payloads, serialised as protobuf binary.
+//
+// All events go to one topic exchange, "swiftmed.events". The routing key for each
+// event is in its comment. Consumers bind their own queue per routing key.
+// Consumers must be idempotent: deduplicate on metadata.event_id.
+package swiftmed.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/events/v1;eventsv1";
+
+message EventMetadata {
+  // Unique per event (UUID). Used for deduplication.
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  // Same value for every event in one saga (the hold_id for reservations).
+  string correlation_id = 3;
+  // Service that published the event, e.g. "holds".
+  string producer = 4;
+}
+
+// --- Reservation saga ---
+
+// Routing key: hold.requested
+// Producer: holds. Consumers: inventory, analytics.
+message HoldRequested {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string user_id = 3;
+  string pharmacy_id = 4;
+  string product_id = 5;
+  int32 quantity = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+// Routing key: stock.reserved
+// Producer: inventory. Consumers: holds.
+message StockReserved {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string pharmacy_id = 3;
+  string product_id = 4;
+  int32 quantity = 5;
+}
+
+// Routing key: stock.unavailable
+// Producer: inventory. Consumers: holds, analytics.
+message StockUnavailable {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string pharmacy_id = 3;
+  string product_id = 4;
+  int32 requested_quantity = 5;
+  int32 available_quantity = 6;
+}
+
+// Routing key: hold.confirmed
+// Producer: holds. Consumers: notification (sends pickup code), expiry (stores deadline), analytics.
+message HoldConfirmed {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string user_id = 3;
+  string pharmacy_id = 4;
+  string product_id = 5;
+  int32 quantity = 6;
+  string pickup_code = 7;
+  google.protobuf.Timestamp expires_at = 8;
+}
+
+// --- Stock and trust ---
+
+// Routing key: stock.increased
+// Producer: inventory. Consumers: watchlist.
+message StockIncreased {
+  EventMetadata metadata = 1;
+  string pharmacy_id = 2;
+  string product_id = 3;
+  int32 previous_available = 4;
+  int32 new_available = 5;
+}
+
+// Routing key: feedback.submitted
+// Producer: feedback. Consumers: trust, analytics.
+// Deliberately carries no user_id (minimal personal data, risk R8).
+message FeedbackSubmitted {
+  EventMetadata metadata = 1;
+  string feedback_id = 2;
+  string hold_id = 3;
+  string pharmacy_id = 4;
+  string product_id = 5;
+  bool was_in_stock = 6;
+  int32 rating = 7;
+}

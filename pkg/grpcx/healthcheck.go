@@ -14,15 +14,23 @@ import (
 //
 // Services call this from a "healthcheck" sub-command so the Docker HEALTHCHECK
 // can run the service binary itself; distroless images have no shell or curl.
+<<<<<<< HEAD
 func CheckHealth(ctx context.Context, addr string) (err error) {
+=======
+func CheckHealth(ctx context.Context, addr string) error {
+>>>>>>> origin/develop
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)
 	}
 	defer func() {
+<<<<<<< HEAD
 		if closeErr := conn.Close(); closeErr != nil && err == nil {
 			err = fmt.Errorf("close health check connection: %w", closeErr)
 		}
+=======
+		_ = conn.Close()
+>>>>>>> origin/develop
 	}()
 
 	resp, err := healthpb.NewHealthClient(conn).Check(ctx, &healthpb.HealthCheckRequest{})

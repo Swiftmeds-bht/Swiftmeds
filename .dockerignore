@@ -1,0 +1,11 @@
+# Service images are built from the repo root; keep the build context small.
+.git
+.github
+.env
+**/node_modules
+web/
+workers/
+tests/
+docs/
+data/
+deploy/

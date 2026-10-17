@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+// Shared types used by more than one service.
+//
+// Conventions for every SwiftMed contract:
+//   - Money is int64 in chhertum (100 chhertum = 1 Ngultrum). Never float.
+//   - IDs are strings (UUIDs).
+//   - Timestamps are google.protobuf.Timestamp, in UTC.
+//   - Distances are int32 metres.
+//   - Scores (freshness, trust, ranking) are double in the range 0.0–1.0.
+//   - Errors use gRPC status codes (NOT_FOUND, INVALID_ARGUMENT, ...), not error fields.
+//   - Enum zero values are *_UNSPECIFIED and are never valid input.
+package swiftmed.common.v1;
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/common/v1;commonv1";
+
+// A WGS84 coordinate.
+message GeoPoint {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// Identifies one product at one pharmacy. Used for stock, price and freshness lookups.
+message StockKey {
+  string pharmacy_id = 1;
+  string product_id = 2;
+}
+
+// Cursor-based pagination. An empty page_token means the first page.
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  // Empty when there are no more pages.
+  string next_page_token = 1;
+}

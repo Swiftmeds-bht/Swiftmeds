@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+// Freshness: how much to trust a stock figure, given its age. Owner: Sherab. Core service.
+// Confidence starts at 1.0 when stock is set/confirmed and decays with age.
+// The freshness-decay Cloudflare Worker calls ApplyDecay on a schedule (via the gateway).
+package swiftmed.freshness.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1;freshnessv1";
+
+service FreshnessService {
+  // Called by Inventory whenever a pharmacy sets or confirms stock.
+  rpc RecordConfirmation(RecordConfirmationRequest) returns (RecordConfirmationResponse);
+  rpc GetFreshness(GetFreshnessRequest) returns (GetFreshnessResponse);
+  // Recomputes stored scores as of the given time. Idempotent.
+  rpc ApplyDecay(ApplyDecayRequest) returns (ApplyDecayResponse);
+}
+
+message FreshnessScore {
+  swiftmed.common.v1.StockKey key = 1;
+  double score = 2;
+  google.protobuf.Timestamp confirmed_at = 3;
+}
+
+message RecordConfirmationRequest {
+  swiftmed.common.v1.StockKey key = 1;
+  google.protobuf.Timestamp confirmed_at = 2;
+}
+
+message RecordConfirmationResponse {
+  FreshnessScore freshness = 1;
+}
+
+message GetFreshnessRequest {
+  repeated swiftmed.common.v1.StockKey keys = 1;
+}
+
+message GetFreshnessResponse {
+  // Keys never confirmed are omitted (treat as score 0.0).
+  repeated FreshnessScore scores = 1;
+}
+
+message ApplyDecayRequest {
+  // The "now" to decay to. Passed in so tests can use a fake clock.
+  google.protobuf.Timestamp as_of = 1;
+}
+
+message ApplyDecayResponse {
+  int32 updated_count = 1;
+}

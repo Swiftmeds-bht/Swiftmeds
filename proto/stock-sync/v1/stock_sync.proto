@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+// Stock Sync: CSV upload of stock and prices from the pharmacy dashboard. Owner: Jigme.
+// Parses and validates the file, then calls Inventory.BulkSetStock and Pricing.SetPrices.
+//
+// CSV columns: product_id,quantity,price_chhertum   (price_chhertum optional)
+package swiftmed.stocksync.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/stock-sync/v1;stocksyncv1";
+
+service StockSyncService {
+  rpc UploadStockCsv(UploadStockCsvRequest) returns (UploadStockCsvResponse);
+  rpc GetSyncJob(GetSyncJobRequest) returns (GetSyncJobResponse);
+  rpc ListSyncJobs(ListSyncJobsRequest) returns (ListSyncJobsResponse);
+}
+
+enum SyncJobStatus {
+  SYNC_JOB_STATUS_UNSPECIFIED = 0;
+  SYNC_JOB_STATUS_PROCESSING = 1;
+  // Every row applied.
+  SYNC_JOB_STATUS_COMPLETED = 2;
+  // Some rows applied, some rejected (see row_errors).
+  SYNC_JOB_STATUS_PARTIAL = 3;
+  // Nothing applied (e.g. bad header, unreadable file).
+  SYNC_JOB_STATUS_FAILED = 4;
+}
+
+message RowError {
+  // 1-based, counting the header as row 1.
+  int32 row_number = 1;
+  string message = 2;
+}
+
+message SyncJob {
+  string job_id = 1;
+  string pharmacy_id = 2;
+  string uploaded_by_user_id = 3;
+  string filename = 4;
+  SyncJobStatus status = 5;
+  int32 rows_total = 6;
+  int32 rows_applied = 7;
+  int32 rows_rejected = 8;
+  repeated RowError row_errors = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+}
+
+message UploadStockCsvRequest {
+  string pharmacy_id = 1;
+  string uploaded_by_user_id = 2;
+  string filename = 3;
+  // Raw file, UTF-8. Max 1 MB.
+  bytes csv_content = 4;
+}
+
+message UploadStockCsvResponse {
+  SyncJob job = 1;
+}
+
+message GetSyncJobRequest {
+  string job_id = 1;
+}
+
+message GetSyncJobResponse {
+  SyncJob job = 1;
+}
+
+message ListSyncJobsRequest {
+  string pharmacy_id = 1;
+  swiftmed.common.v1.PageRequest page = 2;
+}
+
+message ListSyncJobsResponse {
+  repeated SyncJob jobs = 1;
+  swiftmed.common.v1.PageResponse page = 2;
+}
