@@ -150,7 +150,13 @@ func TestServeReportsHealthAndShutsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
+<<<<<<< HEAD
+		if err := conn.Close(); err != nil {
+			t.Errorf("close client connection: %v", err)
+		}
+=======
 		_ = conn.Close()
+>>>>>>> origin/develop
 	}()
 
 	// Serve sets SERVING just after starting; allow a moment for that.

@@ -4,6 +4,7 @@ use (
 	./pkg
 	./services/gateway
 	./proto/gen/go
+	./services/auth
 	./services/pricing
 	// Add each service here as soon as it has a go.mod, e.g.:
 	// ./services/inventory
