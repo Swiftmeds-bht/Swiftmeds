@@ -6,9 +6,10 @@ go 1.25.0
 require google.golang.org/grpc v1.84.0
 =======
 require (
+	github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go v0.0.0
 	github.com/rabbitmq/amqp091-go v1.15.0
 	google.golang.org/grpc v1.84.0
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
 >>>>>>> origin/develop
 
@@ -22,3 +23,5 @@ require (
 =======
 >>>>>>> origin/develop
 )
+
+replace github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go => ../proto/gen/go
