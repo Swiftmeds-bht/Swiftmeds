@@ -13,10 +13,22 @@ type fakeRepository struct {
 	users   map[string]domain.User
 	byEmail map[string]string
 	refresh map[string]string
+
+	// failWith, when set, is returned by every read and token method to
+	// simulate the database being unavailable.
+	failWith error
 }
 
 func newFakeRepository() *fakeRepository {
 	return &fakeRepository{users: map[string]domain.User{}, byEmail: map[string]string{}, refresh: map[string]string{}}
+}
+
+func (r *fakeRepository) RevokeRefreshToken(_ context.Context, tokenHash string) error {
+	if r.failWith != nil {
+		return r.failWith
+	}
+	delete(r.refresh, tokenHash)
+	return nil
 }
 
 func (r *fakeRepository) CreateUser(_ context.Context, user domain.User) error {
@@ -29,6 +41,9 @@ func (r *fakeRepository) CreateUser(_ context.Context, user domain.User) error {
 }
 
 func (r *fakeRepository) FindUserByEmail(_ context.Context, email string) (domain.User, error) {
+	if r.failWith != nil {
+		return domain.User{}, r.failWith
+	}
 	id, ok := r.byEmail[email]
 	if !ok {
 		return domain.User{}, domain.ErrUserNotFound
@@ -50,6 +65,9 @@ func (r *fakeRepository) SaveRefreshToken(_ context.Context, tokenHash, userID s
 }
 
 func (r *fakeRepository) ConsumeRefreshToken(_ context.Context, tokenHash string) (string, error) {
+	if r.failWith != nil {
+		return "", r.failWith
+	}
 	userID, ok := r.refresh[tokenHash]
 	if !ok {
 		return "", domain.ErrRefreshRevoked

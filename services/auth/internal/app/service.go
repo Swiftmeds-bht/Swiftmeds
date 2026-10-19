@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -76,7 +77,16 @@ func (s *Service) Register(ctx context.Context, email, password string, role dom
 
 func (s *Service) Login(ctx context.Context, email, password string) (domain.User, TokenPair, error) {
 	user, err := s.repo.FindUserByEmail(ctx, domain.NormalizeEmail(email))
-	if err != nil || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+	switch {
+	case errors.Is(err, domain.ErrUserNotFound):
+		// Spend the same bcrypt time as for a real account, so the response
+		// time does not reveal which emails are registered.
+		_ = bcrypt.CompareHashAndPassword(dummyHash(), []byte(password))
+		return domain.User{}, TokenPair{}, domain.ErrInvalidCredentials
+	case err != nil:
+		return domain.User{}, TokenPair{}, fmt.Errorf("find user: %w", err)
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		return domain.User{}, TokenPair{}, domain.ErrInvalidCredentials
 	}
 	tokens, err := s.issueTokens(ctx, user)
@@ -92,17 +102,34 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, 
 		return TokenPair{}, domain.ErrInvalidToken
 	}
 	userID, err := s.repo.ConsumeRefreshToken(ctx, hashToken(refreshToken))
-	if err != nil || userID != claims.Subject {
-		if errors.Is(err, domain.ErrRefreshRevoked) {
-			return TokenPair{}, domain.ErrRefreshRevoked
-		}
+	switch {
+	case errors.Is(err, domain.ErrRefreshRevoked):
+		return TokenPair{}, domain.ErrRefreshRevoked
+	case err != nil:
+		return TokenPair{}, fmt.Errorf("consume refresh token: %w", err)
+	case userID != claims.Subject:
 		return TokenPair{}, domain.ErrInvalidToken
 	}
 	user, err := s.repo.FindUserByID(ctx, userID)
-	if err != nil {
+	switch {
+	case errors.Is(err, domain.ErrUserNotFound):
 		return TokenPair{}, domain.ErrInvalidToken
+	case err != nil:
+		return TokenPair{}, fmt.Errorf("find user: %w", err)
 	}
 	return s.issueTokens(ctx, user)
+}
+
+// Logout revokes a refresh token so it can no longer be used. Logging out with
+// a token that is already revoked succeeds, so clients can safely retry.
+func (s *Service) Logout(ctx context.Context, refreshToken string) error {
+	if _, err := s.parseToken(refreshToken, "refresh"); err != nil {
+		return domain.ErrInvalidToken
+	}
+	if err := s.repo.RevokeRefreshToken(ctx, hashToken(refreshToken)); err != nil {
+		return fmt.Errorf("revoke refresh token: %w", err)
+	}
+	return nil
 }
 
 type TokenIdentity struct {
@@ -197,6 +224,16 @@ func (s *Service) sign(user domain.User, tokenType string, expiresAt time.Time) 
 		"type": tokenType, "iat": s.now().Unix(), "exp": expiresAt.Unix(), "jti": id,
 	}).SignedString(s.secret)
 }
+
+// dummyHash is a bcrypt hash of a random value, computed once. Login compares
+// against it when the email is unknown.
+var dummyHash = sync.OnceValue(func() []byte {
+	h, err := bcrypt.GenerateFromPassword([]byte("swiftmed-timing-equaliser"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(fmt.Sprintf("auth: generate dummy bcrypt hash: %v", err))
+	}
+	return h
+})
 
 func newID() (string, error) {
 	b := make([]byte, 16)

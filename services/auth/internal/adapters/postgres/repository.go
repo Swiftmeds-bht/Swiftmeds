@@ -71,6 +71,15 @@ func (r *Repository) SaveRefreshToken(ctx context.Context, tokenHash, userID str
 	return nil
 }
 
+func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	_, err := r.db.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = NOW()
+		WHERE token_hash = $1 AND revoked_at IS NULL`, tokenHash)
+	if err != nil {
+		return fmt.Errorf("revoke refresh token: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) ConsumeRefreshToken(ctx context.Context, tokenHash string) (string, error) {
 	var userID string
 	err := r.db.QueryRow(ctx, `UPDATE refresh_tokens
