@@ -5,7 +5,7 @@ COMPOSE     := docker compose -f deploy/docker-compose.yml --env-file .env
 # Every Go module listed in go.work
 GO_MODULES   = $(shell go list -m -f '{{.Dir}}')
 
-.PHONY: help proto up down test lint
+.PHONY: help proto up down test lint coverage
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -26,6 +26,9 @@ test: ## Run unit tests in every Go module in go.work
 		echo "==> $$d"; \
 		(cd $$d && go test -cover ./...) || exit 1; \
 	done
+
+coverage: ## Fail if a core service's domain+app coverage is below 80%
+	@./scripts/coverage-gate.sh
 
 lint: ## Run golangci-lint in every Go module in go.work
 	@for d in $(GO_MODULES); do \

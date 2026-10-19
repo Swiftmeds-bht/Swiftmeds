@@ -79,6 +79,9 @@ jobs:
             echo "::endgroup::"
           done < <(go list -m -f '{{.Dir}}')
 
+      - name: Enforce coverage gate on core services
+        run: ./scripts/coverage-gate.sh
+
       - name: Upload coverage reports
         if: always()
         uses: actions/upload-artifact@v4

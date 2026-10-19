@@ -84,6 +84,7 @@ local PostgreSQL and RabbitMQ data volumes.
 ```bash
 make test               # unit tests in every Go module
 make lint               # golangci-lint in every Go module
+make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
 ```
 
 ### Adding a service
