@@ -14,10 +14,13 @@ func NewRouter(cfg Config, logger *slog.Logger) http.Handler {
 	})
 	mux.Handle("/api/v1/", http.NotFoundHandler())
 
+	// The first middleware is the outermost. Recover sits inside Logging so a
+	// panic is logged as a 500 request, and outside CORS and the handlers.
 	return httpx.Chain(
 		mux,
 		httpx.RequestID,
 		httpx.Logging(logger),
+		httpx.Recover(logger),
 		httpx.CORS(cfg.CORSOrigins),
 	)
 }

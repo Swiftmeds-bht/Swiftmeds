@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const requestIDHeader = "X-Request-ID"
+const (
+	requestIDHeader = "X-Request-ID"
+	healthPath      = "/healthz"
+)
 
 type Middleware func(http.Handler) http.Handler
 
@@ -37,6 +40,10 @@ func Logging(logger *slog.Logger) Middleware {
 			start := time.Now()
 			recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(recorder, r)
+			// Docker calls /healthz every few seconds; only log it when it fails.
+			if r.URL.Path == healthPath && recorder.status == http.StatusOK {
+				return
+			}
 			logger.Info("http request",
 				"request_id", RequestIDFromContext(r.Context()),
 				"method", r.Method,
