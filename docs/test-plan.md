@@ -26,9 +26,15 @@ or reviewable test case.
 
 ### 1.2 Out of scope
 
-- Clinical advice, diagnosis, prescription validation, or dispensing decisions.
-- Payment processing and delivery logistics, which are not specified by the
-  current product baseline.
+Excluded by the project proposal (Section 2A), so not tested:
+
+- Online payment, checkout, and home delivery; SwiftMed shows availability only.
+- Uploading or storing prescriptions; pharmacists check prescriptions at the counter.
+- Controlled and restricted medicines. The only test here is that they never
+  appear in search or substitution results (TC-021).
+- Clinical advice, diagnosis, or dispensing decisions.
+- Automatic integration with pharmacy point-of-sale systems.
+- Native Android or iOS applications.
 - Benchmarking infrastructure unrelated to SwiftMed's gateway, services,
   databases, queues, and web applications.
 
@@ -51,15 +57,23 @@ or reviewable test case.
 - **Equivalence partitioning:** valid/invalid medicine names, molecule and
   strength formats, coordinates, radius, stock quantities, user roles, token
   states, pharmacy status, and notification channels.
-- **Boundary-value analysis:** zero/negative/maximum radius, empty and maximum
-  result sets, stock `0/1/max`, hold duration at just before/at/just after
-  expiry, freshness thresholds, pagination limits, and k6 rate thresholds.
+- **Boundary-value analysis:** use the limits fixed in the `.proto` contracts:
+  search radius 499/500/50000/50001 m (0 means the 5000 m default), hold
+  quantity 0/1/5/6, stock `0/1/max`, password length 7/8/72/73 bytes, gateway
+  port 0/1/65535/65536, hold duration just before/at/just after expiry,
+  freshness and trust scores at 0.0 and 1.0, empty and maximum result sets, and
+  k6 rate thresholds.
 - **Decision tables:** reservation eligibility (verified pharmacy, available
   stock, active user, duplicate hold, and concurrent requests), search ranking
   tie-breakers, substitution matching, and notification eligibility.
-- **State-transition testing:** stock confirmed/stale/expired, hold
-  pending/confirmed/collected/expired/cancelled, user authenticated/expired/
-  unauthorized, and watchlist inactive/triggered/delivered.
+- **State-transition testing:** the hold lifecycle in `holds.proto`:
+  PENDING→ACTIVE (stock reserved), PENDING→REJECTED (stock unavailable),
+  ACTIVE→COLLECTED/CANCELLED/EXPIRED; terminal states accept no further
+  transition. Refresh tokens: issued→rotated or revoked (Logout), never reusable.
+  Watchlist subscriptions: subscribed→notified (`notified_at` set, fires once)
+  or unsubscribed. Freshness is not a state machine; it is a score that decays
+  from 1.0 with age and resets on confirmation, so test it with boundary
+  values instead.
 - **Pairwise combinations:** role, stock state, pharmacy verification,
   freshness, network outcome, and notification channel where exhaustive
   combinations are disproportionate.
@@ -86,7 +100,9 @@ or reviewable test case.
 
 | Concern | Tool/process |
 |---|---|
-| Go unit and integration tests | `go test ./...` per Go module; repository `make test` |
+| Go unit tests | `go test ./...` per Go module; repository `make test` (CI runs every module with `GOWORK=off`) |
+| Go integration tests | Build tag `integration` and a live dependency from `make up`, e.g. `POSTGRES_URL=... go test -tags integration ./migrate/` (pkg/migrate) and `RABBITMQ_URL=amqp://swiftmed:change-me@localhost:5672/ go test -run Integration ./messaging/` (pkg/messaging). Without the variable the test is skipped, not failed |
+| Coverage gate | `make coverage`: domain and app packages of the core services must reach 80% (CI runs the same script) |
 | Static quality gate | `make lint` and the CI configuration |
 | Service dependencies | Docker Compose with Postgres, RabbitMQ, and Traefik |
 | Browser E2E and fixtures | Cypress; scenarios under `tests/e2e` and `tests/features` |
@@ -147,7 +163,7 @@ failure into a pass.
 | Critical state transitions | 100% of legal transitions and representative illegal transitions |
 | Critical user journeys | 100% pass in Chromium and the supported responsive viewport set |
 | Accessibility | No critical or serious axe violations; all critical journeys keyboard-completable |
-| Load | No threshold breach for p95 latency, error rate, throughput, or queue lag defined by the release profile |
+| Load | Search: p95 below 2 s at 100 concurrent users (proposal objective 4), error rate below 1%. Reservation: no oversell and p95 below 2 s at the same load |
 | Mutation | No surviving mutant in a core safety or reservation rule without a documented waiver |
 | Traceability | 100% of formal SRS requirements mapped to at least one test case |
 
@@ -183,7 +199,7 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | SRS-F-18 | Analytics and feedback record the agreed pharmacy accuracy and user feedback data without changing the ranking inputs outside their defined rules. | TC-033 | IT, UAT | P1 |
 | SRS-NFR-01 | Core reservation and inventory operations preserve atomicity, consistency, and non-negative stock across retries and failures. | TC-012, TC-013, TC-031 | UT, IT, Mutation | P0 |
 | SRS-NFR-02 | The system remains observable through structured logs, correlation IDs, event outcomes, and actionable errors. | TC-034 | IT, UAT | P0 |
-| SRS-NFR-03 | Critical gateway and search flows meet the release k6 latency, throughput, error-rate, and queue-lag thresholds. | TC-035, TC-036 | LT | P0 |
+| SRS-NFR-03 | Search returns within 2 s for 95% of requests at 100 concurrent users, and reservations stay correct at the same load. | TC-035, TC-036 | LT | P0 |
 | SRS-NFR-04 | Patient and pharmacy web journeys meet WCAG-oriented keyboard, focus, naming, contrast, and status-announcement checks. | TC-037, TC-038 | AT, E2E | P0 |
 | SRS-NFR-05 | Public contracts, migrations, and generated protobuf code remain backward compatible for supported clients and services. | TC-039 | Contract, IT, Regression | P1 |
 | SRS-NFR-06 | Test environments isolate data, use non-production credentials, and never expose secrets or real patient data. | TC-040 | IT, UAT, Review | P0 |
@@ -194,15 +210,15 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 |---|---|---|
 | TC-001 | Valid product search | Matching product and strength are returned |
 | TC-002 | Molecule/strength equivalence | Equivalent molecule search returns intended catalog entries |
-| TC-003 | Verified pharmacy availability | Unverified, closed, and zero-stock pharmacies are excluded |
+| TC-003 | Verified pharmacy availability | Pending, rejected, suspended, and zero-stock pharmacies are excluded |
 | TC-004 | Search result freshness | Freshness and availability reflect persisted confirmation time |
-| TC-005 | Radius partitions | Empty, negative, zero, normal, and maximum radius are handled |
-| TC-006 | Search input validation | Malformed coordinates, strength, and pagination return documented errors |
+| TC-005 | Radius partitions | 0 uses the 5000 m default; 499 and 50001 are rejected; 500 and 50000 are accepted; negative is rejected |
+| TC-006 | Search input validation | Empty query, out-of-range coordinates, and `max_offers` below 0 return `INVALID_ARGUMENT` |
 | TC-007 | Ranking decision table | Distance, freshness, accuracy, and price tie-breakers are deterministic |
 | TC-008 | Paid-placement invariant | No non-approved field or flag changes ranking order |
 | TC-009 | Result details | Pharmacy, stock, price, distance, and freshness are visible and consistent |
-| TC-010 | Create hold | Eligible stock decreases/reserves and a unique pickup code is issued |
-| TC-011 | Hold boundary duration | Before, at, and after expiry have the specified outcome |
+| TC-010 | Create hold | Quantity 1–5 accepted, 0 and 6 rejected; stock is reserved and a unique pickup code is issued once the hold is ACTIVE |
+| TC-011 | Hold boundary duration | With an injected clock (`RunSweep.as_of`): just before expiry stays ACTIVE, at and after expiry becomes EXPIRED |
 | TC-012 | Concurrent holds | Inventory never goes below zero and only eligible requests succeed |
 | TC-013 | Idempotent hold retry | Replayed request/event does not create a second hold or deduction |
 | TC-014 | Collect with code | Valid code collects once; invalid, reused, and unauthorized codes fail |
@@ -218,7 +234,7 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | TC-024 | Return-stock notification | Eligible watcher receives one notification and retries are safe |
 | TC-025 | Pharmacy verification | Registry status gates listing and stock operations |
 | TC-026 | Pharmacy dashboard stock | Authorized dashboard user can add/update/remove stock |
-| TC-027 | Authentication states | Valid, expired, missing, malformed, and revoked tokens behave correctly |
+| TC-027 | Authentication states | Valid, expired, malformed, tampered, wrong-type, wrong-issuer, and revoked (rotated or logged out) tokens behave correctly; password length 7/8/72/73; a database outage is `INTERNAL`, never `UNAUTHENTICATED` |
 | TC-028 | Role authorization | Patient, pharmacy, and unauthenticated callers receive least-privilege access |
 | TC-029 | Gateway validation | REST input, status codes, error body, and correlation ID are correct |
 | TC-030 | Gateway gRPC mapping | Correct method, timeout, and downstream error translation are verified |
@@ -232,6 +248,25 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | TC-038 | Pharmacy accessibility | Dashboard critical paths pass the same accessibility checks |
 | TC-039 | Contract compatibility | Existing clients tolerate additive changes and migrations are safe |
 | TC-040 | Test-data hygiene | No real secrets/patient data enter fixtures, logs, or artifacts |
+
+### 7.2 Automation status at the end of Sprint 1
+
+Only Gateway, Auth, and Pricing exist as running services so far. Everything
+not listed is planned for the sprint that builds the service. The TC-027 to
+TC-029 rows include the Sprint 1 cleanup (SCRUM-106 auth, SCRUM-107 gateway),
+and `make coverage` comes from SCRUM-89.
+
+| Test case / area | Automated now | Where |
+|---|---|---|
+| TC-027 Authentication states | Yes (UT) | `services/auth/internal/{domain,app,adapters/grpc}` |
+| TC-028 Role authorization | Partly (UT: role mapping, admin self-registration blocked) | `services/auth/internal/adapters/grpc` |
+| TC-029 Gateway validation | Partly (UT: config, request ID, CORS, panic → 500) | `services/gateway/internal/{app,httpx}` |
+| TC-030 Gateway gRPC mapping | Partly (UT: gRPC → HTTP status mapping, client factory) | `services/gateway/internal/{httpx,grpcx}` |
+| TC-031 Saga retry / duplicates | Partly (UT: consumer dedupe, retry, dead-letter) | `pkg/messaging` |
+| TC-032 RabbitMQ contract | Partly (IT: publish and consume a real event) | `pkg/messaging` (integration) |
+| TC-039 Migration safety | Yes (IT: ordered, once only, rollback on failure, concurrent replicas) | `pkg/migrate` (integration) |
+| Resilience patterns | Yes (UT: breaker, retry with backoff, timeout, bulkhead) | `pkg/resilience` |
+| Pricing rules | Yes (UT: price boundaries 0/1, all-or-nothing updates) | `services/pricing/internal` |
 
 ## 8. Risk-based integration order
 
