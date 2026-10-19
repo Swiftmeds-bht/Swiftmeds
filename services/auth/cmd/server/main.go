@@ -3,20 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/migrate"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/auth/internal/adapters/grpc"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/auth/internal/adapters/postgres"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/auth/internal/app"
+	"github.com/Swiftmeds-bht/Swiftmeds/services/auth/migrations"
 )
 
 const (
@@ -48,18 +52,28 @@ func run() error {
 		return fmt.Errorf("config: %w", err)
 	}
 
+	log := logger.New(serviceName, logLevel)
+
 	db, err := pgxpool.New(context.Background(), databaseURL)
 	if err != nil {
 		return fmt.Errorf("postgres: %w", err)
 	}
 	defer db.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := db.Ping(ctx); err != nil {
 		return fmt.Errorf("postgres ping: %w", err)
 	}
 
-	log := logger.New(serviceName, logLevel)
+	// Bring auth_db up to date before serving any request.
+	sqlDB := stdlib.OpenDBFromPool(db)
+	defer func() { _ = sqlDB.Close() }()
+	applied, err := migrate.Up(ctx, sqlDB, migrations.FS)
+	if err != nil {
+		return fmt.Errorf("migrations: %w", err)
+	}
+	log.Info("database migrations up to date", slog.Int("applied", len(applied)), slog.Any("versions", applied))
+
 	signalCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

@@ -9,6 +9,28 @@ import (
 
 var ErrEmptyEventID = errors.New("event ID is empty")
 
+// DedupSchema creates the table PostgresDeduper reads and writes.
+const DedupSchema = `CREATE TABLE IF NOT EXISTS swiftmed_processed_events (
+	event_id     TEXT PRIMARY KEY,
+	processed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`
+
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// EnsureSchema creates the deduplication table in the consuming service's own
+// database. Call it at startup, before NewPostgresDeduper. It is idempotent.
+func EnsureSchema(ctx context.Context, db execer) error {
+	if db == nil {
+		return errors.New("database is nil")
+	}
+	if _, err := db.ExecContext(ctx, DedupSchema); err != nil {
+		return fmt.Errorf("create deduplication table: %w", err)
+	}
+	return nil
+}
+
 // Deduper tracks event IDs that have been processed.
 type Deduper interface {
 	IsProcessed(ctx context.Context, eventID string) (bool, error)
