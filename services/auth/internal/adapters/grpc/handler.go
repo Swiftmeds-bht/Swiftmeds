@@ -63,6 +63,13 @@ func (h *Handler) ValidateToken(ctx context.Context, req *authv1.ValidateTokenRe
 	}, nil
 }
 
+func (h *Handler) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
+	if err := h.svc.Logout(ctx, req.GetRefreshToken()); err != nil {
+		return nil, toStatus(err)
+	}
+	return &authv1.LogoutResponse{}, nil
+}
+
 func fromProtoRole(role authv1.Role) (domain.Role, bool) {
 	switch role {
 	case authv1.Role_ROLE_PATIENT:

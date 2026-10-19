@@ -14,9 +14,15 @@ const (
 	RoleAdmin      Role = "ADMIN"
 )
 
+const (
+	MinPasswordLength = 8
+	// MaxPasswordLength is bcrypt's limit: it rejects longer inputs (in bytes).
+	MaxPasswordLength = 72
+)
+
 var (
 	ErrInvalidEmail       = errors.New("email is required and must be valid")
-	ErrInvalidPassword    = errors.New("password must be at least 8 characters")
+	ErrInvalidPassword    = errors.New("password must be between 8 and 72 bytes")
 	ErrInvalidRole        = errors.New("role is invalid")
 	ErrAdminRegistration  = errors.New("admin accounts cannot self-register")
 	ErrInvalidCredentials = errors.New("invalid credentials")
@@ -49,7 +55,7 @@ func ValidateRegistration(email, password string, role Role) error {
 	if !ValidEmail(email) {
 		return ErrInvalidEmail
 	}
-	if len(password) < 8 {
+	if len(password) < MinPasswordLength || len(password) > MaxPasswordLength {
 		return ErrInvalidPassword
 	}
 	if role != RolePatient && role != RolePharmacist {
