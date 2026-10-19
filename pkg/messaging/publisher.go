@@ -52,7 +52,7 @@ func (p *Publisher) Publish(ctx context.Context, routingKey string, event proto.
 		return errors.New("event is nil")
 	}
 	value := reflect.ValueOf(event)
-	if value.Kind() == reflect.Ptr && value.IsNil() {
+	if value.Kind() == reflect.Pointer && value.IsNil() {
 		return errors.New("event is nil")
 	}
 	if strings.TrimSpace(routingKey) == "" {
