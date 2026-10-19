@@ -1,13 +1,23 @@
 module github.com/Swiftmeds-bht/Swiftmeds/services/gateway
 
-go 1.25
-
-require google.golang.org/grpc v1.75.0
+go 1.25.0
 
 require (
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	github.com/Swiftmeds-bht/Swiftmeds/pkg v0.0.0
+	google.golang.org/grpc v1.84.0
+)
+
+require (
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
+)
+
+// Shared modules live in this repo, not on a module proxy. These make
+// `go mod tidy` and the Docker build (GOWORK=off) find them locally.
+replace (
+	github.com/Swiftmeds-bht/Swiftmeds/pkg => ../../pkg
+	github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go => ../../proto/gen/go
 )
