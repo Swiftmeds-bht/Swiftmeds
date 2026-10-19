@@ -33,19 +33,19 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     restart: unless-stopped
-    # No RABBITMQ_DEFAULT_USER/PASS: RabbitMQ ignores them when definitions are
-    # loaded at boot. The swiftmed user (password change-me) is defined in
-    # rabbitmq/definitions.json instead.
+    # The broker user comes from .env. No definitions file is loaded at boot
+    # (that would make RabbitMQ skip creating this user); pkg/messaging declares
+    # the swiftmed.events exchange and the queues itself.
+    # The user is created only when the volume is new: after changing the
+    # password, run `docker compose -f deploy/docker-compose.yml down -v`.
     environment:
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: >-
-        -rabbitmq_management load_definitions
-        "/etc/rabbitmq/definitions.json"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-swiftmed}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-me}
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
