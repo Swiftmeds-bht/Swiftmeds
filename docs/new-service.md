@@ -92,6 +92,33 @@ set `EXPOSE` to your port. Build from the **repo root**:
 docker build -f services/<name>/Dockerfile -t swiftmed/<name> .
 ```
 
+## 5b. Database migrations (services with a database)
+
+Put SQL files in `services/<name>/migrations/` as `001_create_x.up.sql`,
+`002_add_y.up.sql`, ... (zero-padded so they sort in order) and embed them:
+
+```go
+// services/<name>/migrations/migrations.go
+package migrations
+
+import "embed"
+
+//go:embed *.sql
+var FS embed.FS
+```
+
+Apply them in `main.go` after connecting and before serving (see `services/auth`):
+
+```go
+sqlDB := stdlib.OpenDBFromPool(pool)          // github.com/jackc/pgx/v5/stdlib
+applied, err := migrate.Up(ctx, sqlDB, migrations.FS)
+```
+
+Each file runs once, in a transaction, and is recorded in `schema_migrations`. Never
+edit a migration that has been merged; add a new one. If the service consumes
+RabbitMQ events, also call `messaging.EnsureSchema(ctx, sqlDB)` to create the
+deduplication table in its own database.
+
 ## 6. Check before opening the PR
 
 - [ ] `make test` passes, and the domain and app layers have tests
@@ -107,6 +134,6 @@ docker build -f services/<name>/Dockerfile -t swiftmed/<name> .
 | `pkg/config` | Reading env vars: `String`, `Required`, `Int`, `Bool`, `Duration`, then `Err()` |
 | `pkg/logger` | `logger.New("<name>", level)`: JSON logs with a `service` field |
 | `pkg/grpcx` | `NewServer` (logging + panic recovery + health + reflection), `Serve` (graceful shutdown on SIGTERM), `CheckHealth` (for the `healthcheck` sub-command) |
-
-Coming later: `pkg/messaging` (RabbitMQ), `pkg/resilience` (circuit breaker, retry,
-timeout, bulkhead) and `pkg/auth` (JWT).
+| `pkg/migrate` | `Up(ctx, db, migrations.FS)`: apply the service's embedded `*.up.sql` files at startup |
+| `pkg/messaging` | RabbitMQ `Publisher`/`Consumer` with dedup; `EnsureSchema` creates the dedup table |
+| `pkg/resilience` | Circuit breaker, retry with backoff, timeout, bulkhead |
