@@ -71,6 +71,50 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  # --- gRPC services -------------------------------------------------------
+  # Not published on the host. Traefik's "grpc" entrypoint (:50051) routes each
+  # call by its :authority, which the gateway sets to the service name
+  # (services/gateway/internal/grpcx), so Host(`auth`) selects this service.
+  # scheme=h2c: the services speak plaintext HTTP/2 (gRPC without TLS).
+
+  auth:
+    build:
+      context: ..
+      dockerfile: services/auth/Dockerfile
+    restart: unless-stopped
+    environment:
+      AUTH_GRPC_PORT: ${AUTH_GRPC_PORT:-50051}
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:?set AUTH_DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_ISSUER: ${JWT_ISSUER:-swiftmed}
+      JWT_TTL: ${JWT_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-720h}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.auth.rule=Host(`auth`)
+      - traefik.http.routers.auth.entrypoints=grpc
+      - traefik.http.services.auth.loadbalancer.server.port=${AUTH_GRPC_PORT:-50051}
+      - traefik.http.services.auth.loadbalancer.server.scheme=h2c
+
+  pricing:
+    build:
+      context: ..
+      dockerfile: services/pricing/Dockerfile
+    restart: unless-stopped
+    environment:
+      PRICING_GRPC_PORT: ${PRICING_GRPC_PORT:-50063}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pricing.rule=Host(`pricing`)
+      - traefik.http.routers.pricing.entrypoints=grpc
+      - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
+      - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
+
 volumes:
   postgres_data:
   rabbitmq_data:
