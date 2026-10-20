@@ -1,0 +1,23 @@
+# Traefik static configuration.
+#
+# Loaded with --configFile (see deploy/docker-compose.yml). When a config file is
+# used, Traefik ignores all other CLI flags, so every static setting must be here.
+
+entryPoints:
+  # gRPC traffic from the gateway to the services.
+  grpc:
+    address: ":50051"
+  # Dashboard and API. Published on host port ${TRAEFIK_DASHBOARD_PORT:-8081}.
+  traefik:
+    address: ":8081"
+
+api:
+  dashboard: true
+  # Serves the dashboard without auth on the "traefik" entrypoint. Local dev only.
+  insecure: true
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    # Services must opt in with the label traefik.enable=true.
+    exposedByDefault: false
