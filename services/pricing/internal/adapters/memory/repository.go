@@ -1,5 +1,5 @@
-// Package memory is an in-memory PriceRepository.
-// It keeps the template runnable without a database; the postgres adapter replaces it.
+// Package memory is an in-memory PriceRepository, used in tests and for
+// running the service without a database.
 package memory
 
 import (
@@ -36,7 +36,12 @@ func (r *Repository) GetMany(_ context.Context, keys []domain.Key) ([]domain.Pri
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	out := make([]domain.Price, 0, len(keys))
+	seen := make(map[domain.Key]bool, len(keys))
 	for _, k := range keys {
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
 		if p, ok := r.prices[k]; ok {
 			out = append(out, p)
 		}

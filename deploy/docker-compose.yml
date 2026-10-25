@@ -107,7 +107,11 @@ services:
     restart: unless-stopped
     environment:
       PRICING_GRPC_PORT: ${PRICING_GRPC_PORT:-50063}
+      PRICING_DATABASE_URL: ${PRICING_DATABASE_URL:?set PRICING_DATABASE_URL in .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.pricing.rule=Host(`pricing`)
