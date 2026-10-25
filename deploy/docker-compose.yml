@@ -115,6 +115,25 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  geo:
+    build:
+      context: ..
+      dockerfile: services/geo/Dockerfile
+    restart: unless-stopped
+    environment:
+      GEO_GRPC_PORT: ${GEO_GRPC_PORT:-50062}
+      GEO_DATABASE_URL: ${GEO_DATABASE_URL:?set GEO_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.geo.rule=Host(`geo`)
+      - traefik.http.routers.geo.entrypoints=grpc
+      - traefik.http.services.geo.loadbalancer.server.port=${GEO_GRPC_PORT:-50062}
+      - traefik.http.services.geo.loadbalancer.server.scheme=h2c
+
 volumes:
   postgres_data:
   rabbitmq_data:
