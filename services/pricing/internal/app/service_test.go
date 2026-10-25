@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ type fakeRepo struct {
 	saved   []domain.Price
 	stored  []domain.Price
 	saveErr error
+	getErr  error
 }
 
 func (f *fakeRepo) SaveAll(_ context.Context, prices []domain.Price) error {
@@ -29,6 +31,9 @@ func (f *fakeRepo) SaveAll(_ context.Context, prices []domain.Price) error {
 }
 
 func (f *fakeRepo) GetMany(_ context.Context, _ []domain.Key) ([]domain.Price, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
 	return f.stored, nil
 }
 
@@ -73,6 +78,35 @@ func TestSetPricesWrapsRepositoryErrors(t *testing.T) {
 
 	_, err := svc.SetPrices(context.Background(), "ph-1", []Update{{ProductID: "pr-1", AmountChhertum: 1}})
 	if !errors.Is(err, dbDown) {
+		t.Fatalf("err = %v, want wrapped db error", err)
+	}
+}
+
+func TestBatchGetPricesReturnsCheapestFirst(t *testing.T) {
+	at := func(pharmacy string, amount int64) domain.Price {
+		return domain.Price{Key: domain.Key{PharmacyID: pharmacy, ProductID: "pr-1"}, AmountChhertum: amount}
+	}
+	// The repository returns them in arbitrary order.
+	svc := NewService(&fakeRepo{stored: []domain.Price{at("ph-3", 900), at("ph-1", 450), at("ph-2", 450)}}, clock)
+
+	got, err := svc.BatchGetPrices(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for _, p := range got {
+		order = append(order, p.PharmacyID)
+	}
+	if want := []string{"ph-1", "ph-2", "ph-3"}; strings.Join(order, ",") != strings.Join(want, ",") {
+		t.Errorf("order = %v, want %v (cheapest first, tie by pharmacy ID)", order, want)
+	}
+}
+
+func TestBatchGetPricesWrapsRepositoryErrors(t *testing.T) {
+	dbDown := errors.New("db down")
+	svc := NewService(&fakeRepo{getErr: dbDown}, clock)
+
+	if _, err := svc.BatchGetPrices(context.Background(), nil); !errors.Is(err, dbDown) {
 		t.Fatalf("err = %v, want wrapped db error", err)
 	}
 }
