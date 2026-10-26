@@ -119,6 +119,25 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  user-profile:
+    build:
+      context: ..
+      dockerfile: services/user-profile/Dockerfile
+    restart: unless-stopped
+    environment:
+      USER_PROFILE_GRPC_PORT: ${USER_PROFILE_GRPC_PORT:-50052}
+      USER_PROFILE_DATABASE_URL: ${USER_PROFILE_DATABASE_URL:?set USER_PROFILE_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.user-profile.rule=Host(`user-profile`)
+      - traefik.http.routers.user-profile.entrypoints=grpc
+      - traefik.http.services.user-profile.loadbalancer.server.port=${USER_PROFILE_GRPC_PORT:-50052}
+      - traefik.http.services.user-profile.loadbalancer.server.scheme=h2c
+
   geo:
     build:
       context: ..
