@@ -78,7 +78,7 @@ func (p *Publisher) publish(
 	event proto.Message,
 ) error {
 	if p == nil || p.publisher == nil {
-		return errors.New("Inventory RabbitMQ publisher is nil")
+		return errors.New("inventory RabbitMQ publisher is nil")
 	}
 	if err := p.publisher.Publish(ctx, routingKey, event); err != nil {
 		return fmt.Errorf("publish %s: %w", routingKey, err)
