@@ -154,22 +154,37 @@ func run() error {
 		runtimeErrors <- holdConsumer.Start(ctx)
 	}()
 
+	return waitForRuntime(ctx, stop, runtimeErrors)
+}
+
+func waitForRuntime(
+	ctx context.Context,
+	stop context.CancelFunc,
+	runtimeErrors <-chan error,
+) error {
 	firstErr := <-runtimeErrors
 	if ctx.Err() != nil {
 		stop()
-		<-runtimeErrors
+		secondErr := <-runtimeErrors
+
+		if firstErr != nil && !errors.Is(firstErr, context.Canceled) {
+			return fmt.Errorf("inventory runtime shutdown: %w", firstErr)
+		}
+		if secondErr != nil && !errors.Is(secondErr, context.Canceled) {
+			return fmt.Errorf("inventory runtime shutdown: %w", secondErr)
+		}
 		return nil
 	}
 
 	stop()
 	secondErr := <-runtimeErrors
 	if firstErr != nil {
-		return fmt.Errorf("Inventory runtime: %w", firstErr)
+		return fmt.Errorf("inventory runtime: %w", firstErr)
 	}
 	if secondErr != nil {
-		return fmt.Errorf("Inventory runtime: %w", secondErr)
+		return fmt.Errorf("inventory runtime: %w", secondErr)
 	}
-	return errors.New("Inventory runtime stopped unexpectedly")
+	return errors.New("inventory runtime stopped unexpectedly")
 }
 
 func healthcheck() int {
