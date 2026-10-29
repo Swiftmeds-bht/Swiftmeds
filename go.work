@@ -7,6 +7,5 @@ use (
 	./services/auth
 	./services/pricing
 	./services/geo
-	// Add each service here as soon as it has a go.mod, e.g.:
-	// ./services/inventory
+	./services/inventory
 )
