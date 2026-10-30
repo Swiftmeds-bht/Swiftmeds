@@ -50,7 +50,7 @@ func TestWeightsValidate(t *testing.T) {
 	}{
 		{"sums to 1", Weights{0.25, 0.25, 0.25, 0.25}, true},
 		{"one factor only", Weights{1, 0, 0, 0}, true},
-		{"float rounding within tolerance", Weights{0.1, 0.2, 0.3, 0.4 + 1e-9}, true},
+		{"decimal weights with float rounding", Weights{0.1, 0.2, 0.3, 0.4}, true},
 		{"sums to slightly more than 1", Weights{0.25, 0.25, 0.25, 0.26}, false},
 		{"sums to slightly less than 1", Weights{0.25, 0.25, 0.25, 0.24}, false},
 		{"all zero", Weights{}, false},
@@ -108,6 +108,33 @@ func TestRankAcceptsBoundaryValues(t *testing.T) {
 	}
 	if _, err := Rank(edge, DefaultWeights); err != nil {
 		t.Fatalf("boundary values rejected: %v", err)
+	}
+}
+
+// Boundary values for the weight-sum tolerance. 1 ± 2^-20 and 1 ± 2^-19 are
+// exact in float64, so these sit precisely on and just past the boundary.
+func TestWeightSumToleranceBoundary(t *testing.T) {
+	cases := []struct {
+		name  string
+		total float64
+		ok    bool
+	}{
+		{"exactly 1", 1, true},
+		{"1 + tolerance (on the boundary)", 1 + WeightSumTolerance, true},
+		{"1 - tolerance (on the boundary)", 1 - WeightSumTolerance, true},
+		{"1 + 2×tolerance (past it)", 1 + 2*WeightSumTolerance, false},
+		{"1 - 2×tolerance (past it)", 1 - 2*WeightSumTolerance, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Weights{Distance: tc.total}.Validate()
+			if tc.ok && err != nil {
+				t.Errorf("sum %v rejected: %v", tc.total, err)
+			}
+			if !tc.ok && !errors.Is(err, ErrInvalidWeights) {
+				t.Errorf("sum %v accepted, want ErrInvalidWeights", tc.total)
+			}
+		})
 	}
 }
 

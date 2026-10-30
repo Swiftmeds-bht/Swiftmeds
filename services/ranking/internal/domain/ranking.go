@@ -20,8 +20,10 @@ import (
 // MaxCandidates bounds one request (Search sends at most a few hundred).
 const MaxCandidates = 1000
 
-// weightSumTolerance allows for floating-point error in weights such as 0.1+0.2+...
-const weightSumTolerance = 1e-6
+// WeightSumTolerance allows for floating-point error in weights such as
+// 0.1+0.2+... It is 2^-20 (about 9.5e-7), written as a hex float: an exact
+// binary fraction, so tests can put a sum exactly on the boundary.
+const WeightSumTolerance = 0x1p-20
 
 var (
 	ErrInvalidWeights    = errors.New("weights must be finite, non-negative and sum to 1")
@@ -45,7 +47,7 @@ func (w Weights) Validate() error {
 		}
 		sum += v
 	}
-	if math.Abs(sum-1) > weightSumTolerance {
+	if math.Abs(sum-1) > WeightSumTolerance {
 		return ErrInvalidWeights
 	}
 	return nil
@@ -65,21 +67,29 @@ type Candidate struct {
 	Quantity int32
 }
 
+// validate uses plain if statements rather than a tagless switch: Go's coverage
+// profile does not cover switch case expressions, so mutation testing could
+// not tell that these checks are tested.
 func (c Candidate) validate() error {
-	switch {
-	case c.PharmacyID == "":
+	if c.PharmacyID == "" {
 		return fmt.Errorf("%w: pharmacy_id is required", ErrInvalidCandidate)
-	case c.ProductID == "":
+	}
+	if c.ProductID == "" {
 		return fmt.Errorf("%w: product_id is required", ErrInvalidCandidate)
-	case c.DistanceM < 0:
+	}
+	if c.DistanceM < 0 {
 		return fmt.Errorf("%w: distance_m must not be negative", ErrInvalidCandidate)
-	case !unitInterval(c.Freshness):
+	}
+	if !unitInterval(c.Freshness) {
 		return fmt.Errorf("%w: freshness_score must be between 0 and 1", ErrInvalidCandidate)
-	case !unitInterval(c.Trust):
+	}
+	if !unitInterval(c.Trust) {
 		return fmt.Errorf("%w: trust_score must be between 0 and 1", ErrInvalidCandidate)
-	case c.PriceChhertum < 0:
+	}
+	if c.PriceChhertum < 0 {
 		return fmt.Errorf("%w: price_chhertum must not be negative", ErrInvalidCandidate)
-	case c.Quantity < 0:
+	}
+	if c.Quantity < 0 {
 		return fmt.Errorf("%w: quantity_available must not be negative", ErrInvalidCandidate)
 	}
 	return nil
