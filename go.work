@@ -9,4 +9,5 @@ use (
 	./services/geo
 	./services/inventory
 	./services/user-profile
+	./services/ranking
 )

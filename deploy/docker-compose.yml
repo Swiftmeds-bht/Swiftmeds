@@ -157,6 +157,26 @@ services:
       - traefik.http.services.geo.loadbalancer.server.port=${GEO_GRPC_PORT:-50062}
       - traefik.http.services.geo.loadbalancer.server.scheme=h2c
 
+  ranking:
+    build:
+      context: ..
+      dockerfile: services/ranking/Dockerfile
+    restart: unless-stopped
+    environment:
+      RANKING_GRPC_PORT: ${RANKING_GRPC_PORT:-50061}
+      # Optional: override the default weights (all four must sum to 1).
+      RANKING_WEIGHT_DISTANCE: ${RANKING_WEIGHT_DISTANCE:-}
+      RANKING_WEIGHT_FRESHNESS: ${RANKING_WEIGHT_FRESHNESS:-}
+      RANKING_WEIGHT_TRUST: ${RANKING_WEIGHT_TRUST:-}
+      RANKING_WEIGHT_PRICE: ${RANKING_WEIGHT_PRICE:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ranking.rule=Host(`ranking`)
+      - traefik.http.routers.ranking.entrypoints=grpc
+      - traefik.http.services.ranking.loadbalancer.server.port=${RANKING_GRPC_PORT:-50061}
+      - traefik.http.services.ranking.loadbalancer.server.scheme=h2c
+
 volumes:
   postgres_data:
   rabbitmq_data:
