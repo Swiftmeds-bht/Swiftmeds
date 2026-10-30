@@ -138,6 +138,29 @@ services:
       - traefik.http.services.user-profile.loadbalancer.server.port=${USER_PROFILE_GRPC_PORT:-50052}
       - traefik.http.services.user-profile.loadbalancer.server.scheme=h2c
 
+  inventory:
+    build:
+      context: ..
+      dockerfile: services/inventory/Dockerfile
+    restart: unless-stopped
+    environment:
+      INVENTORY_GRPC_PORT: ${INVENTORY_GRPC_PORT:-50056}
+      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL:?set INVENTORY_DATABASE_URL in .env}
+      # Inventory takes part in the reservation saga (hold.requested -> stock.reserved/unavailable).
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.inventory.rule=Host(`inventory`)
+      - traefik.http.routers.inventory.entrypoints=grpc
+      - traefik.http.services.inventory.loadbalancer.server.port=${INVENTORY_GRPC_PORT:-50056}
+      - traefik.http.services.inventory.loadbalancer.server.scheme=h2c
+
   geo:
     build:
       context: ..
