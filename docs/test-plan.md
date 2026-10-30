@@ -267,6 +267,35 @@ and `make coverage` comes from SCRUM-89.
 | TC-039 Migration safety | Yes (IT: ordered, once only, rollback on failure, concurrent replicas) | `pkg/migrate` (integration) |
 | Resilience patterns | Yes (UT: breaker, retry with backoff, timeout, bulkhead) | `pkg/resilience` |
 | Pricing rules | Yes (UT: price boundaries 0/1, all-or-nothing updates) | `services/pricing/internal` |
+| TC-007 Ranking decision table | Yes (UT: normalisation, median for unknown price, worked example, tie order) | `services/ranking/internal/domain` |
+| TC-008 Paid-placement invariant | Yes (UT: order independent of input order; improving any factor never lowers rank; out of stock never ranked) | `services/ranking/internal/domain` |
+
+### 7.3 Mutation testing results
+
+Run with [Gremlins](https://gremlins.dev) v0.5.0, all mutators enabled
+(`services/<name>/.gremlins.yaml`), from the service folder:
+`GOWORK=off gremlins unleash ./internal/domain`. *Efficacy* = killed ÷ (killed +
+lived); *mutant coverage* = mutants on tested code ÷ all mutants.
+
+| Package | Date | Killed | Lived | Not covered | Efficacy | Mutant coverage | Statement coverage |
+|---|---|---|---|---|---|---|---|
+| `services/ranking/internal/domain` (SCRUM-51) | 2026-10-30 | 55 | 0 | 0 | **100%** | **100%** | 100% |
+
+How the first run (46 killed, 1 lived, 8 not covered; 97.9% efficacy) was brought to 100%:
+
+- **Lived: `>` → `>=` in the weight-sum check.** No test sat exactly on the
+  tolerance, and with a decimal tolerance (1e-6) no float sum can. The tolerance is
+  now 2⁻²⁰, an exact binary fraction, and `TestWeightSumToleranceBoundary` checks
+  sums exactly on it (valid) and just past it (invalid).
+- **Not covered: the candidate checks.** They were `case` expressions in a tagless
+  `switch`, which Go's coverage profile does not record, so Gremlins could not see
+  that the tests reach them. The checks are now plain `if` statements; behaviour is
+  unchanged and every one is killed.
+- **Not covered: the tolerance constant.** Gremlins mutated the operators in
+  `1.0 / (1 << 20)`, which no coverage profile can include. It is now the literal
+  `0x1p-20` (the same value).
+
+Gate: `.gremlins.yaml` fails the run below 95% efficacy or 95% mutant coverage.
 
 ## 8. Risk-based integration order
 

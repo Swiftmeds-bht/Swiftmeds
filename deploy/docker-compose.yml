@@ -177,6 +177,27 @@ services:
       - traefik.http.services.ranking.loadbalancer.server.port=${RANKING_GRPC_PORT:-50061}
       - traefik.http.services.ranking.loadbalancer.server.scheme=h2c
 
+  search:
+    build:
+      context: ..
+      dockerfile: services/search/Dockerfile
+    restart: unless-stopped
+    environment:
+      SEARCH_GRPC_PORT: ${SEARCH_GRPC_PORT:-50060}
+      # Search calls every downstream service through Traefik.
+      SEARCH_UPSTREAM: traefik:50051
+      SEARCH_CALL_TIMEOUT: ${SEARCH_CALL_TIMEOUT:-800ms}
+      SEARCH_REQUEST_TIMEOUT: ${SEARCH_REQUEST_TIMEOUT:-2s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.search.rule=Host(`search`)
+      - traefik.http.routers.search.entrypoints=grpc
+      - traefik.http.services.search.loadbalancer.server.port=${SEARCH_GRPC_PORT:-50060}
+      - traefik.http.services.search.loadbalancer.server.scheme=h2c
+
 volumes:
   postgres_data:
   rabbitmq_data:

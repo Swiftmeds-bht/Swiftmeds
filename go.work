@@ -10,4 +10,5 @@ use (
 	./services/inventory
 	./services/user-profile
 	./services/ranking
+	./services/search
 )

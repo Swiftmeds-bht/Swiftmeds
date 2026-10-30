@@ -62,6 +62,11 @@ quantity, freshness/trust outside 0..1, invalid weights, more than 1000 candidat
 
 ```bash
 go test -cover ./...
-make coverage                      # core-service gate
-gremlins unleash ./internal/domain # mutation testing (SCRUM-51)
+make coverage                                  # core-service gate (from the repo root)
+GOWORK=off gremlins unleash ./internal/domain  # mutation testing, settings in .gremlins.yaml
 ```
+
+Mutation testing (SCRUM-51): all 55 mutants killed, 100% efficacy and 100% mutant
+coverage, with every Gremlins mutator enabled. Details and how the first run was
+improved: [docs/test-plan.md §7.3](../../docs/test-plan.md). Install Gremlins with
+`go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0`.
