@@ -1,0 +1,10 @@
+# Store and check out text files with LF line endings, whatever editor or OS
+# is used. Windows editors otherwise save CRLF, which makes every line of a
+# file look changed and blocks `git pull`.
+* text=auto eol=lf
+
+# Never touch binary files.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
