@@ -118,7 +118,6 @@ services:
       - traefik.http.routers.pricing.entrypoints=grpc
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
-
   user-profile:
     build:
       context: ..
@@ -221,6 +220,26 @@ services:
       - traefik.http.services.search.loadbalancer.server.port=${SEARCH_GRPC_PORT:-50060}
       - traefik.http.services.search.loadbalancer.server.scheme=h2c
 
+  freshness:
+    build:
+      context: ..
+      dockerfile: services/freshness/Dockerfile
+    restart: unless-stopped
+    environment:
+      FRESHNESS_GRPC_PORT: ${FRESHNESS_GRPC_PORT:-50069}
+      FRESHNESS_DATABASE_URL: ${FRESHNESS_DATABASE_URL:?set FRESHNESS_DATABASE_URL in .env}
+      FRESHNESS_HIGH_WITHIN: ${FRESHNESS_HIGH_WITHIN:-6h}
+      FRESHNESS_MEDIUM_WITHIN: ${FRESHNESS_MEDIUM_WITHIN:-24h}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.freshness.rule=Host(`freshness`)
+      - traefik.http.routers.freshness.entrypoints=grpc
+      - traefik.http.services.freshness.loadbalancer.server.port=${FRESHNESS_GRPC_PORT:-50069}
+      - traefik.http.services.freshness.loadbalancer.server.scheme=h2c
 volumes:
   postgres_data:
   rabbitmq_data:
