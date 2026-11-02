@@ -119,6 +119,25 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  catalog:
+    build:
+      context: ..
+      dockerfile: services/catalog/Dockerfile
+    restart: unless-stopped
+    environment:
+      CATALOG_GRPC_PORT: ${CATALOG_GRPC_PORT:-50055}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL:?set CATALOG_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.catalog.rule=Host(`catalog`)
+      - traefik.http.routers.catalog.entrypoints=grpc
+      - traefik.http.services.catalog.loadbalancer.server.port=${CATALOG_GRPC_PORT:-50055}
+      - traefik.http.services.catalog.loadbalancer.server.scheme=h2c
+
   user-profile:
     build:
       context: ..

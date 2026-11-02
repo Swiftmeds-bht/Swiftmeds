@@ -2,13 +2,14 @@ go 1.25.0
 
 use (
 	./pkg
-	./services/gateway
 	./proto/gen/go
 	./services/auth
-	./services/pricing
+	./services/catalog
+	./services/gateway
 	./services/geo
 	./services/inventory
-	./services/user-profile
+	./services/pricing
 	./services/ranking
 	./services/search
+	./services/user-profile
 )
