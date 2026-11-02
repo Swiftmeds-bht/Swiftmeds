@@ -6,9 +6,15 @@ use (
 	./proto/gen/go
 	./services/auth
 	./services/pricing
+<<<<<<< Updated upstream
 	./services/geo
 	./services/inventory
 	./services/user-profile
 	./services/ranking
 	./services/search
+=======
+	./services/freshness
+	// Add each service here as soon as it has a go.mod, e.g.:
+	// ./services/inventory
+>>>>>>> Stashed changes
 )
