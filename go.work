@@ -2,19 +2,15 @@ go 1.25.0
 
 use (
 	./pkg
-	./services/gateway
 	./proto/gen/go
 	./services/auth
-	./services/pricing
-<<<<<<< Updated upstream
+	./services/catalog
+	./services/freshness
+	./services/gateway
 	./services/geo
 	./services/inventory
-	./services/user-profile
+	./services/pricing
 	./services/ranking
 	./services/search
-=======
-	./services/freshness
-	// Add each service here as soon as it has a go.mod, e.g.:
-	// ./services/inventory
->>>>>>> Stashed changes
+	./services/user-profile
 )

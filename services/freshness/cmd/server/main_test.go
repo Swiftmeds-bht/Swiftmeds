@@ -133,7 +133,9 @@ func TestHealthcheck(t *testing.T) {
 	}
 
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Errorf("server returned an error after cancellation: %v", err)
+	}
 	if code := healthcheck(port); code != 1 {
 		t.Errorf("healthcheck of a stopped server = %d, want 1", code)
 	}

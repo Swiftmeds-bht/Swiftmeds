@@ -146,7 +146,9 @@ func TestConfirmationConfidenceIsRepeatable(t *testing.T) {
 	th := DefaultThresholds()
 	now := confirmedAt.Add(10 * time.Hour)
 
-	if c.Confidence(th, now) != c.Confidence(th, now) {
+	first := c.Confidence(th, now)
+	second := c.Confidence(th, now)
+	if first != second {
 		t.Error("same inputs gave different answers")
 	}
 }
