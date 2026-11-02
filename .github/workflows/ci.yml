@@ -73,9 +73,9 @@ jobs:
           done < <(go list -m -f '{{.Dir}}')
 
       - name: Run tests with coverage
+        env:
+          FRESHNESS_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/freshness_db?sslmode=disable"
         shell: bash
-         env:
-          FRESHNESS_TEST_DATABASE_URL: postgres://swiftmed:change-me@127.0.0.1:5432/freshness_db?sslmode=disable
         run: |
           set -euo pipefail
 
