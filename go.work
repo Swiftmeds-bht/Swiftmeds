@@ -12,5 +12,6 @@ use (
 	./services/pricing
 	./services/ranking
 	./services/search
+	./services/substitution
 	./services/user-profile
 )
