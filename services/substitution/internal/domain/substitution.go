@@ -32,7 +32,8 @@ type Substitute struct {
 }
 
 // BuildSubstitute excludes the source product, controlled products, and products
-// from another molecule. Strength or dosage-form differences require pharmacist review.
+// from another molecule. Prescription-only products and strength or dosage-form
+// differences require pharmacist review.
 func BuildSubstitute(source, candidate Product) (Substitute, bool) {
 	sourceID := strings.TrimSpace(source.ProductID)
 	candidateID := strings.TrimSpace(candidate.ProductID)
@@ -46,7 +47,9 @@ func BuildSubstitute(source, candidate Product) (Substitute, bool) {
 	}
 
 	matchType := MatchTypeNeedsPharmacistCheck
-	if normalize(source.Strength) == normalize(candidate.Strength) &&
+	if !source.RequiresPrescription &&
+		!candidate.RequiresPrescription &&
+		normalize(source.Strength) == normalize(candidate.Strength) &&
 		normalize(source.DosageForm) == normalize(candidate.DosageForm) {
 		matchType = MatchTypeExact
 	}

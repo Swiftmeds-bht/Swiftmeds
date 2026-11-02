@@ -5,12 +5,17 @@ Catalog. It does not own a database.
 
 ## Matching rules
 
-- Exclude the source product, controlled products, and products with a different molecule.
-- A candidate with the same normalized strength and dosage form is marked
-  `SUBSTITUTE_MATCH_TYPE_EXACT`.
-- A candidate with the same molecule but a different strength or dosage form is
-  marked `SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK`.
-- Exact matches are returned first.
+- Exclude the source product, controlled products, and products with a different
+  molecule.
+- Mark a candidate `SUBSTITUTE_MATCH_TYPE_EXACT` only when its molecule, normalized
+  strength, and dosage form match the source product and neither product is
+  prescription-only.
+- If either product is prescription-only, or the strength or dosage form differs,
+  mark the candidate `SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK`.
+- Return exact matches before candidates needing pharmacist review.
+
+These results classify suggestions. They do not authorize dispensing or replace
+a lawful prescription.
 
 ## API
 
@@ -31,8 +36,10 @@ Catalog calls go through Traefik with the `catalog` authority.
 
 ## Run and verify
 
-From the repository root, configure `.env` and start the Compose stack with
-`make up`. To run the service checks locally:
+Create a local `.env` from `.env.example` if needed, then start the Compose
+stack from the repository root with `make up`.
+
+Run the service checks with:
 
 ```bash
 cd services/substitution

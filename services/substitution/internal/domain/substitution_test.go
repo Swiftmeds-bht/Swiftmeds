@@ -55,6 +55,37 @@ func TestBuildSubstitute(t *testing.T) {
 			wantMatch: MatchTypeNeedsPharmacistCheck,
 		},
 		{
+			name: "prescription-only source needs pharmacist check",
+			source: Product{
+				ProductID:            "source",
+				MoleculeID:           "molecule-1",
+				Strength:             "500mg",
+				DosageForm:           "DOSAGE_FORM_TABLET",
+				RequiresPrescription: true,
+			},
+			candidate: Product{
+				ProductID:  "candidate",
+				MoleculeID: "molecule-1",
+				Strength:   "500mg",
+				DosageForm: "DOSAGE_FORM_TABLET",
+			},
+			wantOK:    true,
+			wantMatch: MatchTypeNeedsPharmacistCheck,
+		},
+		{
+			name:   "prescription-only candidate needs pharmacist check",
+			source: source,
+			candidate: Product{
+				ProductID:            "candidate",
+				MoleculeID:           "molecule-1",
+				Strength:             "500mg",
+				DosageForm:           "DOSAGE_FORM_TABLET",
+				RequiresPrescription: true,
+			},
+			wantOK:    true,
+			wantMatch: MatchTypeNeedsPharmacistCheck,
+		},
+		{
 			name:   "different molecule is excluded",
 			source: source,
 			candidate: Product{
