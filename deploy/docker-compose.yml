@@ -138,6 +138,24 @@ services:
       - traefik.http.services.catalog.loadbalancer.server.port=${CATALOG_GRPC_PORT:-50055}
       - traefik.http.services.catalog.loadbalancer.server.scheme=h2c
 
+  substitution:
+    build:
+      context: ..
+      dockerfile: services/substitution/Dockerfile
+    restart: unless-stopped
+    environment:
+      SUBSTITUTION_GRPC_PORT: ${SUBSTITUTION_GRPC_PORT:-50058}
+      SUBSTITUTION_UPSTREAM: traefik:50051
+      SUBSTITUTION_CALL_TIMEOUT: ${SUBSTITUTION_CALL_TIMEOUT:-800ms}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.substitution.rule=Host(`substitution`)
+      - traefik.http.routers.substitution.entrypoints=grpc
+      - traefik.http.services.substitution.loadbalancer.server.port=${SUBSTITUTION_GRPC_PORT:-50058}
+      - traefik.http.services.substitution.loadbalancer.server.scheme=h2c
   user-profile:
     build:
       context: ..
