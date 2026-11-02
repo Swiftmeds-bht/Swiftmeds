@@ -119,6 +119,28 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  stock-sync:
+    build:
+      context: ..
+      dockerfile: services/stock-sync/Dockerfile
+    restart: unless-stopped
+    environment:
+      STOCK_SYNC_GRPC_PORT: ${STOCK_SYNC_GRPC_PORT:-50057}
+      STOCK_SYNC_DATABASE_URL: ${STOCK_SYNC_DATABASE_URL:?set STOCK_SYNC_DATABASE_URL in .env}
+      STOCK_SYNC_UPSTREAM: ${STOCK_SYNC_UPSTREAM:-traefik:50051}
+      STOCK_SYNC_CALL_TIMEOUT: ${STOCK_SYNC_CALL_TIMEOUT:-800ms}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.stock-sync.rule=Host(`stock-sync`)
+      - traefik.http.routers.stock-sync.entrypoints=grpc
+      - traefik.http.services.stock-sync.loadbalancer.server.port=${STOCK_SYNC_GRPC_PORT:-50057}
+      - traefik.http.services.stock-sync.loadbalancer.server.scheme=h2c
   catalog:
     build:
       context: ..
@@ -137,7 +159,6 @@ services:
       - traefik.http.routers.catalog.entrypoints=grpc
       - traefik.http.services.catalog.loadbalancer.server.port=${CATALOG_GRPC_PORT:-50055}
       - traefik.http.services.catalog.loadbalancer.server.scheme=h2c
-
   substitution:
     build:
       context: ..

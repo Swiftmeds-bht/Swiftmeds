@@ -12,6 +12,7 @@ use (
 	./services/pricing
 	./services/ranking
 	./services/search
+	./services/stock-sync
 	./services/substitution
 	./services/user-profile
 )
