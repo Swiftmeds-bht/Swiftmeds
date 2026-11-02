@@ -16,6 +16,20 @@ jobs:
   ci:
     name: Go checks
     runs-on: ubuntu-latest
+      services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: swiftmed
+          POSTGRES_PASSWORD: change-me
+          POSTGRES_DB: freshness_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U swiftmed -d freshness_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out repository
@@ -59,6 +73,8 @@ jobs:
 
       - name: Run tests with coverage
         shell: bash
+         env:
+          FRESHNESS_TEST_DATABASE_URL: postgres://swiftmed:change-me@127.0.0.1:5432/freshness_db?sslmode=disable
         run: |
           set -euo pipefail
 
