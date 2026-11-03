@@ -8,6 +8,7 @@ use (
 	./services/freshness
 	./services/gateway
 	./services/geo
+	./services/holds
 	./services/inventory
 	./services/pricing
 	./services/ranking
