@@ -41,15 +41,17 @@ a { color: var(--primary); }
 .site-footer { border-top: 1px solid var(--border); margin-top: 2rem; }
 
 .lead { font-size: 1.1rem; }
-.muted { color: var(--muted); margin: 0.15rem 0; }
+.muted { color: var(--muted); margin: 0.15rem 0; overflow-wrap: anywhere; }
 .hint { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; }
 .empty { padding: 1rem; background: var(--surface); border-radius: var(--radius); }
 .notice { padding: 0.75rem 1rem; background: var(--medium-bg); color: var(--medium-text); border-radius: var(--radius); }
 
 /* Search form: one column on phones, a row on wider screens. */
-.search-form { display: grid; gap: 0.75rem; grid-template-columns: 1fr; align-items: end; margin: 1rem 0; }
+.search-form { display: grid; gap: 0.75rem; grid-template-columns: 1fr; align-items: start; margin: 1rem 0; }
 @media (min-width: 40rem) {
-  .search-form { grid-template-columns: 1fr auto auto auto; }
+  .search-form { grid-template-columns: 1fr 1fr 1fr auto; }
+  .search-form .field-wide { grid-column: 1 / -1; }
+  .search-form .button { margin-top: 1.9rem; }
 }
 .field { display: flex; flex-direction: column; }
 .field label { font-weight: 600; margin-bottom: 0.25rem; }
@@ -63,6 +65,42 @@ input, select {
   color: var(--primary-text); background: var(--primary); border: 0; border-radius: var(--radius); cursor: pointer;
 }
 
+.button:disabled { opacity: 0.75; cursor: progress; }
+a.button { display: inline-flex; align-items: center; text-decoration: none; }
+.link-button {
+  font: inherit; color: var(--primary); background: none; border: 0; padding: 0.5rem 0; min-height: 2.75rem;
+  text-align: left; text-decoration: underline; cursor: pointer;
+}
+.link-button:disabled { color: var(--muted); cursor: progress; }
+select:disabled { background: var(--surface); color: var(--muted); }
+
+/* Name suggestions under the search box. */
+.combobox { position: relative; }
+.suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 0.25rem 0 0; padding: 0; list-style: none;
+  background: var(--bg); border: 1px solid var(--muted); border-radius: var(--radius);
+  max-height: 16rem; overflow-y: auto; box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+}
+.suggestions [role="option"] { padding: 0.65rem 0.75rem; min-height: 2.75rem; cursor: pointer; overflow-wrap: anywhere; }
+.suggestions [role="option"]:hover { background: var(--surface); }
+.suggestions [role="option"][aria-selected="true"] { background: var(--primary); color: var(--primary-text); }
+
+/* Loading and error states. */
+.skeleton { display: grid; gap: 1rem; }
+.skeleton-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; display: grid; gap: 0.6rem; }
+.skeleton-line { height: 0.9rem; border-radius: 6px; background: var(--border); }
+.skeleton-title { width: 55%; height: 1.2rem; }
+.skeleton-short { width: 35%; }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-line { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+}
+.problem { padding: 1rem; background: var(--low-bg); color: var(--low-text); border-radius: var(--radius); display: grid; gap: 0.5rem; justify-items: start; }
+.problem h2, .problem p { margin: 0; }
+.problem a:not(.button) { color: var(--low-text); }
+.problem .hint { color: var(--low-text); }
+.problem .button { background: var(--low-text); color: var(--low-bg); }
+
 .results { display: grid; gap: 1rem; }
 .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; background: var(--bg); }
 .offers { list-style: none; padding: 0; margin: 0.75rem 0 0; display: grid; gap: 0.75rem; }
@@ -70,7 +108,8 @@ input, select {
   display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem;
   padding-top: 0.75rem; border-top: 1px solid var(--border);
 }
-.offer-name { font-weight: 600; }
+.offer-name { font-weight: 600; overflow-wrap: anywhere; }
+.best-match { margin: 0 0 0.2rem; font-size: 0.85rem; font-weight: 700; color: var(--primary); }
 .offer-facts { display: flex; gap: 1.25rem; margin: 0; }
 .offer-facts dt { color: var(--muted); font-size: 0.85rem; }
 .offer-facts dd { margin: 0; font-weight: 600; }
