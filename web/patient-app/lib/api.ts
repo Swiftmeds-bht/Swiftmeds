@@ -1,13 +1,26 @@
-// API client for the patient app. Calls the REST gateway at GATEWAY_URL; until
-// the gateway exposes search (SCRUM-49) it falls back to demo data, and says so.
+// API client for the patient app. It calls the REST gateway at GATEWAY_URL.
+// With no GATEWAY_URL it serves clearly labelled demo data. When a gateway is
+// configured but fails, it throws a SearchError: it never shows demo stock in
+// place of a real search, because a patient could act on stock that is not there.
 import { MOCK_PHARMACIES, MOCK_PRODUCTS, MOCK_STOCK } from "./mock-data";
-import type { GeoPoint, PharmacyOffer, PharmacySummary, ProductResult, SearchParams, SearchResponse } from "./types";
+import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "./rules";
+import type {
+  GeoPoint,
+  PharmacyOffer,
+  PharmacySummary,
+  ProductResult,
+  SearchParams,
+  SearchResponse,
+  Suggestion,
+} from "./types";
 
 export type DataSource = "gateway" | "demo";
 
 export interface SearchResult {
   source: DataSource;
   data: SearchResponse;
+  /** Optional services that did not answer (from the x-search-degraded header). Empty when all is well. */
+  degraded: string[];
 }
 
 export interface ApiOptions {
@@ -20,8 +33,56 @@ export interface ApiOptions {
 const defaultOptions = (): ApiOptions => ({
   gatewayUrl: process.env.GATEWAY_URL ?? "",
   fetchFn: globalThis.fetch,
-  timeoutMs: 3000,
+  timeoutMs: 5000,
 });
+
+export type SearchErrorKind = "unreachable" | "timeout" | "not_available" | "bad_request" | "server";
+
+/** Why a gateway call failed, in terms the screen can explain to the patient. */
+export class SearchError extends Error {
+  readonly kind: SearchErrorKind;
+
+  constructor(kind: SearchErrorKind, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "SearchError";
+    this.kind = kind;
+  }
+}
+
+function errorForStatus(status: number): SearchError {
+  if (status === 400) return new SearchError("bad_request", "The gateway rejected the search (HTTP 400)");
+  if (status === 404 || status === 501) {
+    return new SearchError("not_available", `The gateway has no search route (HTTP ${status})`);
+  }
+  if (status === 408 || status === 504) return new SearchError("timeout", `The search timed out (HTTP ${status})`);
+  return new SearchError("server", `The gateway could not search (HTTP ${status})`);
+}
+
+async function getJson(url: string, opts: ApiOptions): Promise<{ body: unknown; headers: Headers }> {
+  let res: Response;
+  try {
+    res = await (opts.fetchFn ?? fetch)(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+  } catch (cause) {
+    // By name, not instanceof: a DOMException from another realm is not an instance of this realm's Error.
+    const name = (cause as { name?: unknown } | null)?.name;
+    const timedOut = name === "TimeoutError" || name === "AbortError";
+    throw new SearchError(
+      timedOut ? "timeout" : "unreachable",
+      timedOut ? "The gateway did not answer in time" : "Could not reach the gateway",
+      { cause },
+    );
+  }
+  if (!res.ok) throw errorForStatus(res.status);
+  try {
+    return { body: await res.json(), headers: res.headers };
+  } catch (cause) {
+    throw new SearchError("server", "The gateway sent an answer that is not JSON", { cause });
+  }
+}
 
 /** Builds GET /api/v1/search?q=..&lat=..&lng=..&radius_m=.. */
 export function searchUrl(gatewayUrl: string, p: SearchParams): string {
@@ -33,28 +94,54 @@ export function searchUrl(gatewayUrl: string, p: SearchParams): string {
   return url.toString();
 }
 
+/** Builds GET /api/v1/search/autocomplete?prefix=..&limit=.. */
+export function autocompleteUrl(gatewayUrl: string, prefix: string, limit = 8): string {
+  const url = new URL("/api/v1/search/autocomplete", gatewayUrl);
+  url.searchParams.set("prefix", prefix);
+  url.searchParams.set("limit", String(limit));
+  return url.toString();
+}
+
+/** Searches through the gateway, or on demo data when no gateway is configured. Throws SearchError. */
 export async function searchMedicines(params: SearchParams, options: ApiOptions = {}): Promise<SearchResult> {
   const opts = { ...defaultOptions(), ...options };
-  if (opts.gatewayUrl && opts.fetchFn) {
-    try {
-      const res = await opts.fetchFn(searchUrl(opts.gatewayUrl, params), {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(opts.timeoutMs ?? 3000),
-      });
-      if (res.ok) {
-        const body = (await res.json()) as Partial<SearchResponse>;
-        return {
-          source: "gateway",
-          data: { searchId: body.searchId ?? "", results: body.results ?? [], substitutes: body.substitutes ?? [] },
-        };
-      }
-      // 404 until the gateway route exists; anything else is also a reason to fall back.
-    } catch {
-      // Gateway unreachable or timed out: fall back to demo data below.
-    }
+  if (!opts.gatewayUrl) return { source: "demo", data: mockSearch(params), degraded: [] };
+
+  const { body, headers } = await getJson(searchUrl(opts.gatewayUrl, params), opts);
+  const data = (body ?? {}) as Partial<SearchResponse>;
+  const degraded = (headers.get("x-search-degraded") ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return {
+    source: "gateway",
+    data: { searchId: data.searchId ?? "", results: data.results ?? [], substitutes: data.substitutes ?? [] },
+    degraded,
+  };
+}
+
+function isSuggestion(value: unknown): value is Suggestion {
+  const v = value as Partial<Suggestion> | null;
+  return typeof v?.productId === "string" && typeof v.displayName === "string";
+}
+
+/**
+ * Name suggestions for the search box. Suggestions are a convenience, so any
+ * failure gives an empty list instead of an error.
+ */
+export async function fetchSuggestions(prefix: string, options: ApiOptions = {}): Promise<Suggestion[]> {
+  const text = prefix.trim();
+  if (text.length < MIN_QUERY_LENGTH || text.length > MAX_QUERY_LENGTH) return [];
+
+  const opts = { ...defaultOptions(), timeoutMs: 1500, ...options };
+  if (!opts.gatewayUrl) return mockSuggest(text);
+  try {
+    const { body } = await getJson(autocompleteUrl(opts.gatewayUrl, text), opts);
+    const list = (body as { suggestions?: unknown } | null)?.suggestions;
+    return Array.isArray(list) ? list.filter(isSuggestion) : [];
+  } catch {
+    return [];
   }
-  return { source: "demo", data: mockSearch(params) };
 }
 
 export function getPharmacy(id: string): PharmacySummary | undefined {
@@ -108,6 +195,14 @@ function toResult(p: (typeof MOCK_PRODUCTS)[number], params: SearchParams): Prod
     strength: p.strength,
     offers: offersFor(p.productId, params),
   };
+}
+
+export function mockSuggest(prefix: string, limit = 8): Suggestion[] {
+  const q = prefix.trim().toLowerCase();
+  if (!q) return [];
+  return MOCK_PRODUCTS.filter((p) => p.brandName.toLowerCase().includes(q) || p.genericName.toLowerCase().includes(q))
+    .slice(0, limit)
+    .map((p) => ({ productId: p.productId, displayName: `${p.brandName} (${p.genericName})` }));
 }
 
 export function mockSearch(params: SearchParams): SearchResponse {
