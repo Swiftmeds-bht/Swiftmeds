@@ -1,0 +1,2538 @@
+openapi: 3.0.3
+info:
+  title: SwiftMed Gateway REST API
+  version: 1.0.0
+  license:
+    name: Proprietary (CST course project)
+  description: |
+    SwiftMed finds which verified pharmacies near a patient have a medicine in stock,
+    lets the patient hold it for a short time, and lets the pharmacy hand it over
+    against a pickup code. Clients talk REST to the gateway. The gateway checks the
+    request and calls the matching gRPC method on the owning service.
+
+    ## Implementation status
+
+    Every operation has an `x-status`:
+
+    | `x-status` | Meaning |
+    |---|---|
+    | `implemented` | The route exists in `services/gateway/internal/app/router.go` today. Only `GET /healthz`. |
+    | `planned` | The route is part of the agreed contract (derived from the `.proto` files and the test plan) but the gateway does not serve it yet. Until it does, `/api/v1/*` returns the plain-text 404 described below. |
+
+    Every operation also has `x-grpc`, the gRPC method it calls, and `x-roles`, the
+    roles allowed to call it. When a route is built, change its `x-status` to
+    `implemented` in the same pull request.
+
+    ## Conventions
+
+    - **Base path.** All routes except `/healthz` start with `/api/v1`.
+    - **JSON form.** Bodies follow protobuf JSON: `camelCase` names, enums as their full
+      proto names (for example `HOLD_STATUS_ACTIVE`), timestamps as RFC 3339 UTC
+      strings, and 64-bit integers as strings. A field that holds its default value
+      (`0`, `false`, empty) may be left out of a response.
+    - **Money** is in chhertum, sent as a string (100 chhertum = Nu. 1). `"0"` means the
+      pharmacy has not set a price.
+    - **IDs** are strings (UUIDs). **Distances** are whole metres. **Scores**
+      (freshness, trust, rank) are numbers from 0.0 to 1.0.
+    - **Paging.** List routes take `pageSize` and `pageToken` and return
+      `page.nextPageToken`. An empty token means the first page, and an empty
+      `nextPageToken` means the last page.
+    - **Identity comes from the token, never from the body.** The gateway sets the
+      `user_id`, `pharmacy_id` or `admin_user_id` of the gRPC request from the validated
+      access token. Request bodies do not carry them, and a client cannot act for
+      someone else.
+
+    ## Authentication
+
+    Send `Authorization: Bearer <accessToken>`. For every route that needs a token, the
+    gateway calls `AuthService.ValidateToken` and receives the user ID, the role and, for
+    pharmacy staff, the pharmacy ID. Access tokens last 15 minutes by default. Use
+    `POST /api/v1/auth/refresh` to get a new pair. Routes marked public in this file
+    (`security: []`) need no token.
+
+    | Role | Who |
+    |---|---|
+    | `ROLE_PATIENT` | A patient |
+    | `ROLE_PHARMACY_STAFF` | Staff of one pharmacy. They can act only on their own pharmacy. |
+    | `ROLE_ADMIN` | SwiftMed staff, created outside the API (admins cannot self-register) |
+
+    ## Errors
+
+    Errors are JSON `{"error": "<message>"}`. The message never contains internal
+    details, and a server fault always reads `internal error`. The gateway converts the
+    gRPC status code of the failed call like this (`services/gateway/internal/httpx/errors.go`):
+
+    | gRPC code | HTTP status |
+    |---|---|
+    | `INVALID_ARGUMENT` | 400 |
+    | `UNAUTHENTICATED` | 401 |
+    | `PERMISSION_DENIED` | 403 |
+    | `NOT_FOUND` | 404 |
+    | `CANCELED` | 408 |
+    | `ALREADY_EXISTS`, `ABORTED` | 409 |
+    | `FAILED_PRECONDITION` | 412 |
+    | `RESOURCE_EXHAUSTED` | 429 |
+    | `UNAVAILABLE` | 503 |
+    | `DEADLINE_EXCEEDED` | 504 |
+    | anything else, and a panic in a handler | 500 |
+
+    Each operation lists the errors that are specific to it. Any operation can also
+    return 500, 503 or 504, shown as `default`.
+
+    Three cases do not use the JSON body, because the Go router and the CORS layer answer
+    them before any handler runs:
+
+    - A path under `/api/v1/` that has no route returns **404** with a plain-text body.
+    - A known path called with the wrong method returns **405** with a plain-text body.
+    - A CORS preflight (`OPTIONS`) from a missing origin returns **400**, and from an
+      origin that is not allowed returns **403**, both as plain text.
+
+    ## Request ID
+
+    Send `X-Request-ID` to name a request. If you do not, the gateway makes one. Every
+    response carries the same header, and it appears in the gateway's logs, so quote it
+    when reporting a problem.
+
+    ## CORS
+
+    The gateway allows the origins in `CORS_ALLOWED_ORIGINS` (default
+    `http://localhost:3000` and `http://localhost:3001`), with credentials. Allowed
+    headers are `Authorization`, `Content-Type` and `X-Request-ID`. Allowed methods are
+    `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`. A preflight from an allowed
+    origin returns 204.
+
+    ## Not exposed
+
+    These gRPC methods are for service-to-service calls and have no REST route:
+    `Auth.ValidateToken`, `Catalog.BatchGetProducts`, `Catalog.ListProductsByMolecule`,
+    `Expiry.GetHoldDuration`, `Freshness.RecordConfirmation`, `Freshness.GetFreshness`,
+    `Geo.*`, `Holds.ExpireHold`, `Inventory.BatchGetStock`, `Inventory.BulkSetStock`,
+    `Inventory.CommitReservation`, `Inventory.ReleaseReservation`,
+    `Notification.SendNotification`, `PharmacyRegistry.BatchGetPharmacies`,
+    `Pricing.BatchGetPrices`, `Ranking.RankOffers`, `Substitution.GetSubstitutes` and
+    `Trust.GetTrustScores`. Substitutes reach the patient inside the search response.
+servers:
+  - url: http://{host}:{port}
+    description: Local development (`make up`, or `docker compose -f deploy/docker-compose.yml up -d`)
+    variables:
+      host:
+        default: localhost
+        description: Host that runs the gateway.
+      port:
+        default: "8080"
+        description: The gateway's `GATEWAY_HTTP_PORT`.
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+    description: Liveness check used by Docker and by load balancers.
+  - name: Auth
+    description: Accounts and tokens. Public, except that they need a valid refresh token where noted.
+  - name: Catalog
+    description: Medicine names, strengths and forms. Controlled medicines are never returned.
+  - name: Search
+    description: The patient's "who has this medicine near me?" query.
+  - name: Pharmacies
+    description: Pharmacy registration, details and admin verification.
+  - name: Stock
+    description: A pharmacy's stock, prices and CSV uploads, used by the pharmacy dashboard.
+  - name: Holds
+    description: Short reservations that a patient collects with a pickup code.
+  - name: Feedback
+    description: A patient's report on whether the medicine was really in stock.
+  - name: Watchlist
+    description: Alerts when a medicine comes back in stock nearby.
+  - name: Notifications
+    description: A user's in-app notifications.
+  - name: Profile
+    description: The signed-in user's contact details. No medical data is stored.
+  - name: Analytics
+    description: Unmet demand and pharmacy statistics.
+  - name: Internal
+    description: Routes called by the scheduled Cloudflare Workers, not by people.
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: Check that the gateway is running
+      description: |
+        Returns 200 while the process is serving requests. It does not check the
+        downstream services. The gateway's `healthcheck` sub-command and the Docker
+        HEALTHCHECK call it, and successful calls are not written to the request log.
+      security: []
+      x-status: implemented
+      x-roles: []
+      responses:
+        "200":
+          description: The gateway is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+              example:
+                status: ok
+        "405":
+          description: The path was called with a method other than GET. Plain-text body from the router.
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Method Not Allowed
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Create a patient or pharmacy-staff account
+      description: Admins cannot self-register. The password must be 8 to 72 bytes (bcrypt's limit).
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.auth.v1.AuthService/Register
+      x-roles: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              email: tashi@example.bt
+              password: correct-horse-battery
+              role: ROLE_PATIENT
+      responses:
+        "201":
+          description: The account was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The email is already registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with email and password
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.auth.v1.AuthService/Login
+      x-roles: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in. Keep the refresh token safe.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: The email or password is wrong. The message does not say which.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      description: The old refresh token stops working as soon as the new pair is issued.
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.auth.v1.AuthService/RefreshToken
+      x-roles: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          description: A new token pair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshTokenResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: The refresh token is invalid, expired, already used or revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke a refresh token
+      description: Safe to call more than once with the same token.
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.auth.v1.AuthService/Logout
+      x-roles: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "204":
+          description: The refresh token is revoked.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/products:
+    get:
+      tags: [Catalog]
+      operationId: listProducts
+      summary: Find medicines by name
+      description: |
+        Matches brand and generic names, ignoring case, by prefix and by close spelling.
+        Best match first. Pharmacy staff use it to find the product ID for a stock update.
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.catalog.v1.CatalogService/ResolveName
+      x-roles: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: The name as typed.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - name: limit
+          in: query
+          description: Most products to return.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Matching products, best match first. The list is empty when nothing matches.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        default:
+          $ref: "#/components/responses/ServerError"
+    post:
+      tags: [Catalog]
+      operationId: createProduct
+      summary: Add a medicine to the catalogue
+      description: For administrators and seed data only.
+      x-status: planned
+      x-grpc: swiftmed.catalog.v1.CatalogService/CreateProduct
+      x-roles: [ROLE_ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: The product was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/products/{productId}:
+    get:
+      tags: [Catalog]
+      operationId: getProduct
+      summary: Get one medicine
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.catalog.v1.CatalogService/GetProduct
+      x-roles: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: The product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/search:
+    get:
+      tags: [Search]
+      operationId: searchMedicine
+      summary: Find nearby pharmacies that have a medicine
+      description: |
+        Returns the matching medicines and, for each, the verified pharmacies that have it
+        in stock, best first. Ranking uses only distance, how recently the stock was
+        confirmed, the pharmacy's accuracy record and price. Nothing can be paid for a
+        better place. If no pharmacy has the matched medicines, `substitutes` lists
+        products with the same molecule and strength.
+
+        Catalog, Geo and Inventory are required: if one fails the search fails with 503, or
+        504 when out of time. Freshness, Pricing, Trust, Pharmacy Registry, Ranking and
+        Substitution are optional. If one does not answer, the search still succeeds with
+        neutral values and names the missing services in the `x-search-degraded` header.
+        A whole search is capped at 2 seconds.
+
+        Limits: 5 products, 100 nearby pharmacies and 5 substitutes per search.
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.search.v1.SearchService/SearchMedicine
+      x-roles: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Brand or generic name, 2 to 100 characters after trimming.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - name: lat
+          in: query
+          required: true
+          description: Latitude of the patient, in degrees.
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - name: lng
+          in: query
+          required: true
+          description: Longitude of the patient, in degrees.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - name: radius_m
+          in: query
+          description: |
+            Search radius in metres. Omit or send 0 for the default of 5000. Otherwise it
+            must be 500 to 50000.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 50000
+            default: 0
+        - name: max_offers
+          in: query
+          description: Most pharmacies to return per medicine. Omit or send 0 for the default of 10.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: The search ran. `results` is empty when no medicine matches.
+          headers:
+            x-search-degraded:
+              description: |
+                Comma-separated names of optional services that did not answer, for example
+                `freshness,ranking`. Absent when everything answered.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+              example:
+                searchId: 7c1f0d0e-6a53-4b8e-9a52-2f0f6f0c9a11
+                results:
+                  - productId: 3f6c7b2e-1d44-4d6f-9b0a-0a4d5f2f8c10
+                    brandName: Napa
+                    genericName: Paracetamol
+                    strength: 500mg
+                    offers:
+                      - pharmacyId: 9b2d7a54-5c0e-4a77-8b11-6d2f3b1c4e20
+                        pharmacyName: Druk Pharmacy
+                        address: Norzin Lam, Thimphu
+                        location:
+                          latitude: 27.4728
+                          longitude: 89.6393
+                        distanceM: 420
+                        quantityAvailable: 24
+                        priceChhertum: "4500"
+                        freshnessScore: 0.9
+                        trustScore: 0.8
+                        rankScore: 0.93
+                        stockConfirmedAt: "2026-11-05T04:12:00Z"
+                substitutes: []
+        "400":
+          description: |
+            The query is shorter than 2 or longer than 100 characters, a coordinate is out of
+            range, or `radius_m` or `max_offers` is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: A required service (Catalog, Geo or Inventory) is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "504":
+          description: The search took longer than its 2 second budget.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/search/autocomplete:
+    get:
+      tags: [Search]
+      operationId: autocomplete
+      summary: Suggest medicine names while the patient types
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.search.v1.SearchService/Autocomplete
+      x-roles: []
+      parameters:
+        - name: prefix
+          in: query
+          required: true
+          description: The text typed so far, 2 to 100 characters.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - name: limit
+          in: query
+          description: Most suggestions to return.
+          schema:
+            type: integer
+            minimum: 1
+            default: 8
+      responses:
+        "200":
+          description: Suggestions, best first. The list is empty when nothing matches.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutocompleteResponse"
+              example:
+                suggestions:
+                  - productId: 3f6c7b2e-1d44-4d6f-9b0a-0a4d5f2f8c10
+                    displayName: Napa 500mg (Paracetamol)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies:
+    post:
+      tags: [Pharmacies]
+      operationId: registerPharmacy
+      summary: Register a pharmacy
+      description: |
+        The signed-in pharmacy-staff user becomes the owner. The pharmacy starts as
+        `VERIFICATION_STATUS_PENDING`, does not appear in search and cannot take holds
+        until an administrator verifies it.
+      x-status: planned
+      x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/RegisterPharmacy
+      x-roles: [ROLE_PHARMACY_STAFF]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPharmacyRequest"
+      responses:
+        "201":
+          description: The pharmacy was registered and is waiting for verification.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pharmacy"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A pharmacy with this licence number is already registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+    get:
+      tags: [Pharmacies]
+      operationId: listPharmacies
+      summary: List pharmacies by verification status
+      description: Used by administrators to review pending pharmacies.
+      x-status: planned
+      x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/ListPharmacies
+      x-roles: [ROLE_ADMIN]
+      parameters:
+        - name: status
+          in: query
+          description: Only pharmacies with this status. Omit to list all.
+          schema:
+            $ref: "#/components/schemas/VerificationStatus"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of pharmacies.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PharmacyList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}:
+    get:
+      tags: [Pharmacies]
+      operationId: getPharmacy
+      summary: Get one pharmacy
+      description: |
+        Public, so the patient app can show a pharmacy's details. `ownerUserId` and
+        `licenseNumber` are returned only to the pharmacy's own staff and to administrators.
+      security: []
+      x-status: planned
+      x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/GetPharmacy
+      x-roles: []
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+      responses:
+        "200":
+          description: The pharmacy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pharmacy"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/verification:
+    put:
+      tags: [Pharmacies]
+      operationId: setPharmacyVerification
+      summary: Approve, reject or suspend a pharmacy
+      description: |
+        Approving a pharmacy puts it on the map and into search. Suspending removes it.
+        A reason is required for `VERIFICATION_STATUS_REJECTED` and
+        `VERIFICATION_STATUS_SUSPENDED`.
+      x-status: planned
+      x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus
+      x-roles: [ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetVerificationRequest"
+      responses:
+        "200":
+          description: The pharmacy with its new status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pharmacy"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/stats:
+    get:
+      tags: [Analytics]
+      operationId: getPharmacyStats
+      summary: Hold and feedback counts for a pharmacy
+      x-status: planned
+      x-grpc: swiftmed.analytics.v1.AnalyticsService/GetPharmacyStats
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+      responses:
+        "200":
+          description: The counts for the time range.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PharmacyStats"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/feedback:
+    get:
+      tags: [Feedback]
+      operationId: listPharmacyFeedback
+      summary: List the feedback patients left about a pharmacy
+      x-status: planned
+      x-grpc: swiftmed.feedback.v1.FeedbackService/ListPharmacyFeedback
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of feedback.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/stock:
+    get:
+      tags: [Stock]
+      operationId: listPharmacyStock
+      summary: List all stock of a pharmacy
+      description: The pharmacy dashboard's stock table.
+      x-status: planned
+      x-grpc: swiftmed.inventory.v1.InventoryService/ListPharmacyStock
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of stock levels.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/stock/{productId}:
+    get:
+      tags: [Stock]
+      operationId: getStock
+      summary: Get the stock of one medicine at a pharmacy
+      x-status: planned
+      x-grpc: swiftmed.inventory.v1.InventoryService/GetStock
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: The stock level.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockLevel"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+    put:
+      tags: [Stock]
+      operationId: setStock
+      summary: Set the quantity on hand of one medicine
+      description: |
+        Sending the same quantity again still counts as a confirmation and refreshes the
+        stock's freshness. To remove a medicine from sale, set the quantity to 0.
+        Raising the quantity tells the watchlist service, which may alert waiting patients.
+      x-status: planned
+      x-grpc: swiftmed.inventory.v1.InventoryService/SetStock
+      x-roles: [ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetStockRequest"
+            example:
+              quantityOnHand: 40
+      responses:
+        "200":
+          description: The updated stock level.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockLevel"
+        "400":
+          description: The quantity is negative or lower than the quantity reserved by active holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/prices:
+    put:
+      tags: [Stock]
+      operationId: setPrices
+      summary: Set the prices of one or more medicines
+      description: Prices are per pack, in chhertum, and must be greater than 0.
+      x-status: planned
+      x-grpc: swiftmed.pricing.v1.PricingService/SetPrices
+      x-roles: [ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPricesRequest"
+            example:
+              updates:
+                - productId: 3f6c7b2e-1d44-4d6f-9b0a-0a4d5f2f8c10
+                  priceChhertum: "4500"
+      responses:
+        "200":
+          description: The prices that were set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetPricesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs:
+    post:
+      tags: [Stock]
+      operationId: uploadStockCsv
+      summary: Upload a CSV file of stock and prices
+      description: |
+        The file is UTF-8, at most 1 MB, with the header `product_id,quantity,price_chhertum`.
+        `price_chhertum` is optional. Valid rows are applied and bad rows are reported in
+        the job's `rowErrors`, so a job can finish as `SYNC_JOB_STATUS_PARTIAL`.
+      x-status: planned
+      x-grpc: swiftmed.stocksync.v1.StockSyncService/UploadStockCsv
+      x-roles: [ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/UploadStockCsvRequest"
+      responses:
+        "201":
+          description: The file was read and the job recorded. Check its `status` and `rowErrors`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+        "400":
+          description: The request is not multipart, the `file` part is missing or the file is not valid UTF-8.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          description: The file is larger than 1 MB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+    get:
+      tags: [Stock]
+      operationId: listSyncJobs
+      summary: List the CSV upload jobs of a pharmacy
+      x-status: planned
+      x-grpc: swiftmed.stocksync.v1.StockSyncService/ListSyncJobs
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of jobs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJobList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs/{jobId}:
+    get:
+      tags: [Stock]
+      operationId: getSyncJob
+      summary: Get one CSV upload job
+      description: A job that belongs to a different pharmacy than the one in the path returns 404.
+      x-status: planned
+      x-grpc: swiftmed.stocksync.v1.StockSyncService/GetSyncJob
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJob"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/holds:
+    post:
+      tags: [Holds]
+      operationId: createHold
+      summary: Hold some units of a medicine at a pharmacy
+      description: |
+        Reserves 1 to 5 units for a short time. The hold starts as `HOLD_STATUS_PENDING`
+        while Inventory checks the stock, so the answer is 202. Poll
+        `GET /api/v1/holds/{holdId}` until the status is `HOLD_STATUS_ACTIVE` (the pickup
+        code is then set) or `HOLD_STATUS_REJECTED` (not enough stock). The patient is the
+        signed-in user.
+      x-status: planned
+      x-grpc: swiftmed.holds.v1.HoldsService/CreateHold
+      x-roles: [ROLE_PATIENT]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateHoldRequest"
+            example:
+              pharmacyId: 9b2d7a54-5c0e-4a77-8b11-6d2f3b1c4e20
+              productId: 3f6c7b2e-1d44-4d6f-9b0a-0a4d5f2f8c10
+              quantity: 2
+      responses:
+        "202":
+          description: The hold was accepted and is `HOLD_STATUS_PENDING`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hold"
+        "400":
+          description: The quantity is not 1 to 5, or an ID is missing or malformed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: The pharmacy or the product does not exist, or the pharmacy is not verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+    get:
+      tags: [Holds]
+      operationId: listHolds
+      summary: List holds
+      description: |
+        A patient sees their own holds. Pharmacy staff see the holds of their pharmacy,
+        without pickup codes.
+      x-status: planned
+      x-grpc: swiftmed.holds.v1.HoldsService/ListHolds
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+      parameters:
+        - name: status
+          in: query
+          description: Only holds with this status. Omit to list all.
+          schema:
+            $ref: "#/components/schemas/HoldStatus"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of holds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HoldList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/holds/{holdId}:
+    get:
+      tags: [Holds]
+      operationId: getHold
+      summary: Get one hold
+      description: |
+        The patient who made the hold sees it, including `pickupCode`. Staff of the hold's
+        pharmacy see it without `pickupCode`, because they enter the code the patient
+        shows at the counter. Anyone else gets 404.
+      x-status: planned
+      x-grpc: swiftmed.holds.v1.HoldsService/GetHold
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/HoldId"
+      responses:
+        "200":
+          description: The hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hold"
+              example:
+                holdId: 5e0b3c9a-2f41-4c7d-8a66-1b9d0e7f3a52
+                userId: 1a8c4e2f-7b30-4d19-9c55-3e6f2a0b8d71
+                pharmacyId: 9b2d7a54-5c0e-4a77-8b11-6d2f3b1c4e20
+                productId: 3f6c7b2e-1d44-4d6f-9b0a-0a4d5f2f8c10
+                quantity: 2
+                status: HOLD_STATUS_ACTIVE
+                pickupCode: "482913"
+                createdAt: "2026-11-05T05:00:00Z"
+                expiresAt: "2026-11-05T07:00:00Z"
+                statusChangedAt: "2026-11-05T05:00:02Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/holds/{holdId}/cancel:
+    post:
+      tags: [Holds]
+      operationId: cancelHold
+      summary: Cancel a hold
+      description: |
+        The patient who made the hold cancels it and the reserved units go back to
+        available stock. The contract allows this for an `HOLD_STATUS_ACTIVE` hold.
+        Terminal holds cannot be changed.
+      x-status: planned
+      x-grpc: swiftmed.holds.v1.HoldsService/CancelHold
+      x-roles: [ROLE_PATIENT]
+      parameters:
+        - $ref: "#/components/parameters/HoldId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelHoldRequest"
+      responses:
+        "200":
+          description: The hold, now `HOLD_STATUS_CANCELLED`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hold"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/HoldChanged"
+        "412":
+          $ref: "#/components/responses/HoldNotActive"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/holds/{holdId}/collect:
+    post:
+      tags: [Holds]
+      operationId: collectHold
+      summary: Hand over the medicine against the pickup code
+      description: |
+        Pharmacy staff enter the code the patient shows. A wrong code is rejected and the
+        hold stays `HOLD_STATUS_ACTIVE`. A hold can be collected only once. The hold must
+        belong to the signed-in staff member's pharmacy.
+      x-status: planned
+      x-grpc: swiftmed.holds.v1.HoldsService/CollectHold
+      x-roles: [ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/HoldId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectHoldRequest"
+            example:
+              pickupCode: "482913"
+      responses:
+        "200":
+          description: The hold, now `HOLD_STATUS_COLLECTED`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Hold"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: The pickup code is wrong, or the hold belongs to another pharmacy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/HoldChanged"
+        "412":
+          description: |
+            The hold is not `HOLD_STATUS_ACTIVE`: it was already collected, or it expired or
+            was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/holds/{holdId}/feedback:
+    post:
+      tags: [Feedback]
+      operationId: submitFeedback
+      summary: Say whether the medicine was really in stock
+      description: |
+        One feedback per hold, from the patient who made it. It feeds the pharmacy's trust
+        score, which is one of the four ranking inputs.
+      x-status: planned
+      x-grpc: swiftmed.feedback.v1.FeedbackService/SubmitFeedback
+      x-roles: [ROLE_PATIENT]
+      parameters:
+        - $ref: "#/components/parameters/HoldId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitFeedbackRequest"
+            example:
+              wasInStock: true
+              rating: 5
+              comment: Quick and friendly.
+      responses:
+        "201":
+          description: The feedback was recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+        "400":
+          description: The rating is not 0 to 5, or the comment is longer than 500 characters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Feedback was already given for this hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/watchlist:
+    post:
+      tags: [Watchlist]
+      operationId: subscribeWatchlist
+      summary: Watch a medicine near a place
+      description: |
+        The patient is alerted once when the medicine comes back in stock within the radius.
+        A notified subscription does not fire again.
+      x-status: planned
+      x-grpc: swiftmed.watchlist.v1.WatchlistService/Subscribe
+      x-roles: [ROLE_PATIENT]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeRequest"
+      responses:
+        "201":
+          description: The subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The patient already watches this medicine near this place.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+    get:
+      tags: [Watchlist]
+      operationId: listSubscriptions
+      summary: List the patient's watchlist
+      x-status: planned
+      x-grpc: swiftmed.watchlist.v1.WatchlistService/ListSubscriptions
+      x-roles: [ROLE_PATIENT]
+      responses:
+        "200":
+          description: The patient's subscriptions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/watchlist/alerts:
+    get:
+      tags: [Watchlist]
+      operationId: streamAlerts
+      summary: Receive back-in-stock alerts as they happen
+      description: |
+        A long-lived response using server-sent events. Each event's `data` is one
+        `StockAlert` as JSON. The stream stays open until the client closes it, so it is not
+        cut off by a write timeout. A browser `EventSource` cannot send an `Authorization`
+        header, so web clients read this stream with `fetch`.
+      x-status: planned
+      x-grpc: swiftmed.watchlist.v1.WatchlistService/StreamAlerts
+      x-roles: [ROLE_PATIENT]
+      responses:
+        "200":
+          description: |
+            The event stream. Each event's `data:` line holds one `StockAlert` as JSON, for example
+            `data: {"quantityAvailable":12,"occurredAt":"2026-11-05T06:30:00Z"}` (other fields left out here).
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/StockAlert"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/watchlist/{subscriptionId}:
+    delete:
+      tags: [Watchlist]
+      operationId: unsubscribe
+      summary: Stop watching a medicine
+      description: The subscription must belong to the signed-in patient.
+      x-status: planned
+      x-grpc: swiftmed.watchlist.v1.WatchlistService/Unsubscribe
+      x-roles: [ROLE_PATIENT]
+      parameters:
+        - $ref: "#/components/parameters/SubscriptionId"
+      responses:
+        "204":
+          description: The subscription is removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: List the signed-in user's notifications
+      x-status: planned
+      x-grpc: swiftmed.notification.v1.NotificationService/ListNotifications
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: One page of notifications.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/me/profile:
+    get:
+      tags: [Profile]
+      operationId: getMyProfile
+      summary: Get the signed-in user's profile
+      x-status: planned
+      x-grpc: swiftmed.userprofile.v1.UserProfileService/GetProfile
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: The user has not saved a profile yet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+    put:
+      tags: [Profile]
+      operationId: updateMyProfile
+      summary: Save the signed-in user's profile
+      description: Creates the profile if it does not exist yet.
+      x-status: planned
+      x-grpc: swiftmed.userprofile.v1.UserProfileService/UpdateProfile
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: The saved profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/analytics/unmet-demand:
+    get:
+      tags: [Analytics]
+      operationId: getUnmetDemand
+      summary: Medicines people searched for and could not find
+      description: Most-searched first.
+      x-status: planned
+      x-grpc: swiftmed.analytics.v1.AnalyticsService/GetUnmetDemand
+      x-roles: [ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/From"
+        - $ref: "#/components/parameters/To"
+        - name: dzongkhag
+          in: query
+          description: Only this district. Omit for the whole country.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Most items to return.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The unmet demand.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnmetDemandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/internal/freshness/decay:
+    post:
+      tags: [Internal]
+      operationId: runFreshnessDecay
+      summary: Recompute stock freshness scores
+      description: |
+        Called on a schedule by the freshness-decay worker. Safe to repeat: the scores
+        depend only on `asOf`.
+      x-status: planned
+      x-grpc: swiftmed.freshness.v1.FreshnessService/ApplyDecay
+      x-roles: [ROLE_ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AsOfRequest"
+      responses:
+        "200":
+          description: How many scores were updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyDecayResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/internal/expiry/sweep:
+    post:
+      tags: [Internal]
+      operationId: runHoldExpirySweep
+      summary: Expire every hold whose deadline has passed
+      description: |
+        Called on a schedule by the hold-expiry worker. Safe to repeat. Each expired hold
+        releases its reserved stock.
+      x-status: planned
+      x-grpc: swiftmed.expiry.v1.ExpiryService/RunSweep
+      x-roles: [ROLE_ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AsOfRequest"
+      responses:
+        "200":
+          description: The holds that were expired.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunSweepResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The access token from `POST /api/v1/auth/login` or `POST /api/v1/auth/refresh`.
+        It is valid for 15 minutes by default. A missing, malformed, expired or revoked
+        token gives 401. A valid token with the wrong role, or for another pharmacy's
+        data, gives 403.
+  headers:
+    XRequestId:
+      description: The request ID, echoed from the request or made by the gateway.
+      schema:
+        type: string
+  parameters:
+    PageSize:
+      name: pageSize
+      in: query
+      description: Most items to return in one page. The owning service sets the default and the maximum.
+      schema:
+        type: integer
+        minimum: 1
+    PageToken:
+      name: pageToken
+      in: query
+      description: The `page.nextPageToken` of the previous page. Omit for the first page.
+      schema:
+        type: string
+    PharmacyId:
+      name: pharmacyId
+      in: path
+      required: true
+      description: ID of the pharmacy. Pharmacy staff can use only their own.
+      schema:
+        type: string
+        format: uuid
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      description: ID of the medicine in the catalogue.
+      schema:
+        type: string
+        format: uuid
+    HoldId:
+      name: holdId
+      in: path
+      required: true
+      description: ID of the hold.
+      schema:
+        type: string
+        format: uuid
+    SubscriptionId:
+      name: subscriptionId
+      in: path
+      required: true
+      description: ID of the watchlist subscription.
+      schema:
+        type: string
+        format: uuid
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      description: ID of the CSV upload job.
+      schema:
+        type: string
+        format: uuid
+    From:
+      name: from
+      in: query
+      description: Start of the time range, inclusive (RFC 3339, UTC).
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      description: End of the time range (RFC 3339, UTC).
+      schema:
+        type: string
+        format: date-time
+  responses:
+    BadRequest:
+      description: The request is not valid (gRPC `INVALID_ARGUMENT`). The message says what to fix.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: quantity must be between 1 and 5
+    Unauthorized:
+      description: The access token is missing, malformed, expired or revoked (gRPC `UNAUTHENTICATED`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: |
+        The token is valid but its role is not allowed here, or the data belongs to another
+        user or pharmacy (gRPC `PERMISSION_DENIED`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: |
+        The resource does not exist, or the caller is not allowed to know that it exists
+        (gRPC `NOT_FOUND`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    HoldChanged:
+      description: |
+        The hold changed at the same moment, for example it expired while this call ran, and
+        this call lost. Read the hold again and decide (gRPC `ABORTED`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    HoldNotActive:
+      description: The hold is not `HOLD_STATUS_ACTIVE`, so it can no longer be changed (gRPC `FAILED_PRECONDITION`).
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: |
+        Any other failure: 500 (`internal error`, details only in the logs), 503 when a
+        service is unavailable, 504 when a call timed out, and so on, as in the table in the
+        API description.
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: internal error
+  schemas:
+    Error:
+      type: object
+      description: The body of every JSON error.
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: A short message that is safe to show to the user.
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    GeoPoint:
+      type: object
+      description: A WGS84 coordinate.
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    Chhertum:
+      type: string
+      pattern: "^[0-9]+$"
+      description: Money in chhertum as a decimal string (100 chhertum = Nu. 1). `"0"` means no price is set.
+      example: "4500"
+    Score:
+      type: number
+      format: double
+      minimum: 0
+      maximum: 1
+    PageInfo:
+      type: object
+      properties:
+        nextPageToken:
+          type: string
+          description: Pass it as `pageToken` to get the next page. Empty on the last page.
+    Role:
+      type: string
+      enum: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+    RegisterRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: 8 to 72 bytes. The limit is in bytes, so multi-byte characters count more than once.
+        role:
+          type: string
+          enum: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+    RegisterResponse:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      required: [userId, role, tokens]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        tokens:
+          $ref: "#/components/schemas/TokenPair"
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    RefreshTokenResponse:
+      type: object
+      required: [tokens]
+      properties:
+        tokens:
+          $ref: "#/components/schemas/TokenPair"
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    DosageForm:
+      type: string
+      enum:
+        - DOSAGE_FORM_TABLET
+        - DOSAGE_FORM_CAPSULE
+        - DOSAGE_FORM_SYRUP
+        - DOSAGE_FORM_SUSPENSION
+        - DOSAGE_FORM_INJECTION
+        - DOSAGE_FORM_CREAM
+        - DOSAGE_FORM_OINTMENT
+        - DOSAGE_FORM_DROPS
+        - DOSAGE_FORM_INHALER
+        - DOSAGE_FORM_OTHER
+    Product:
+      type: object
+      required: [productId, brandName, genericName, strength]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        brandName:
+          type: string
+        genericName:
+          type: string
+        moleculeId:
+          type: string
+        moleculeName:
+          type: string
+        strength:
+          type: string
+          description: Lower case, no spaces, for example `500mg` or `125mg/5ml`.
+        dosageForm:
+          $ref: "#/components/schemas/DosageForm"
+        packSize:
+          type: integer
+          format: int32
+          description: Units per pack, for example 10 tablets.
+        manufacturer:
+          type: string
+        requiresPrescription:
+          type: boolean
+    ProductList:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+    CreateProductRequest:
+      type: object
+      required:
+        [brandName, genericName, moleculeId, moleculeName, strength, dosageForm]
+      properties:
+        brandName:
+          type: string
+        genericName:
+          type: string
+        moleculeId:
+          type: string
+        moleculeName:
+          type: string
+        strength:
+          type: string
+        dosageForm:
+          $ref: "#/components/schemas/DosageForm"
+        packSize:
+          type: integer
+          format: int32
+          minimum: 1
+        manufacturer:
+          type: string
+        requiresPrescription:
+          type: boolean
+        controlled:
+          type: boolean
+          description: Narcotic or psychotropic. Controlled products are kept out of search and substitution.
+    PharmacyOffer:
+      type: object
+      description: One pharmacy that has the medicine, with what the result card shows.
+      required: [pharmacyId]
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        pharmacyName:
+          type: string
+        address:
+          type: string
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+        distanceM:
+          type: integer
+          format: int32
+          description: Straight-line distance in metres.
+        quantityAvailable:
+          type: integer
+          format: int32
+        priceChhertum:
+          $ref: "#/components/schemas/Chhertum"
+        freshnessScore:
+          $ref: "#/components/schemas/Score"
+        trustScore:
+          $ref: "#/components/schemas/Score"
+        rankScore:
+          $ref: "#/components/schemas/Score"
+        stockConfirmedAt:
+          type: string
+          format: date-time
+          description: When the pharmacy last set or confirmed this stock.
+    ProductResult:
+      type: object
+      required: [productId]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        brandName:
+          type: string
+        genericName:
+          type: string
+        strength:
+          type: string
+        offers:
+          type: array
+          description: Best first.
+          items:
+            $ref: "#/components/schemas/PharmacyOffer"
+    SearchResponse:
+      type: object
+      properties:
+        searchId:
+          type: string
+          description: Identifies this search in logs and analytics.
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductResult"
+        substitutes:
+          type: array
+          description: Filled only when no pharmacy has the matched medicines.
+          items:
+            $ref: "#/components/schemas/ProductResult"
+    Suggestion:
+      type: object
+      required: [productId, displayName]
+      properties:
+        productId:
+          type: string
+        displayName:
+          type: string
+          example: Napa 500mg (Paracetamol)
+    AutocompleteResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Suggestion"
+    VerificationStatus:
+      type: string
+      enum:
+        - VERIFICATION_STATUS_PENDING
+        - VERIFICATION_STATUS_VERIFIED
+        - VERIFICATION_STATUS_REJECTED
+        - VERIFICATION_STATUS_SUSPENDED
+    Pharmacy:
+      type: object
+      required: [pharmacyId, name, status]
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+          format: uuid
+          description: Returned only to the pharmacy's own staff and to administrators.
+        name:
+          type: string
+        licenseNumber:
+          type: string
+          description: Returned only to the pharmacy's own staff and to administrators.
+        phone:
+          type: string
+        address:
+          type: string
+        dzongkhag:
+          type: string
+          description: The district.
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+        status:
+          $ref: "#/components/schemas/VerificationStatus"
+        statusReason:
+          type: string
+          description: Set when the status is rejected or suspended.
+        createdAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+    RegisterPharmacyRequest:
+      type: object
+      required: [name, licenseNumber, phone, address, dzongkhag, location]
+      properties:
+        name:
+          type: string
+        licenseNumber:
+          type: string
+        phone:
+          type: string
+        address:
+          type: string
+        dzongkhag:
+          type: string
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+    PharmacyList:
+      type: object
+      properties:
+        pharmacies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pharmacy"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    SetVerificationRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum:
+            - VERIFICATION_STATUS_VERIFIED
+            - VERIFICATION_STATUS_REJECTED
+            - VERIFICATION_STATUS_SUSPENDED
+        reason:
+          type: string
+          description: Required for rejected and suspended.
+    StockLevel:
+      type: object
+      required: [pharmacyId, productId]
+      description: "`quantityAvailable` is `quantityOnHand` minus `quantityReserved` and is never negative."
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        quantityOnHand:
+          type: integer
+          format: int32
+        quantityReserved:
+          type: integer
+          format: int32
+        quantityAvailable:
+          type: integer
+          format: int32
+        confirmedAt:
+          type: string
+          format: date-time
+          description: The last time the pharmacy set or confirmed this stock.
+    StockList:
+      type: object
+      properties:
+        stock:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockLevel"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    SetStockRequest:
+      type: object
+      required: [quantityOnHand]
+      properties:
+        quantityOnHand:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Must also be at least the quantity reserved by active holds.
+    PriceUpdate:
+      type: object
+      required: [productId, priceChhertum]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        priceChhertum:
+          $ref: "#/components/schemas/Chhertum"
+    SetPricesRequest:
+      type: object
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PriceUpdate"
+    Price:
+      type: object
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        priceChhertum:
+          $ref: "#/components/schemas/Chhertum"
+        updatedAt:
+          type: string
+          format: date-time
+    SetPricesResponse:
+      type: object
+      properties:
+        prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
+    UploadStockCsvRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The CSV file, UTF-8, at most 1 MB. The file name is kept on the job.
+    SyncJobStatus:
+      type: string
+      enum:
+        - SYNC_JOB_STATUS_PROCESSING
+        - SYNC_JOB_STATUS_COMPLETED
+        - SYNC_JOB_STATUS_PARTIAL
+        - SYNC_JOB_STATUS_FAILED
+    RowError:
+      type: object
+      properties:
+        rowNumber:
+          type: integer
+          format: int32
+          description: 1-based, counting the header as row 1.
+        message:
+          type: string
+    SyncJob:
+      type: object
+      required: [jobId, status]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        uploadedByUserId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        status:
+          $ref: "#/components/schemas/SyncJobStatus"
+        rowsTotal:
+          type: integer
+          format: int32
+        rowsApplied:
+          type: integer
+          format: int32
+        rowsRejected:
+          type: integer
+          format: int32
+        rowErrors:
+          type: array
+          items:
+            $ref: "#/components/schemas/RowError"
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+    SyncJobList:
+      type: object
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncJob"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    HoldStatus:
+      type: string
+      description: |
+        `PENDING` becomes `ACTIVE` or `REJECTED`. `ACTIVE` becomes `COLLECTED`, `CANCELLED`
+        or `EXPIRED`. The other statuses are final.
+      enum:
+        - HOLD_STATUS_PENDING
+        - HOLD_STATUS_ACTIVE
+        - HOLD_STATUS_COLLECTED
+        - HOLD_STATUS_EXPIRED
+        - HOLD_STATUS_CANCELLED
+        - HOLD_STATUS_REJECTED
+    Hold:
+      type: object
+      required: [holdId, status]
+      properties:
+        holdId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5
+        status:
+          $ref: "#/components/schemas/HoldStatus"
+        pickupCode:
+          type: string
+          description: Set once the hold is active. Shown only to the patient who made the hold.
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: Set when the hold becomes active.
+        statusChangedAt:
+          type: string
+          format: date-time
+        statusReason:
+          type: string
+          description: Set for rejected and cancelled holds.
+    CreateHoldRequest:
+      type: object
+      required: [pharmacyId, productId, quantity]
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 5
+    HoldList:
+      type: object
+      properties:
+        holds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hold"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    CancelHoldRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Why the patient cancelled. Stored as the hold's `statusReason`.
+    CollectHoldRequest:
+      type: object
+      required: [pickupCode]
+      properties:
+        pickupCode:
+          type: string
+    SubmitFeedbackRequest:
+      type: object
+      required: [wasInStock]
+      properties:
+        wasInStock:
+          type: boolean
+        rating:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5
+          description: 1 to 5, or 0 for no rating.
+        comment:
+          type: string
+          maxLength: 500
+    Feedback:
+      type: object
+      required: [feedbackId, holdId]
+      properties:
+        feedbackId:
+          type: string
+          format: uuid
+        holdId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        wasInStock:
+          type: boolean
+        rating:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 5
+        comment:
+          type: string
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+    FeedbackList:
+      type: object
+      properties:
+        feedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/Feedback"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    Subscription:
+      type: object
+      required: [subscriptionId, productId]
+      properties:
+        subscriptionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+        radiusM:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        notifiedAt:
+          type: string
+          format: date-time
+          description: Set once the patient has been notified. The subscription does not fire again.
+    SubscribeRequest:
+      type: object
+      required: [productId, location]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+        radiusM:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 50000
+          description: Radius in metres. Use the same limits as search.
+    SubscriptionList:
+      type: object
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Subscription"
+    StockAlert:
+      type: object
+      description: The `data` of one event on the alert stream.
+      properties:
+        subscriptionId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        quantityAvailable:
+          type: integer
+          format: int32
+        occurredAt:
+          type: string
+          format: date-time
+    Channel:
+      type: string
+      enum: [CHANNEL_IN_APP, CHANNEL_EMAIL, CHANNEL_SMS]
+    Template:
+      type: string
+      enum:
+        - TEMPLATE_HOLD_CONFIRMED
+        - TEMPLATE_HOLD_EXPIRING_SOON
+        - TEMPLATE_HOLD_EXPIRED
+        - TEMPLATE_BACK_IN_STOCK
+        - TEMPLATE_FEEDBACK_REQUEST
+        - TEMPLATE_PHARMACY_VERIFIED
+    Notification:
+      type: object
+      required: [notificationId]
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        channel:
+          $ref: "#/components/schemas/Channel"
+        template:
+          $ref: "#/components/schemas/Template"
+        params:
+          type: object
+          description: Values filled into the template, for example the pickup code.
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+    NotificationList:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+    Profile:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        phone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        phone:
+          type: string
+    UnmetDemandItem:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        searchCount:
+          type: integer
+          format: int32
+        unmetCount:
+          type: integer
+          format: int32
+    UnmetDemandResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnmetDemandItem"
+    PharmacyStats:
+      type: object
+      properties:
+        holdsRequested:
+          type: integer
+          format: int32
+        holdsConfirmed:
+          type: integer
+          format: int32
+        holdsUnavailable:
+          type: integer
+          format: int32
+        feedbackCount:
+          type: integer
+          format: int32
+        feedbackInStockCount:
+          type: integer
+          format: int32
+    AsOfRequest:
+      type: object
+      required: [asOf]
+      properties:
+        asOf:
+          type: string
+          format: date-time
+          description: The "now" to work up to. The worker sends the current time.
+    ApplyDecayResponse:
+      type: object
+      properties:
+        updatedCount:
+          type: integer
+          format: int32
+    RunSweepResponse:
+      type: object
+      properties:
+        expiredHoldIds:
+          type: array
+          items:
+            type: string
+            format: uuid
