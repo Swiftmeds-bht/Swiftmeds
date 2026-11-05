@@ -1,0 +1,14 @@
+# Freshness decay Worker (SCRUM-74): once an hour it calls the gateway, which
+# asks the Freshness service to recompute every stored confidence level.
+name = "swiftmed-freshness-decay"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[triggers]
+# Every hour, on the hour (UTC).
+crons = ["0 * * * *"]
+
+# GATEWAY_URL and WORKER_SHARED_SECRET are not set here on purpose.
+#   Local:      copy .dev.vars.example to .dev.vars and fill it in.
+#   Deployed:   wrangler secret put WORKER_SHARED_SECRET
+#               and set GATEWAY_URL as a variable in the Cloudflare dashboard.

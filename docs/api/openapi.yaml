@@ -16,7 +16,7 @@ info:
 
     | `x-status` | Meaning |
     |---|---|
-    | `implemented` | The route exists in `services/gateway/internal/app/router.go` today. Only `GET /healthz`. |
+    | `implemented` | The route exists in `services/gateway/internal/app/router.go` today. Only `GET /healthz` and `POST /api/v1/internal/freshness/decay`. |
     | `planned` | The route is part of the agreed contract (derived from the `.proto` files and the test plan) but the gateway does not serve it yet. Until it does, `/api/v1/*` returns the plain-text 404 described below. |
 
     Every operation also has `x-grpc`, the gRPC method it calls, and `x-roles`, the
@@ -149,7 +149,10 @@ tags:
   - name: Analytics
     description: Unmet demand and pharmacy statistics.
   - name: Internal
-    description: Routes called by the scheduled Cloudflare Workers, not by people.
+    description: |
+      Routes called by the scheduled Cloudflare Workers, not by people. They do not use a
+      user token. The Worker sends the shared secret in the `X-Worker-Secret` header, and
+      the gateway rejects a missing or wrong secret with 401.
 paths:
   /healthz:
     get:
@@ -1469,17 +1472,23 @@ paths:
       operationId: runFreshnessDecay
       summary: Recompute stock freshness scores
       description: |
-        Called on a schedule by the freshness-decay worker. Safe to repeat: the scores
-        depend only on `asOf`.
-      x-status: planned
+        Called every hour by the freshness-decay worker (`workers/freshness-decay`). Safe to
+        repeat: the scores depend only on `asOf`. The caller sends the shared secret in
+        `X-Worker-Secret`. If the gateway has no `WORKER_SHARED_SECRET` set, every call is
+        rejected with 401.
+      security:
+        - workerSecret: []
+      x-status: implemented
       x-grpc: swiftmed.freshness.v1.FreshnessService/ApplyDecay
-      x-roles: [ROLE_ADMIN]
+      x-roles: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/AsOfRequest"
+            example:
+              asOf: "2026-11-05T07:00:00.000Z"
       responses:
         "200":
           description: How many scores were updated.
@@ -1487,12 +1496,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApplyDecayResponse"
+              example:
+                updatedCount: 12
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+          description: The `X-Worker-Secret` header is missing or wrong, or the gateway has no secret configured.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: unauthorized
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/internal/expiry/sweep:
@@ -1538,6 +1556,13 @@ components:
         It is valid for 15 minutes by default. A missing, malformed, expired or revoked
         token gives 401. A valid token with the wrong role, or for another pharmacy's
         data, gives 403.
+    workerSecret:
+      type: apiKey
+      in: header
+      name: X-Worker-Secret
+      description: |
+        The secret shared by the gateway and the Cloudflare Workers (`WORKER_SHARED_SECRET`).
+        Used only by the routes tagged Internal. A missing or wrong secret gives 401.
   headers:
     XRequestId:
       description: The request ID, echoed from the request or made by the gateway.
