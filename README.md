@@ -82,6 +82,22 @@ docker compose -f deploy/docker-compose.yml ps
 docker compose -f deploy/docker-compose.yml down
 ```
 
+Search and Inventory are discovered by Traefik through Docker labels and use
+round-robin load balancing. To run two replicas of each service:
+
+```powershell
+docker compose -f deploy/docker-compose.yml up -d --scale search=2 --scale inventory=2
+docker compose -f deploy/docker-compose.yml logs -f search inventory traefik
+```
+
+The active backends are visible in the Traefik dashboard at
+`http://localhost:8081/dashboard/`. Stopping one replica removes it from
+Traefik's backend list while the remaining replica continues serving requests:
+
+```powershell
+docker compose -f deploy/docker-compose.yml stop search-1
+```
+
 Do not add `-v` to the `down` command unless you intentionally want to delete the
 local PostgreSQL and RabbitMQ data volumes.
 
