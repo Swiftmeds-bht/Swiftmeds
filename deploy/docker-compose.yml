@@ -324,6 +324,33 @@ services:
       - traefik.http.services.search.loadbalancer.server.port=${SEARCH_GRPC_PORT:-50060}
       - traefik.http.services.search.loadbalancer.server.scheme=h2c
 
+  watchlist:
+    build:
+      context: ..
+      dockerfile: services/watchlist/Dockerfile
+    restart: unless-stopped
+    environment:
+      WATCHLIST_GRPC_PORT: ${WATCHLIST_GRPC_PORT:-50064}
+      WATCHLIST_DATABASE_URL: ${WATCHLIST_DATABASE_URL:?set WATCHLIST_DATABASE_URL in .env}
+      # Consumes stock.increased; asks Geo (through Traefik) which subscribers are in range.
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      WATCHLIST_UPSTREAM: traefik:50051
+      WATCHLIST_GEO_TIMEOUT: ${WATCHLIST_GEO_TIMEOUT:-2s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.watchlist.rule=Host(`watchlist`)
+      - traefik.http.routers.watchlist.entrypoints=grpc
+      - traefik.http.services.watchlist.loadbalancer.server.port=${WATCHLIST_GRPC_PORT:-50064}
+      - traefik.http.services.watchlist.loadbalancer.server.scheme=h2c
+
   freshness:
     build:
       context: ..

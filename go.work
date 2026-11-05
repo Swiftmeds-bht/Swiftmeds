@@ -10,11 +10,12 @@ use (
 	./services/geo
 	./services/holds
 	./services/inventory
-	./services/pricing
 	./services/pharmacy-registry
+	./services/pricing
 	./services/ranking
 	./services/search
 	./services/stock-sync
 	./services/substitution
 	./services/user-profile
+	./services/watchlist
 )
