@@ -17,6 +17,9 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
+	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
+	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
+	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/app"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/grpcx"
@@ -62,10 +65,28 @@ func run() error {
 		return fmt.Errorf("auth client: %w", err)
 	}
 	auth := clients.NewAuthClient(authv1.NewAuthServiceClient(authConn))
+	searchConn, err := conns.Connection(context.Background(), "search")
+	if err != nil {
+		return fmt.Errorf("search client: %w", err)
+	}
+	geoConn, err := conns.Connection(context.Background(), "geo")
+	if err != nil {
+		return fmt.Errorf("geo client: %w", err)
+	}
+	substitutionConn, err := conns.Connection(context.Background(), "substitution")
+	if err != nil {
+		return fmt.Errorf("substitution client: %w", err)
+	}
 
 	server := &http.Server{
-		Addr:              cfg.HTTPAddress(),
-		Handler:           app.NewRouter(cfg, log, app.WithFreshness(freshness), app.WithAuth(auth)),
+		Addr: cfg.HTTPAddress(),
+		Handler: app.NewRouter(cfg, log,
+			app.WithFreshness(freshness),
+			app.WithAuth(auth),
+			app.WithSearch(clients.NewSearchClient(searchv1.NewSearchServiceClient(searchConn))),
+			app.WithGeo(clients.NewGeoClient(geov1.NewGeoServiceClient(geoConn))),
+			app.WithSubstitution(clients.NewSubstitutionClient(substitutionv1.NewSubstitutionServiceClient(substitutionConn))),
+		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		IdleTimeout:       60 * time.Second,

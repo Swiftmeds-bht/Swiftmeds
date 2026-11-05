@@ -87,7 +87,9 @@ func bearerToken(header string) (string, bool) {
 
 func isPublicRoute(path string) bool {
 	return routeMatches(path, "/api/v1/search") ||
+		routeMatches(path, "/api/v1/pharmacies/nearby") ||
 		routeMatches(path, "/api/v1/nearby") ||
+		routeMatches(path, "/api/v1/medicines") ||
 		routeMatches(path, "/api/v1/login") ||
 		routeMatches(path, "/api/v1/auth/login")
 }
