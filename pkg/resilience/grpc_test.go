@@ -87,6 +87,20 @@ func TestInterceptorNeverRetriesNonRetryableCodes(t *testing.T) {
 	}
 }
 
+func TestInterceptorNeverRetriesCreateHold(t *testing.T) {
+	f := &fakeInvoker{results: []error{unavailable(), nil}}
+	in := UnaryClientInterceptor(Config{Retry: fastRetry(5)})
+
+	err := in(context.Background(), "/swiftmed.holds.v1.HoldsService/CreateHold", nil, nil, nil, f.invoke)
+
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("code = %v, want Unavailable", status.Code(err))
+	}
+	if f.calls != 1 {
+		t.Fatalf("calls = %d, want 1 for non-idempotent CreateHold", f.calls)
+	}
+}
+
 func TestInterceptorOpensTheBreakerAndFailsFast(t *testing.T) {
 	clock := &fakeClock{now: time.Unix(1000, 0)}
 	f := &fakeInvoker{results: []error{unavailable(), unavailable()}}

@@ -2,10 +2,19 @@ go 1.25.0
 
 use (
 	./pkg
-	./services/gateway
 	./proto/gen/go
 	./services/auth
+	./services/catalog
+	./services/freshness
+	./services/gateway
+	./services/geo
+	./services/holds
+	./services/inventory
 	./services/pricing
-	// Add each service here as soon as it has a go.mod, e.g.:
-	// ./services/inventory
+	./services/pharmacy-registry
+	./services/ranking
+	./services/search
+	./services/stock-sync
+	./services/substitution
+	./services/user-profile
 )

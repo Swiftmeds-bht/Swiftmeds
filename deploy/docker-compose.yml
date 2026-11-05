@@ -7,10 +7,14 @@ services:
       GATEWAY_HTTP_PORT: ${GATEWAY_HTTP_PORT:-8080}
       TRAEFIK_GRPC_TARGET: ${TRAEFIK_GRPC_TARGET:-traefik:50051}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
-    ports:
-      - "${GATEWAY_HTTP_PORT:-8080}:${GATEWAY_HTTP_PORT:-8080}"
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-}
     depends_on:
       - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gateway.rule=PathPrefix(`/`)
+      - traefik.http.routers.gateway.entrypoints=web
+      - traefik.http.services.gateway.loadbalancer.server.port=${GATEWAY_HTTP_PORT:-8080}
 
   postgres:
     image: postgres:16-alpine
@@ -60,6 +64,7 @@ services:
     command:
       - --configFile=/etc/traefik/traefik.yml
     ports:
+      - "${GATEWAY_HTTP_PORT:-8080}:8080"
       - "50051:50051"
       - "${TRAEFIK_DASHBOARD_PORT:-8081}:8081"
     volumes:
@@ -107,7 +112,11 @@ services:
     restart: unless-stopped
     environment:
       PRICING_GRPC_PORT: ${PRICING_GRPC_PORT:-50063}
+      PRICING_DATABASE_URL: ${PRICING_DATABASE_URL:?set PRICING_DATABASE_URL in .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.pricing.rule=Host(`pricing`)
@@ -115,6 +124,226 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  pharmacy-registry:
+    build:
+      context: ..
+      dockerfile: services/pharmacy-registry/Dockerfile
+    restart: unless-stopped
+    environment:
+      PHARMACY_REGISTRY_GRPC_PORT: ${PHARMACY_REGISTRY_GRPC_PORT:-50053}
+      PHARMACY_REGISTRY_DATABASE_URL: ${PHARMACY_REGISTRY_DATABASE_URL:?set PHARMACY_REGISTRY_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pharmacy-registry.rule=Host(`pharmacy-registry`)
+      - traefik.http.routers.pharmacy-registry.entrypoints=grpc
+      - traefik.http.services.pharmacy-registry.loadbalancer.server.port=${PHARMACY_REGISTRY_GRPC_PORT:-50053}
+      - traefik.http.services.pharmacy-registry.loadbalancer.server.scheme=h2c
+
+  holds:
+       build:
+         context: ..
+         dockerfile: services/holds/Dockerfile
+       restart: unless-stopped
+       environment:
+         HOLDS_GRPC_PORT: ${HOLDS_GRPC_PORT:-50065}
+         HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
+         HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
+         HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
+         LOG_LEVEL: ${LOG_LEVEL:-info}
+       depends_on:
+         postgres:
+           condition: service_healthy
+       labels:
+         - traefik.enable=true
+         - traefik.http.routers.holds.rule=Host(`holds`)
+         - traefik.http.routers.holds.entrypoints=grpc
+         - traefik.http.services.holds.loadbalancer.server.port=${HOLDS_GRPC_PORT:-50065}
+         - traefik.http.services.holds.loadbalancer.server.scheme=h2c
+
+  stock-sync:
+    build:
+      context: ..
+      dockerfile: services/stock-sync/Dockerfile
+    restart: unless-stopped
+    environment:
+      STOCK_SYNC_GRPC_PORT: ${STOCK_SYNC_GRPC_PORT:-50057}
+      STOCK_SYNC_DATABASE_URL: ${STOCK_SYNC_DATABASE_URL:?set STOCK_SYNC_DATABASE_URL in .env}
+      STOCK_SYNC_UPSTREAM: ${STOCK_SYNC_UPSTREAM:-traefik:50051}
+      STOCK_SYNC_CALL_TIMEOUT: ${STOCK_SYNC_CALL_TIMEOUT:-800ms}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.stock-sync.rule=Host(`stock-sync`)
+      - traefik.http.routers.stock-sync.entrypoints=grpc
+      - traefik.http.services.stock-sync.loadbalancer.server.port=${STOCK_SYNC_GRPC_PORT:-50057}
+      - traefik.http.services.stock-sync.loadbalancer.server.scheme=h2c
+  catalog:
+    build:
+      context: ..
+      dockerfile: services/catalog/Dockerfile
+    restart: unless-stopped
+    environment:
+      CATALOG_GRPC_PORT: ${CATALOG_GRPC_PORT:-50055}
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL:?set CATALOG_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.catalog.rule=Host(`catalog`)
+      - traefik.http.routers.catalog.entrypoints=grpc
+      - traefik.http.services.catalog.loadbalancer.server.port=${CATALOG_GRPC_PORT:-50055}
+      - traefik.http.services.catalog.loadbalancer.server.scheme=h2c
+  substitution:
+    build:
+      context: ..
+      dockerfile: services/substitution/Dockerfile
+    restart: unless-stopped
+    environment:
+      SUBSTITUTION_GRPC_PORT: ${SUBSTITUTION_GRPC_PORT:-50058}
+      SUBSTITUTION_UPSTREAM: traefik:50051
+      SUBSTITUTION_CALL_TIMEOUT: ${SUBSTITUTION_CALL_TIMEOUT:-800ms}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.substitution.rule=Host(`substitution`)
+      - traefik.http.routers.substitution.entrypoints=grpc
+      - traefik.http.services.substitution.loadbalancer.server.port=${SUBSTITUTION_GRPC_PORT:-50058}
+      - traefik.http.services.substitution.loadbalancer.server.scheme=h2c
+  user-profile:
+    build:
+      context: ..
+      dockerfile: services/user-profile/Dockerfile
+    restart: unless-stopped
+    environment:
+      USER_PROFILE_GRPC_PORT: ${USER_PROFILE_GRPC_PORT:-50052}
+      USER_PROFILE_DATABASE_URL: ${USER_PROFILE_DATABASE_URL:?set USER_PROFILE_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.user-profile.rule=Host(`user-profile`)
+      - traefik.http.routers.user-profile.entrypoints=grpc
+      - traefik.http.services.user-profile.loadbalancer.server.port=${USER_PROFILE_GRPC_PORT:-50052}
+      - traefik.http.services.user-profile.loadbalancer.server.scheme=h2c
+
+  inventory:
+    build:
+      context: ..
+      dockerfile: services/inventory/Dockerfile
+    restart: unless-stopped
+    environment:
+      INVENTORY_GRPC_PORT: ${INVENTORY_GRPC_PORT:-50056}
+      INVENTORY_DATABASE_URL: ${INVENTORY_DATABASE_URL:?set INVENTORY_DATABASE_URL in .env}
+      # Inventory takes part in the reservation saga (hold.requested -> stock.reserved/unavailable).
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.inventory.rule=Host(`inventory`)
+      - traefik.http.routers.inventory.entrypoints=grpc
+      - traefik.http.services.inventory.loadbalancer.server.port=${INVENTORY_GRPC_PORT:-50056}
+      - traefik.http.services.inventory.loadbalancer.server.scheme=h2c
+
+  geo:
+    build:
+      context: ..
+      dockerfile: services/geo/Dockerfile
+    restart: unless-stopped
+    environment:
+      GEO_GRPC_PORT: ${GEO_GRPC_PORT:-50062}
+      GEO_DATABASE_URL: ${GEO_DATABASE_URL:?set GEO_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.geo.rule=Host(`geo`)
+      - traefik.http.routers.geo.entrypoints=grpc
+      - traefik.http.services.geo.loadbalancer.server.port=${GEO_GRPC_PORT:-50062}
+      - traefik.http.services.geo.loadbalancer.server.scheme=h2c
+
+  ranking:
+    build:
+      context: ..
+      dockerfile: services/ranking/Dockerfile
+    restart: unless-stopped
+    environment:
+      RANKING_GRPC_PORT: ${RANKING_GRPC_PORT:-50061}
+      # Optional: override the default weights (all four must sum to 1).
+      RANKING_WEIGHT_DISTANCE: ${RANKING_WEIGHT_DISTANCE:-}
+      RANKING_WEIGHT_FRESHNESS: ${RANKING_WEIGHT_FRESHNESS:-}
+      RANKING_WEIGHT_TRUST: ${RANKING_WEIGHT_TRUST:-}
+      RANKING_WEIGHT_PRICE: ${RANKING_WEIGHT_PRICE:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ranking.rule=Host(`ranking`)
+      - traefik.http.routers.ranking.entrypoints=grpc
+      - traefik.http.services.ranking.loadbalancer.server.port=${RANKING_GRPC_PORT:-50061}
+      - traefik.http.services.ranking.loadbalancer.server.scheme=h2c
+
+  search:
+    build:
+      context: ..
+      dockerfile: services/search/Dockerfile
+    restart: unless-stopped
+    environment:
+      SEARCH_GRPC_PORT: ${SEARCH_GRPC_PORT:-50060}
+      # Search calls every downstream service through Traefik.
+      SEARCH_UPSTREAM: traefik:50051
+      SEARCH_CALL_TIMEOUT: ${SEARCH_CALL_TIMEOUT:-800ms}
+      SEARCH_REQUEST_TIMEOUT: ${SEARCH_REQUEST_TIMEOUT:-2s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.search.rule=Host(`search`)
+      - traefik.http.routers.search.entrypoints=grpc
+      - traefik.http.services.search.loadbalancer.server.port=${SEARCH_GRPC_PORT:-50060}
+      - traefik.http.services.search.loadbalancer.server.scheme=h2c
+
+  freshness:
+    build:
+      context: ..
+      dockerfile: services/freshness/Dockerfile
+    restart: unless-stopped
+    environment:
+      FRESHNESS_GRPC_PORT: ${FRESHNESS_GRPC_PORT:-50069}
+      FRESHNESS_DATABASE_URL: ${FRESHNESS_DATABASE_URL:?set FRESHNESS_DATABASE_URL in .env}
+      FRESHNESS_HIGH_WITHIN: ${FRESHNESS_HIGH_WITHIN:-6h}
+      FRESHNESS_MEDIUM_WITHIN: ${FRESHNESS_MEDIUM_WITHIN:-24h}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.freshness.rule=Host(`freshness`)
+      - traefik.http.routers.freshness.entrypoints=grpc
+      - traefik.http.services.freshness.loadbalancer.server.port=${FRESHNESS_GRPC_PORT:-50069}
+      - traefik.http.services.freshness.loadbalancer.server.scheme=h2c
 volumes:
   postgres_data:
   rabbitmq_data:

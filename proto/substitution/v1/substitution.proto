@@ -1,9 +1,10 @@
 syntax = "proto3";
 
-// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme. Core service.
+// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme.
 //
-// Rule (decision table in docs/test-plan.md): a substitute has the SAME molecule,
-// SAME strength and SAME dosage form, is not controlled, and is not the product itself.
+// Candidates must share the source molecule, must not be controlled, and must
+// not be the source product. Exact matches also share strength and dosage form;
+// candidates that differ in strength or form need pharmacist review.
 package swiftmed.substitution.v1;
 
 option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1;substitutionv1";
@@ -12,11 +13,18 @@ service SubstitutionService {
   rpc GetSubstitutes(GetSubstitutesRequest) returns (GetSubstitutesResponse);
 }
 
+enum SubstituteMatchType {
+  SUBSTITUTE_MATCH_TYPE_UNSPECIFIED = 0;
+  SUBSTITUTE_MATCH_TYPE_EXACT = 1;
+  SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK = 2;
+}
+
 message Substitute {
   string product_id = 1;
   string brand_name = 2;
   string generic_name = 3;
   string strength = 4;
+  SubstituteMatchType match_type = 5;
 }
 
 message GetSubstitutesRequest {

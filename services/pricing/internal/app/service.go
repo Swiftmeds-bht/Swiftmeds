@@ -44,11 +44,14 @@ func (s *Service) SetPrices(ctx context.Context, pharmacyID string, updates []Up
 	return prices, nil
 }
 
-// BatchGetPrices returns the prices that exist for keys.
+// BatchGetPrices returns the prices that exist for keys, as a comparison:
+// grouped by product, cheapest first, ties ordered by pharmacy ID. Keys with
+// no price are left out, so asking for one product at several pharmacies
+// gives the price comparison for that medicine.
 func (s *Service) BatchGetPrices(ctx context.Context, keys []domain.Key) ([]domain.Price, error) {
 	prices, err := s.repo.GetMany(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf("get prices: %w", err)
 	}
-	return prices, nil
+	return domain.SortCheapestFirst(prices), nil
 }
