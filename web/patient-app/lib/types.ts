@@ -36,6 +36,13 @@ export interface SearchResponse {
   substitutes: ProductResult[];
 }
 
+/** One name offered while the patient types (proto/search/v1 Suggestion). */
+export interface Suggestion {
+  productId: string;
+  /** e.g. "Napa 500mg (Paracetamol)" */
+  displayName: string;
+}
+
 export interface SearchParams {
   query: string;
   location: GeoPoint;

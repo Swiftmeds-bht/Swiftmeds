@@ -18,8 +18,29 @@ type HoldRequestedConsumer struct {
 	consumer *messaging.Consumer
 }
 
+type holdRequestedChannel interface {
+	ExchangeDeclare(
+		name, kind string,
+		durable, autoDelete, internal, noWait bool,
+		args amqp.Table,
+	) error
+	QueueDeclare(
+		name string,
+		durable, autoDelete, exclusive, noWait bool,
+		args amqp.Table,
+	) (amqp.Queue, error)
+	QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error
+	Qos(prefetchCount, prefetchSize int, global bool) error
+	ConsumeWithContext(
+		ctx context.Context,
+		queue, consumer string,
+		autoAck, exclusive, noLocal, noWait bool,
+		args amqp.Table,
+	) (<-chan amqp.Delivery, error)
+}
+
 func NewHoldRequestedConsumer(
-	channel *amqp.Channel,
+	channel holdRequestedChannel,
 	deduper messaging.Deduper,
 	service *app.Service,
 ) (*HoldRequestedConsumer, error) {
@@ -47,21 +68,30 @@ func NewHoldRequestedConsumer(
 	return &HoldRequestedConsumer{consumer: consumer}, nil
 }
 
-func handleHoldRequested(ctx context.Context, delivery amqp.Delivery, service *app.Service) error {
+func handleHoldRequested(
+	ctx context.Context,
+	delivery amqp.Delivery,
+	service *app.Service,
+) error {
 	if service == nil {
 		return errors.New("inventory application service is nil")
 	}
 	if delivery.ContentType != messaging.ProtobufType {
 		return fmt.Errorf("unexpected content type %q", delivery.ContentType)
 	}
+
 	event := &eventsv1.HoldRequested{}
 	if err := proto.Unmarshal(delivery.Body, event); err != nil {
 		return fmt.Errorf("decode HoldRequested event: %w", err)
 	}
+
 	_, _, err := service.Reserve(
 		ctx,
 		event.GetHoldId(),
-		ports.StockKey{PharmacyID: event.GetPharmacyId(), ProductID: event.GetProductId()},
+		ports.StockKey{
+			PharmacyID: event.GetPharmacyId(),
+			ProductID:  event.GetProductId(),
+		},
 		event.GetQuantity(),
 	)
 	if err != nil {

@@ -8,9 +8,13 @@ use (
 	./services/freshness
 	./services/gateway
 	./services/geo
+	./services/holds
 	./services/inventory
 	./services/pricing
+	./services/pharmacy-registry
 	./services/ranking
 	./services/search
+	./services/stock-sync
+	./services/substitution
 	./services/user-profile
 )

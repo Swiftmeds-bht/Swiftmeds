@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { InfoIcon } from "@/components/Icons";
-import { ResultsList } from "@/components/ResultsList";
+import { ResultsSection } from "@/components/ResultsSection";
+import { ResultsSkeleton } from "@/components/ResultsSkeleton";
 import { SearchForm } from "@/components/SearchForm";
-import { searchMedicines } from "@/lib/api";
-import { formatDistance } from "@/lib/format";
-import { parseRadius, placeById } from "@/lib/places";
-
-export const metadata: Metadata = { title: "Search results" };
+import { parseRadius, placeById, resolveLocation } from "@/lib/places";
 
 // Always render per request: stock changes all the time.
 export const dynamic = "force-dynamic";
@@ -16,33 +13,46 @@ type SearchParamsIn = Promise<Record<string, string | string[] | undefined>>;
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
+export async function generateMetadata({ searchParams }: { searchParams: SearchParamsIn }): Promise<Metadata> {
+  const query = (first((await searchParams).q) ?? "").trim();
+  return { title: query ? `Results for ${query}` : "Search results" };
+}
+
 export default async function ResultsPage({ searchParams }: { searchParams: SearchParamsIn }) {
   const sp = await searchParams;
   const query = (first(sp.q) ?? "").trim();
   const place = placeById(first(sp.place));
+  const location = resolveLocation(first(sp.lat), first(sp.lng), first(sp.place));
   const radiusM = parseRadius(first(sp.radius));
 
-  const { source, data } = query
-    ? await searchMedicines({ query, location: place.location, radiusM })
-    : { source: "demo" as const, data: { searchId: "", results: [], substitutes: [] } };
+  // A link that repeats this exact search, for "Try again".
+  const retry = new URLSearchParams();
+  for (const name of ["q", "lat", "lng", "place", "radius"]) {
+    const value = first(sp[name]);
+    if (value) retry.set(name, value);
+  }
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>Results</h1>
-        <h2 className="page-sub">
-          Pharmacies within {formatDistance(radiusM)} of {place.label}
-        </h2>
-      </div>
-      <SearchForm query={query} placeId={place.id} radiusM={radiusM} variant="compact" />
-      {source === "demo" && (
-        <p className="notice" role="note">
-          <InfoIcon />
-          <span>Showing demo data. Live search arrives when the gateway search route is ready.</span>
-        </p>
-      )}
+      <h1>Results</h1>
+      <SearchForm
+        query={query}
+        placeId={place.id}
+        radiusM={radiusM}
+        deviceLocation={location.fromDevice ? location.point : undefined}
+        variant="compact"
+      />
       {query ? (
-        <ResultsList query={query} results={data.results} substitutes={data.substitutes} />
+        // The key makes a new search show the loading state again instead of the old results.
+        <Suspense key={retry.toString()} fallback={<ResultsSkeleton />}>
+          <ResultsSection
+            query={query}
+            point={location.point}
+            label={location.label}
+            radiusM={radiusM}
+            retryHref={`/results?${retry}`}
+          />
+        </Suspense>
       ) : (
         <p className="empty">Type a medicine name to search.</p>
       )}

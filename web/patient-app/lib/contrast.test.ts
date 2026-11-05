@@ -40,6 +40,7 @@ describe("WCAG 2.1 AA contrast of the colour tokens", () => {
     ["high-text", "high-bg", 4.5],
     ["medium-text", "medium-bg", 4.5],
     ["low-text", "low-bg", 4.5],
+    ["low-text", "bg", 4.5], // error heading
     ["info-text", "info-bg", 4.5], // notice banner
     ["focus", "bg", 3], // focus outline (non-text)
     ["input-border", "bg", 3], // search bar and select borders (non-text)

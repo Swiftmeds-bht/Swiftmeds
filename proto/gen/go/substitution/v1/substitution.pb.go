@@ -4,10 +4,11 @@
 // 	protoc        v3.21.12
 // source: substitution/v1/substitution.proto
 
-// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme. Core service.
+// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme.
 //
-// Rule (decision table in docs/test-plan.md): a substitute has the SAME molecule,
-// SAME strength and SAME dosage form, is not controlled, and is not the product itself.
+// Candidates must share the source molecule, must not be controlled, and must
+// not be the source product. Exact matches also share strength and dosage form;
+// candidates that differ in strength or form need pharmacist review.
 
 package substitutionv1
 
@@ -26,12 +27,62 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type SubstituteMatchType int32
+
+const (
+	SubstituteMatchType_SUBSTITUTE_MATCH_TYPE_UNSPECIFIED            SubstituteMatchType = 0
+	SubstituteMatchType_SUBSTITUTE_MATCH_TYPE_EXACT                  SubstituteMatchType = 1
+	SubstituteMatchType_SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK SubstituteMatchType = 2
+)
+
+// Enum value maps for SubstituteMatchType.
+var (
+	SubstituteMatchType_name = map[int32]string{
+		0: "SUBSTITUTE_MATCH_TYPE_UNSPECIFIED",
+		1: "SUBSTITUTE_MATCH_TYPE_EXACT",
+		2: "SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK",
+	}
+	SubstituteMatchType_value = map[string]int32{
+		"SUBSTITUTE_MATCH_TYPE_UNSPECIFIED":            0,
+		"SUBSTITUTE_MATCH_TYPE_EXACT":                  1,
+		"SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK": 2,
+	}
+)
+
+func (x SubstituteMatchType) Enum() *SubstituteMatchType {
+	p := new(SubstituteMatchType)
+	*p = x
+	return p
+}
+
+func (x SubstituteMatchType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SubstituteMatchType) Descriptor() protoreflect.EnumDescriptor {
+	return file_substitution_v1_substitution_proto_enumTypes[0].Descriptor()
+}
+
+func (SubstituteMatchType) Type() protoreflect.EnumType {
+	return &file_substitution_v1_substitution_proto_enumTypes[0]
+}
+
+func (x SubstituteMatchType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SubstituteMatchType.Descriptor instead.
+func (SubstituteMatchType) EnumDescriptor() ([]byte, []int) {
+	return file_substitution_v1_substitution_proto_rawDescGZIP(), []int{0}
+}
+
 type Substitute struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
 	BrandName     string                 `protobuf:"bytes,2,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
 	GenericName   string                 `protobuf:"bytes,3,opt,name=generic_name,json=genericName,proto3" json:"generic_name,omitempty"`
 	Strength      string                 `protobuf:"bytes,4,opt,name=strength,proto3" json:"strength,omitempty"`
+	MatchType     SubstituteMatchType    `protobuf:"varint,5,opt,name=match_type,json=matchType,proto3,enum=swiftmed.substitution.v1.SubstituteMatchType" json:"match_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -92,6 +143,13 @@ func (x *Substitute) GetStrength() string {
 		return x.Strength
 	}
 	return ""
+}
+
+func (x *Substitute) GetMatchType() SubstituteMatchType {
+	if x != nil {
+		return x.MatchType
+	}
+	return SubstituteMatchType_SUBSTITUTE_MATCH_TYPE_UNSPECIFIED
 }
 
 type GetSubstitutesRequest struct {
@@ -202,7 +260,7 @@ var File_substitution_v1_substitution_proto protoreflect.FileDescriptor
 
 const file_substitution_v1_substitution_proto_rawDesc = "" +
 	"\n" +
-	"\"substitution/v1/substitution.proto\x12\x18swiftmed.substitution.v1\"\x89\x01\n" +
+	"\"substitution/v1/substitution.proto\x12\x18swiftmed.substitution.v1\"\xd7\x01\n" +
 	"\n" +
 	"Substitute\x12\x1d\n" +
 	"\n" +
@@ -210,7 +268,9 @@ const file_substitution_v1_substitution_proto_rawDesc = "" +
 	"\n" +
 	"brand_name\x18\x02 \x01(\tR\tbrandName\x12!\n" +
 	"\fgeneric_name\x18\x03 \x01(\tR\vgenericName\x12\x1a\n" +
-	"\bstrength\x18\x04 \x01(\tR\bstrength\"L\n" +
+	"\bstrength\x18\x04 \x01(\tR\bstrength\x12L\n" +
+	"\n" +
+	"match_type\x18\x05 \x01(\x0e2-.swiftmed.substitution.v1.SubstituteMatchTypeR\tmatchType\"L\n" +
 	"\x15GetSubstitutesRequest\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x14\n" +
@@ -218,7 +278,11 @@ const file_substitution_v1_substitution_proto_rawDesc = "" +
 	"\x16GetSubstitutesResponse\x12\x1f\n" +
 	"\vmolecule_id\x18\x01 \x01(\tR\n" +
 	"moleculeId\x12F\n" +
-	"\vsubstitutes\x18\x02 \x03(\v2$.swiftmed.substitution.v1.SubstituteR\vsubstitutes2\x8a\x01\n" +
+	"\vsubstitutes\x18\x02 \x03(\v2$.swiftmed.substitution.v1.SubstituteR\vsubstitutes*\x8f\x01\n" +
+	"\x13SubstituteMatchType\x12%\n" +
+	"!SUBSTITUTE_MATCH_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bSUBSTITUTE_MATCH_TYPE_EXACT\x10\x01\x120\n" +
+	",SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK\x10\x022\x8a\x01\n" +
 	"\x13SubstitutionService\x12s\n" +
 	"\x0eGetSubstitutes\x12/.swiftmed.substitution.v1.GetSubstitutesRequest\x1a0.swiftmed.substitution.v1.GetSubstitutesResponseBPZNgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1;substitutionv1b\x06proto3"
 
@@ -234,21 +298,24 @@ func file_substitution_v1_substitution_proto_rawDescGZIP() []byte {
 	return file_substitution_v1_substitution_proto_rawDescData
 }
 
+var file_substitution_v1_substitution_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_substitution_v1_substitution_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_substitution_v1_substitution_proto_goTypes = []any{
-	(*Substitute)(nil),             // 0: swiftmed.substitution.v1.Substitute
-	(*GetSubstitutesRequest)(nil),  // 1: swiftmed.substitution.v1.GetSubstitutesRequest
-	(*GetSubstitutesResponse)(nil), // 2: swiftmed.substitution.v1.GetSubstitutesResponse
+	(SubstituteMatchType)(0),       // 0: swiftmed.substitution.v1.SubstituteMatchType
+	(*Substitute)(nil),             // 1: swiftmed.substitution.v1.Substitute
+	(*GetSubstitutesRequest)(nil),  // 2: swiftmed.substitution.v1.GetSubstitutesRequest
+	(*GetSubstitutesResponse)(nil), // 3: swiftmed.substitution.v1.GetSubstitutesResponse
 }
 var file_substitution_v1_substitution_proto_depIdxs = []int32{
-	0, // 0: swiftmed.substitution.v1.GetSubstitutesResponse.substitutes:type_name -> swiftmed.substitution.v1.Substitute
-	1, // 1: swiftmed.substitution.v1.SubstitutionService.GetSubstitutes:input_type -> swiftmed.substitution.v1.GetSubstitutesRequest
-	2, // 2: swiftmed.substitution.v1.SubstitutionService.GetSubstitutes:output_type -> swiftmed.substitution.v1.GetSubstitutesResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: swiftmed.substitution.v1.Substitute.match_type:type_name -> swiftmed.substitution.v1.SubstituteMatchType
+	1, // 1: swiftmed.substitution.v1.GetSubstitutesResponse.substitutes:type_name -> swiftmed.substitution.v1.Substitute
+	2, // 2: swiftmed.substitution.v1.SubstitutionService.GetSubstitutes:input_type -> swiftmed.substitution.v1.GetSubstitutesRequest
+	3, // 3: swiftmed.substitution.v1.SubstitutionService.GetSubstitutes:output_type -> swiftmed.substitution.v1.GetSubstitutesResponse
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_substitution_v1_substitution_proto_init() }
@@ -261,13 +328,14 @@ func file_substitution_v1_substitution_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_substitution_v1_substitution_proto_rawDesc), len(file_substitution_v1_substitution_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_substitution_v1_substitution_proto_goTypes,
 		DependencyIndexes: file_substitution_v1_substitution_proto_depIdxs,
+		EnumInfos:         file_substitution_v1_substitution_proto_enumTypes,
 		MessageInfos:      file_substitution_v1_substitution_proto_msgTypes,
 	}.Build()
 	File_substitution_v1_substitution_proto = out.File

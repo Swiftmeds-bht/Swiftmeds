@@ -4,10 +4,11 @@
 // - protoc             v3.21.12
 // source: substitution/v1/substitution.proto
 
-// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme. Core service.
+// Substitution: equivalent products when a medicine is unavailable. Owner: Jigme.
 //
-// Rule (decision table in docs/test-plan.md): a substitute has the SAME molecule,
-// SAME strength and SAME dosage form, is not controlled, and is not the product itself.
+// Candidates must share the source molecule, must not be controlled, and must
+// not be the source product. Exact matches also share strength and dosage form;
+// candidates that differ in strength or form need pharmacist review.
 
 package substitutionv1
 

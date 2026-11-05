@@ -16,12 +16,13 @@ function ProductCard({ product }: { product: ProductResult }) {
       {product.offers.length === 0 ? (
         <p className="empty">Not in stock at any pharmacy in this area.</p>
       ) : (
-        <ul className="offers" aria-label={`Pharmacies with ${product.brandName}`}>
-          {product.offers.map((o) => {
+        <ol className="offers" aria-label={`Pharmacies with ${product.brandName}, best match first`}>
+          {product.offers.map((o, index) => {
             const fresh = freshnessLabel(o.freshnessScore);
             return (
               <li key={o.pharmacyId} className="offer">
                 <div className="offer-main">
+                  {index === 0 && product.offers.length > 1 && <p className="best-match">Best match</p>}
                   <Link href={`/pharmacy/${o.pharmacyId}`} className="offer-name">
                     {o.pharmacyName}
                   </Link>
@@ -39,7 +40,7 @@ function ProductCard({ product }: { product: ProductResult }) {
               </li>
             );
           })}
-        </ul>
+        </ol>
       )}
     </section>
   );
@@ -67,6 +68,9 @@ export function ResultsList({ query, results, substitutes }: Props) {
           ? `No pharmacy nearby has “${query}” in stock.`
           : `${total} ${total === 1 ? "pharmacy has" : "pharmacies have"} “${query}” in stock.`}
       </p>
+      {total > 0 && (
+        <p className="hint">Best match first, by distance, how recently stock was confirmed, and pharmacy reliability.</p>
+      )}
       {results.map((r) => (
         <ProductCard key={r.productId} product={r} />
       ))}

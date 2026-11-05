@@ -228,7 +228,7 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | TC-018 | Search after stock update | Search reflects update after the documented propagation window |
 | TC-019 | Freshness decay | Scheduled worker applies the correct decay at boundary times |
 | TC-020 | Stale stock behavior | Stale/expired stock follows the visibility rule and is labelled |
-| TC-021 | Substitution matching | Same molecule and strength suggestions exclude unsafe mismatches |
+| TC-021 | Substitution decision table | Table-driven tests cover molecule, strength, form, prescription-only, controlled, and source-product rules; see [the decision table](substitution-decision-table.md) |
 | TC-022 | No substitution | No-match response is explicit and does not invent products |
 | TC-023 | Watchlist lifecycle | Create, duplicate, remove, and trigger transitions are correct |
 | TC-024 | Return-stock notification | Eligible watcher receives one notification and retries are safe |

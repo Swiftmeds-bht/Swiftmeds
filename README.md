@@ -68,12 +68,34 @@ The gateway listens on `http://localhost:8080`; its health check is available at
 `http://localhost:8081/dashboard/`, and the RabbitMQ management UI is available at
 `http://localhost:15672`. Run `make help` to list all targets.
 
+Gateway API routes use `Authorization: Bearer <access-token>`. Search, nearby,
+and login routes are public. Other API routes validate the token through Auth;
+pharmacy and admin routes additionally require their respective roles. Missing
+or invalid credentials return `401`, insufficient roles return `403`, and an
+unavailable Auth service returns `503`.
+
 On Windows PowerShell, if `make` is not installed, use Docker Compose directly:
 
 ```powershell
 docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml ps
 docker compose -f deploy/docker-compose.yml down
+```
+
+Search and Inventory are discovered by Traefik through Docker labels and use
+round-robin load balancing. To run two replicas of each service:
+
+```powershell
+docker compose -f deploy/docker-compose.yml up -d --scale search=2 --scale inventory=2
+docker compose -f deploy/docker-compose.yml logs -f search inventory traefik
+```
+
+The active backends are visible in the Traefik dashboard at
+`http://localhost:8081/dashboard/`. Stopping one replica removes it from
+Traefik's backend list while the remaining replica continues serving requests:
+
+```powershell
+docker compose -f deploy/docker-compose.yml stop search-1
 ```
 
 Do not add `-v` to the `down` command unless you intentionally want to delete the

@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { distanceM, getPharmacy, mockSearch, searchMedicines, searchUrl } from "./api";
+import {
+  SearchError,
+  autocompleteUrl,
+  distanceM,
+  fetchSuggestions,
+  getPharmacy,
+  mockSearch,
+  mockSuggest,
+  searchMedicines,
+  searchUrl,
+} from "./api";
 import type { SearchParams } from "./types";
 
 const thimphu = { latitude: 27.4728, longitude: 89.639 };
@@ -17,35 +27,134 @@ describe("searchUrl", () => {
   });
 });
 
+const json = (body: unknown, init: ResponseInit = { status: 200 }) => new Response(JSON.stringify(body), init);
+const kindOf = async (promise: Promise<unknown>) => {
+  try {
+    await promise;
+  } catch (error) {
+    if (error instanceof SearchError) return error.kind;
+    throw error;
+  }
+  return "no error";
+};
+
 describe("searchMedicines", () => {
-  it("uses demo data when no gateway is configured", async () => {
+  it("uses clearly labelled demo data when no gateway is configured", async () => {
     const fetchFn = vi.fn();
     const res = await searchMedicines(params("paracetamol"), { gatewayUrl: "", fetchFn });
     expect(res.source).toBe("demo");
+    expect(res.degraded).toEqual([]);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it("uses gateway data when the gateway answers", async () => {
     const body = { searchId: "s-1", results: [{ productId: "p", brandName: "B", genericName: "G", strength: "1mg", offers: [] }] };
-    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+    const fetchFn = vi.fn().mockResolvedValue(json(body));
     const res = await searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn });
     expect(res.source).toBe("gateway");
     expect(res.data.searchId).toBe("s-1");
     expect(res.data.results).toHaveLength(1);
     expect(res.data.substitutes).toEqual([]); // missing arrays are filled in
+    expect(fetchFn).toHaveBeenCalledOnce();
+    expect(String(fetchFn.mock.calls[0][0])).toContain("/api/v1/search?q=x");
   });
 
-  it("falls back to demo data while the gateway route does not exist (404)", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(new Response("not found", { status: 404 }));
-    const res = await searchMedicines(params("paracetamol"), { gatewayUrl: "http://gw", fetchFn });
-    expect(res.source).toBe("demo");
-    expect(res.data.results.length).toBeGreaterThan(0);
+  it("copes with an empty JSON answer", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(json(null));
+    const res = await searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn });
+    expect(res.data).toEqual({ searchId: "", results: [], substitutes: [] });
   });
 
-  it("falls back to demo data when the gateway is unreachable", async () => {
+  it("reports the optional services that did not answer (x-search-degraded)", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(json({}, { status: 200, headers: { "x-search-degraded": "freshness, ranking" } }));
+    const res = await searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn });
+    expect(res.degraded).toEqual(["freshness", "ranking"]);
+  });
+
+  it.each([
+    [400, "bad_request"],
+    [404, "not_available"],
+    [501, "not_available"],
+    [408, "timeout"],
+    [504, "timeout"],
+    [500, "server"],
+    [503, "server"],
+    [429, "server"],
+  ])("turns HTTP %i into a %s error", async (status, kind) => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("x", { status }));
+    expect(await kindOf(searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn }))).toBe(kind);
+  });
+
+  it("turns a network failure into an unreachable error", async () => {
     const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
-    const res = await searchMedicines(params("paracetamol"), { gatewayUrl: "http://gw", fetchFn });
-    expect(res.source).toBe("demo");
+    expect(await kindOf(searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn }))).toBe("unreachable");
+  });
+
+  it.each(["TimeoutError", "AbortError"])("turns a %s into a timeout error", async (name) => {
+    const fetchFn = vi.fn().mockRejectedValue(new DOMException("too slow", name));
+    expect(await kindOf(searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn }))).toBe("timeout");
+  });
+
+  it("turns an answer that is not JSON into a server error", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("<html>oops</html>", { status: 200 }));
+    expect(await kindOf(searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn }))).toBe("server");
+  });
+
+  it("never falls back to demo data when a configured gateway fails", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("not found", { status: 404 }));
+    await expect(searchMedicines(params("paracetamol"), { gatewayUrl: "http://gw", fetchFn })).rejects.toBeInstanceOf(SearchError);
+  });
+});
+
+describe("autocomplete", () => {
+  it("builds the gateway autocomplete URL", () => {
+    const url = new URL(autocompleteUrl("http://gateway:8080", "para cet", 5));
+    expect(url.pathname).toBe("/api/v1/search/autocomplete");
+    expect(url.searchParams.get("prefix")).toBe("para cet");
+    expect(url.searchParams.get("limit")).toBe("5");
+  });
+
+  it("returns the gateway's suggestions and drops malformed ones", async () => {
+    const body = { suggestions: [{ productId: "p1", displayName: "Napa (Paracetamol)" }, { productId: 7 }, null, "x"] };
+    const fetchFn = vi.fn().mockResolvedValue(json(body));
+    const got = await fetchSuggestions("nap", { gatewayUrl: "http://gw", fetchFn });
+    expect(got).toEqual([{ productId: "p1", displayName: "Napa (Paracetamol)" }]);
+  });
+
+  it.each([
+    ["the gateway fails", () => new Response("x", { status: 500 })],
+    ["the route does not exist yet", () => new Response("x", { status: 404 })],
+    ["the answer is not JSON", () => new Response("<html>", { status: 200 })],
+    ["the answer has no list", () => json({ suggestions: "none" })],
+    ["the answer is empty", () => json(null)],
+  ])("gives an empty list when %s", async (_name, respond) => {
+    const fetchFn = vi.fn().mockResolvedValue(respond());
+    expect(await fetchSuggestions("nap", { gatewayUrl: "http://gw", fetchFn })).toEqual([]);
+  });
+
+  it("gives an empty list when the gateway is unreachable", async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+    expect(await fetchSuggestions("nap", { gatewayUrl: "http://gw", fetchFn })).toEqual([]);
+  });
+
+  it.each([["p"], ["  "], [""], ["x".repeat(101)]])("does not call the gateway for %j", async (prefix) => {
+    const fetchFn = vi.fn();
+    expect(await fetchSuggestions(prefix, { gatewayUrl: "http://gw", fetchFn })).toEqual([]);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("uses demo suggestions when no gateway is configured", async () => {
+    const got = await fetchSuggestions("paracet", { gatewayUrl: "" });
+    expect(got.map((s) => s.displayName)).toContain("Demo Paracetamol 500 (Paracetamol)");
+  });
+});
+
+describe("mockSuggest", () => {
+  it("matches brand or generic names, ignores case and respects the limit", () => {
+    expect(mockSuggest("IBUPROFEN").map((s) => s.displayName)).toEqual(["Demo Ibuprofen 400 (Ibuprofen)"]);
+    expect(mockSuggest("demo", 3)).toHaveLength(3);
+    expect(mockSuggest("nonexistium")).toEqual([]);
+    expect(mockSuggest("  ")).toEqual([]);
   });
 });
 
