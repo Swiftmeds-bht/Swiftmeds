@@ -68,6 +68,12 @@ The gateway listens on `http://localhost:8080`; its health check is available at
 `http://localhost:8081/dashboard/`, and the RabbitMQ management UI is available at
 `http://localhost:15672`. Run `make help` to list all targets.
 
+Gateway API routes use `Authorization: Bearer <access-token>`. Search, nearby,
+and login routes are public. Other API routes validate the token through Auth;
+pharmacy and admin routes additionally require their respective roles. Missing
+or invalid credentials return `401`, insufficient roles return `403`, and an
+unavailable Auth service returns `503`.
+
 On Windows PowerShell, if `make` is not installed, use Docker Compose directly:
 
 ```powershell

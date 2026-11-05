@@ -13,12 +13,18 @@ type RouterOption func(*routes)
 
 type routes struct {
 	freshness ports.DecayApplier
+	auth      ports.Authenticator
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
 // it the route does not exist and the path answers 404.
 func WithFreshness(applier ports.DecayApplier) RouterOption {
 	return func(r *routes) { r.freshness = applier }
+}
+
+// WithAuth adds the Auth service client used by protected API routes.
+func WithAuth(authenticator ports.Authenticator) RouterOption {
+	return func(r *routes) { r.auth = authenticator }
 }
 
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
@@ -44,5 +50,6 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		httpx.Logging(logger),
 		httpx.Recover(logger),
 		httpx.CORS(cfg.CORSOrigins),
+		func(next http.Handler) http.Handler { return httpx.Auth(wired.auth, next) },
 	)
 }
