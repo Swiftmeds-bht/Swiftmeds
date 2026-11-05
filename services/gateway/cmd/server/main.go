@@ -15,6 +15,7 @@ import (
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/app"
@@ -56,10 +57,15 @@ func run() error {
 		return fmt.Errorf("freshness client: %w", err)
 	}
 	freshness := clients.NewFreshnessClient(freshnessv1.NewFreshnessServiceClient(freshnessConn))
+	authConn, err := conns.Connection(context.Background(), "auth")
+	if err != nil {
+		return fmt.Errorf("auth client: %w", err)
+	}
+	auth := clients.NewAuthClient(authv1.NewAuthServiceClient(authConn))
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress(),
-		Handler:           app.NewRouter(cfg, log, app.WithFreshness(freshness)),
+		Handler:           app.NewRouter(cfg, log, app.WithFreshness(freshness), app.WithAuth(auth)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		IdleTimeout:       60 * time.Second,
