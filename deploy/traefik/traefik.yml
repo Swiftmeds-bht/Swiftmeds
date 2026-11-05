@@ -4,6 +4,9 @@
 # used, Traefik ignores all other CLI flags, so every static setting must be here.
 
 entryPoints:
+  # HTTP traffic for the REST gateway.
+  web:
+    address: ":8080"
   # gRPC traffic from the gateway to the services.
   grpc:
     address: ":50051"
