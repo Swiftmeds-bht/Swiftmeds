@@ -32,13 +32,17 @@ describe("WCAG 2.1 AA contrast of the colour tokens", () => {
     ["text", "surface", 4.5],
     ["muted", "bg", 4.5],
     ["muted", "surface", 4.5],
-    ["primary", "bg", 4.5], // links
-    ["primary-text", "primary", 4.5], // button and header
+    ["primary", "bg", 4.5], // links and outline button
+    ["primary-hover", "bg", 4.5], // hovered links
+    ["primary-text", "primary", 4.5], // button
+    ["primary-text", "primary-hover", 4.5], // hovered button
+    ["primary", "high-bg", 4.5], // hovered outline button
     ["high-text", "high-bg", 4.5],
     ["medium-text", "medium-bg", 4.5],
     ["low-text", "low-bg", 4.5],
+    ["info-text", "info-bg", 4.5], // notice banner
     ["focus", "bg", 3], // focus outline (non-text)
-    ["muted", "bg", 3], // input borders (non-text)
+    ["input-border", "bg", 3], // search bar and select borders (non-text)
   ];
   it.each(pairs)("%s on %s >= %s:1", (fg, bg, min) => {
     expect(contrast(token(fg), token(bg))).toBeGreaterThanOrEqual(min);

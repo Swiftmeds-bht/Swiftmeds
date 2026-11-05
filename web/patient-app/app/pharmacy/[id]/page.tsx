@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ArrowLeftIcon, InfoIcon, MapPinIcon } from "@/components/Icons";
 import { getPharmacy } from "@/lib/api";
 
 type Params = Promise<{ id: string }>;
@@ -19,29 +20,30 @@ export default async function PharmacyPage({ params }: { params: Params }) {
   const mapUrl = `https://www.openstreetmap.org/?mlat=${pharmacy.location.latitude}&mlon=${pharmacy.location.longitude}#map=17/${pharmacy.location.latitude}/${pharmacy.location.longitude}`;
 
   return (
-    <>
-      <p>
-        <Link href="/">← New search</Link>
-      </p>
-      <h1>{pharmacy.name}</h1>
-      <dl className="details">
-        <div>
-          <dt>Address</dt>
-          <dd>{pharmacy.address}</dd>
-        </div>
-        <div>
-          <dt>Dzongkhag</dt>
-          <dd>{pharmacy.dzongkhag}</dd>
-        </div>
-      </dl>
-      <p>
-        <a href={mapUrl} rel="noopener noreferrer" target="_blank">
-          Open in map<span className="sr-only"> (opens in a new tab)</span>
+    <div className="page">
+      <Link href="/" className="back-link">
+        <ArrowLeftIcon size={16} /> New search
+      </Link>
+      <article className="card detail-card">
+        <h1>{pharmacy.name}</h1>
+        <dl className="details">
+          <div>
+            <dt>Address</dt>
+            <dd>{pharmacy.address}</dd>
+          </div>
+          <div>
+            <dt>Dzongkhag</dt>
+            <dd>{pharmacy.dzongkhag}</dd>
+          </div>
+        </dl>
+        <a href={mapUrl} rel="noopener noreferrer" target="_blank" className="button button-outline">
+          <MapPinIcon size={16} /> Open in map<span className="sr-only"> (opens in a new tab)</span>
         </a>
-      </p>
+      </article>
       <p className="notice" role="note">
-        Reserving medicine and opening hours are coming soon.
+        <InfoIcon />
+        <span>Reserving medicine and opening hours are coming soon.</span>
       </p>
-    </>
+    </div>
   );
 }

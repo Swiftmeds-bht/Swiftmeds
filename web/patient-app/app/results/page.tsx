@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { InfoIcon } from "@/components/Icons";
 import { ResultsList } from "@/components/ResultsList";
 import { SearchForm } from "@/components/SearchForm";
 import { searchMedicines } from "@/lib/api";
@@ -26,22 +27,25 @@ export default async function ResultsPage({ searchParams }: { searchParams: Sear
     : { source: "demo" as const, data: { searchId: "", results: [], substitutes: [] } };
 
   return (
-    <>
-      <h1>Results</h1>
-      <SearchForm query={query} placeId={place.id} radiusM={radiusM} />
+    <div className="page">
+      <div className="page-head">
+        <h1>Results</h1>
+        <h2 className="page-sub">
+          Pharmacies within {formatDistance(radiusM)} of {place.label}
+        </h2>
+      </div>
+      <SearchForm query={query} placeId={place.id} radiusM={radiusM} variant="compact" />
       {source === "demo" && (
         <p className="notice" role="note">
-          Showing demo data. Live search arrives when the gateway search route is ready.
+          <InfoIcon />
+          <span>Showing demo data. Live search arrives when the gateway search route is ready.</span>
         </p>
       )}
-      <h2 className="sr-only">
-        Pharmacies within {formatDistance(radiusM)} of {place.label}
-      </h2>
       {query ? (
         <ResultsList query={query} results={data.results} substitutes={data.substitutes} />
       ) : (
         <p className="empty">Type a medicine name to search.</p>
       )}
-    </>
+    </div>
   );
 }

@@ -7,10 +7,12 @@ function ProductCard({ product }: { product: ProductResult }) {
   const headingId = `product-${product.productId}`;
   return (
     <section className="card" aria-labelledby={headingId}>
-      <h3 id={headingId}>
-        {product.brandName} <span className="muted">{product.strength}</span>
-      </h3>
-      <p className="muted">{product.genericName}</p>
+      <div className="card-head">
+        <h3 id={headingId}>
+          {product.brandName} <span className="strength">{product.strength}</span>
+        </h3>
+        <p className="generic">{product.genericName}</p>
+      </div>
       {product.offers.length === 0 ? (
         <p className="empty">Not in stock at any pharmacy in this area.</p>
       ) : (
@@ -19,24 +21,20 @@ function ProductCard({ product }: { product: ProductResult }) {
             const fresh = freshnessLabel(o.freshnessScore);
             return (
               <li key={o.pharmacyId} className="offer">
-                <div>
+                <div className="offer-main">
                   <Link href={`/pharmacy/${o.pharmacyId}`} className="offer-name">
                     {o.pharmacyName}
                   </Link>
-                  <p className="muted">
+                  <p className="offer-meta">
                     {formatDistance(o.distanceM)} away · {o.address}
                   </p>
                   <p className={`badge badge-${fresh.level}`}>{fresh.text}</p>
                 </div>
                 <dl className="offer-facts">
-                  <div>
-                    <dt>Price</dt>
-                    <dd>{formatPrice(o.priceChhertum)}</dd>
-                  </div>
-                  <div>
-                    <dt>In stock</dt>
-                    <dd>{formatQuantity(o.quantityAvailable)}</dd>
-                  </div>
+                  <dt className="sr-only">Price</dt>
+                  <dd className="offer-price">{formatPrice(o.priceChhertum)}</dd>
+                  <dt className="sr-only">In stock</dt>
+                  <dd className="offer-qty">{formatQuantity(o.quantityAvailable)} in stock</dd>
                 </dl>
               </li>
             );
@@ -64,7 +62,7 @@ export function ResultsList({ query, results, substitutes }: Props) {
   const total = results.reduce((n, r) => n + r.offers.length, 0);
   return (
     <div className="results">
-      <p role="status">
+      <p role="status" className="results-summary">
         {total === 0
           ? `No pharmacy nearby has “${query}” in stock.`
           : `${total} ${total === 1 ? "pharmacy has" : "pharmacies have"} “${query}” in stock.`}
@@ -74,8 +72,10 @@ export function ResultsList({ query, results, substitutes }: Props) {
       ))}
       {substitutes.length > 0 && (
         <section aria-labelledby="substitutes-heading" className="substitutes">
-          <h2 id="substitutes-heading">Same medicine, other brands</h2>
-          <p className="muted">Same active ingredient and strength. Ask the pharmacist before switching.</p>
+          <div>
+            <h2 id="substitutes-heading">Same medicine, other brands</h2>
+            <p className="muted">Same active ingredient and strength. Ask the pharmacist before switching.</p>
+          </div>
           {substitutes.map((r) => (
             <ProductCard key={r.productId} product={r} />
           ))}
