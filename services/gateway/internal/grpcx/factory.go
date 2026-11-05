@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/resilience"
 )
 
 type ClientFactory struct {
@@ -21,6 +24,13 @@ func NewClientFactory(traefikTarget string) *ClientFactory {
 		target: traefikTarget,
 		opts: []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithChainUnaryInterceptor(resilience.UnaryClientInterceptor(resilience.Config{
+				Timeout: 800 * time.Millisecond,
+				Retry: resilience.RetryConfig{
+					MaxAttempts: 2,
+					BaseDelay:   50 * time.Millisecond,
+				},
+			})),
 		},
 		conns: make(map[string]*grpc.ClientConn),
 	}
