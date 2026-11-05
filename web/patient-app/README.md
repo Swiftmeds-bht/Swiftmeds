@@ -10,7 +10,11 @@ have it in stock. Owner: Pema. Responsive: works on phones and desktops.
 | `/` | Search form: medicine name (with suggestions), location, radius |
 | `/results?q=…&place=…&radius=…` | Matching medicines with in-stock pharmacies (best match first: distance, price, stock, freshness badge), and same-molecule alternatives when nothing is in stock |
 | `/results?q=…&lat=…&lng=…&radius=…` | The same, searched from the patient's device location |
-| `/pharmacy/[id]` | Pharmacy detail (placeholder: address and map link; reservations come later) |
+| `/pharmacy/[id]` | Pharmacy detail (placeholder: address and map link) |
+| `/reserve?product=…&pharmacy=…` | Confirm a reservation: medicine, pharmacy, price, how many units (1 to 5, no more than in stock). Opened from Reserve on a result |
+| `/holds/[id]` | One hold: "Checking stock" (refreshes every 2 s), then the pickup code with a countdown, or why it was not held, expired or cancelled |
+| `/holds` | My holds: current (with Cancel) and past |
+| `/login`, `/register` | Sign in and create an account. Both return to the page that asked, e.g. the reservation |
 
 The search form is a plain `GET` form, so it works without JavaScript and every
 search is a shareable URL. With JavaScript it also shows suggestions, offers
@@ -39,6 +43,41 @@ search is a shareable URL. With JavaScript it also shows suggestions, offers
 | Empty: nobody has it | "No pharmacy nearby has … in stock." plus substitutes when the gateway sends them |
 | Error | A clear message and a Try again link (`SearchProblem`): cannot reach the search, too slow, not working, not available yet, or the search was not accepted |
 | Some details missing | A note when the gateway reports optional services as down (`x-search-degraded` header) |
+
+## Reserving and collecting (SCRUM-60)
+
+A patient presses **Reserve** on a result, signs in if needed, picks how many units
+and confirms. The hold page follows the hold through its states
+(`docs/api/openapi.yaml`, `HoldStatus`):
+
+| Status | What the patient sees |
+|---|---|
+| Pending | "Checking stock"; the page refreshes every 2 seconds (the API is poll-based) |
+| Active | The pickup code, large and read digit by digit by screen readers, a countdown to the expiry time (Bhutan time), and Cancel |
+| Rejected | Why ("Only 1 left at this pharmacy", …), that nothing was reserved, and a link to search again |
+| Expired | When it ran out, and a link to search again. The page turns expired by itself when the countdown ends |
+| Cancelled, collected | A short final message |
+
+**Session.** Signing in stores the access token in an httpOnly, SameSite=Lax cookie
+(`lib/session.ts`, `lib/auth.ts`), so page scripts cannot read it. All gateway
+calls with the token happen on the server (`app/actions.ts`, server components).
+When the gateway rejects the token, the page sends the patient to sign in again
+(`/session-ended` clears the cookie) and back afterwards. The `next` address after
+signing in must be a path on this site, so a crafted link cannot send a patient
+elsewhere. Refresh tokens are not used yet: the patient signs in again when the
+access token expires (`JWT_TTL`, 15 minutes by default).
+
+**Gateway routes** (`lib/holds.ts`): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
+`POST /api/v1/holds`, `GET /api/v1/holds/{id}`, `GET /api/v1/holds`,
+`POST /api/v1/holds/{id}/cancel`. Most are still "planned" in the API spec; until
+they exist, a gateway answering 404 shows "This is not available yet".
+
+**Demo mode** (no `GATEWAY_URL`, `lib/demo-holds.ts`): accounts and holds live in
+the server's memory and are lost on restart. Sign in as `patient@demo.bt` /
+`swiftmed-demo`, or create an account. A hold is pending for 2 seconds, then active
+for 30 minutes. It is rejected when more units are asked for than are left, or when
+the pharmacy had only its last unit (the demo pretends someone else got it first,
+so the rejected screen can be seen: reserve "Demo Paracetamol Syrup" at Thimphu 01).
 
 ## Data
 

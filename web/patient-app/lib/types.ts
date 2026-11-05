@@ -49,6 +49,48 @@ export interface SearchParams {
   radiusM: number;
 }
 
+// Holds and accounts, mirroring docs/api/openapi.yaml (Hold, HoldStatus, LoginResponse).
+
+export type HoldStatus =
+  | "HOLD_STATUS_PENDING"
+  | "HOLD_STATUS_ACTIVE"
+  | "HOLD_STATUS_COLLECTED"
+  | "HOLD_STATUS_EXPIRED"
+  | "HOLD_STATUS_CANCELLED"
+  | "HOLD_STATUS_REJECTED";
+
+export interface Hold {
+  holdId: string;
+  userId?: string;
+  pharmacyId?: string;
+  productId?: string;
+  quantity?: number;
+  status: HoldStatus;
+  /** Set once the hold is active; only the patient who made it sees it. */
+  pickupCode?: string;
+  createdAt?: string;
+  /** Set when the hold becomes active. */
+  expiresAt?: string;
+  statusChangedAt?: string;
+  /** Set for rejected and cancelled holds. */
+  statusReason?: string;
+}
+
+export interface CreateHoldInput {
+  pharmacyId: string;
+  productId: string;
+  quantity: number;
+}
+
+/** The signed-in patient, kept in an httpOnly cookie (lib/session.ts). */
+export interface Session {
+  userId: string;
+  email: string;
+  accessToken: string;
+  /** ISO time the access token stops working, when the gateway says. */
+  expiresAt?: string;
+}
+
 export interface PharmacySummary {
   pharmacyId: string;
   name: string;
