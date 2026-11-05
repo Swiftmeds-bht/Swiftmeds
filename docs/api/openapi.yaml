@@ -16,7 +16,7 @@ info:
 
     | `x-status` | Meaning |
     |---|---|
-    | `implemented` | The route exists in `services/gateway/internal/app/router.go` today. Only `GET /healthz` and `POST /api/v1/internal/freshness/decay`. |
+    | `implemented` | The route exists in `services/gateway/internal/app/router.go` today. |
     | `planned` | The route is part of the agreed contract (derived from the `.proto` files and the test plan) but the gateway does not serve it yet. Until it does, `/api/v1/*` returns the plain-text 404 described below. |
 
     Every operation also has `x-grpc`, the gRPC method it calls, and `x-roles`, the
@@ -106,10 +106,10 @@ info:
     These gRPC methods are for service-to-service calls and have no REST route:
     `Auth.ValidateToken`, `Catalog.BatchGetProducts`, `Catalog.ListProductsByMolecule`,
     `Expiry.GetHoldDuration`, `Freshness.RecordConfirmation`, `Freshness.GetFreshness`,
-    `Geo.*`, `Holds.ExpireHold`, `Inventory.BatchGetStock`, `Inventory.BulkSetStock`,
+    `Holds.ExpireHold`, `Inventory.BatchGetStock`, `Inventory.BulkSetStock`,
     `Inventory.CommitReservation`, `Inventory.ReleaseReservation`,
     `Notification.SendNotification`, `PharmacyRegistry.BatchGetPharmacies`,
-    `Pricing.BatchGetPrices`, `Ranking.RankOffers`, `Substitution.GetSubstitutes` and
+    `Pricing.BatchGetPrices`, `Ranking.RankOffers` and
     `Trust.GetTrustScores`. Substitutes reach the patient inside the search response.
 servers:
   - url: http://{host}:{port}
@@ -189,7 +189,7 @@ paths:
       summary: Create a patient or pharmacy-staff account
       description: Admins cannot self-register. The password must be 8 to 72 bytes (bcrypt's limit).
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Register
       x-roles: []
       requestBody:
@@ -416,7 +416,7 @@ paths:
 
         Limits: 5 products, 100 nearby pharmacies and 5 substitutes per search.
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.search.v1.SearchService/SearchMedicine
       x-roles: []
       parameters:
