@@ -119,6 +119,27 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  holds:
+       build:
+         context: ..
+         dockerfile: services/holds/Dockerfile
+       restart: unless-stopped
+       environment:
+         HOLDS_GRPC_PORT: ${HOLDS_GRPC_PORT:-50065}
+         HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
+         HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
+         HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
+         LOG_LEVEL: ${LOG_LEVEL:-info}
+       depends_on:
+         postgres:
+           condition: service_healthy
+       labels:
+         - traefik.enable=true
+         - traefik.http.routers.holds.rule=Host(`holds`)
+         - traefik.http.routers.holds.entrypoints=grpc
+         - traefik.http.services.holds.loadbalancer.server.port=${HOLDS_GRPC_PORT:-50065}
+         - traefik.http.services.holds.loadbalancer.server.scheme=h2c
+
   stock-sync:
     build:
       context: ..

@@ -11,10 +11,17 @@ var (
 	holdFor = 2 * time.Hour
 )
 
-// holdIn returns a hold that is in the given status.
+const testCode = "ABC234"
+
+// holdIn returns a hold that is in the given status. An ACTIVE hold has the
+// pickup code and expiry time it gets when it is reserved.
 func holdIn(status Status) Hold {
 	h, _ := NewHold("h-1", "u-1", "ph-1", "med-1", 2, t0)
 	h.Status = status
+	if status == Active {
+		h.PickupCode = testCode
+		h.ExpiresAt = t0.Add(holdFor)
+	}
 	return h
 }
 
@@ -74,9 +81,9 @@ func TestNewHoldStartsPendingWithNoExpiryTime(t *testing.T) {
 func TestHoldMethodsFollowTheTransitionTable(t *testing.T) {
 	now := t0.Add(10 * time.Minute)
 	apply := map[Event]func(Hold) (Hold, error){
-		StockReserved:    func(h Hold) (Hold, error) { return h.Reserve(now, holdFor) },
+		StockReserved:    func(h Hold) (Hold, error) { return h.Reserve(now, holdFor, testCode) },
 		StockUnavailable: func(h Hold) (Hold, error) { return h.Reject(now, "no stock") },
-		Collect:          func(h Hold) (Hold, error) { return h.Collect(now) },
+		Collect:          func(h Hold) (Hold, error) { return h.Collect(now, "ph-1", testCode) },
 		Expire:           func(h Hold) (Hold, error) { return h.Expire(now) },
 		Cancel:           func(h Hold) (Hold, error) { return h.Cancel(now, "changed my mind") },
 	}
@@ -114,7 +121,7 @@ func TestExpiryTimeIsSetWhenTheHoldBecomesActive(t *testing.T) {
 	h, _ := NewHold("h-1", "u-1", "ph-1", "med-1", 1, t0)
 	activatedAt := t0.Add(30 * time.Second) // Inventory answers a little after the hold was created
 
-	active, err := h.Reserve(activatedAt, holdFor)
+	active, err := h.Reserve(activatedAt, holdFor, testCode)
 
 	if err != nil {
 		t.Fatal(err)
@@ -129,9 +136,9 @@ func TestExpiryTimeIsSetWhenTheHoldBecomesActive(t *testing.T) {
 
 func TestExpiryTimeStaysAfterLaterTransitions(t *testing.T) {
 	h, _ := NewHold("h-1", "u-1", "ph-1", "med-1", 1, t0)
-	active, _ := h.Reserve(t0, holdFor)
+	active, _ := h.Reserve(t0, holdFor, testCode)
 
-	collected, err := active.Collect(t0.Add(time.Hour))
+	collected, err := active.Collect(t0.Add(time.Hour), "ph-1", testCode)
 
 	if err != nil {
 		t.Fatal(err)
@@ -145,7 +152,7 @@ func TestReserveRejectsAnInvalidDuration(t *testing.T) {
 	for _, d := range []time.Duration{0, -time.Hour} {
 		h := holdIn(Pending)
 
-		got, err := h.Reserve(t0, d)
+		got, err := h.Reserve(t0, d, testCode)
 
 		if !errors.Is(err, ErrInvalidDuration) || got != (Hold{}) {
 			t.Errorf("duration %v: got (%+v, %v), want (empty hold, ErrInvalidDuration)", d, got, err)
@@ -165,7 +172,7 @@ func TestHoldThatWasNeverActiveHasNoExpiryTime(t *testing.T) {
 func TestRejectAndCancelRecordTheReason(t *testing.T) {
 	rejected, _ := holdIn(Pending).Reject(t0, "no stock")
 	cancelled, _ := holdIn(Active).Cancel(t0, "changed my mind")
-	collected, _ := holdIn(Active).Collect(t0)
+	collected, _ := holdIn(Active).Collect(t0, "ph-1", testCode)
 	expired, _ := holdIn(Active).Expire(t0)
 
 	if rejected.StatusReason != "no stock" || cancelled.StatusReason != "changed my mind" {

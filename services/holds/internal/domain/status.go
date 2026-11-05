@@ -47,3 +47,18 @@ func Next(from Status, event Event) (Status, error) {
 	}
 	return to, nil
 }
+
+// Valid reports whether s is one of the six statuses.
+func (s Status) Valid() bool {
+	switch s {
+	case Pending, Active, Collected, Expired, Cancelled, Rejected:
+		return true
+	}
+	return false
+}
+
+// IsOpen reports whether the hold still counts against the patient's limit:
+// it is waiting for Inventory (PENDING) or stock is reserved (ACTIVE).
+func (s Status) IsOpen() bool {
+	return s == Pending || s == Active
+}
