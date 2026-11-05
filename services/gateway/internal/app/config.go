@@ -12,6 +12,9 @@ import (
 const (
 	DefaultHTTPPort      = 8080
 	DefaultTraefikTarget = "traefik:50051"
+
+	// MinWorkerSecretLength is the shortest WORKER_SHARED_SECRET the gateway accepts.
+	MinWorkerSecretLength = 16
 )
 
 var defaultCORSOrigins = []string{"http://localhost:3000", "http://localhost:3001"}
@@ -21,6 +24,10 @@ type Config struct {
 	CORSOrigins   []string
 	TraefikTarget string
 	LogLevel      string
+
+	// WorkerSecret is the shared secret the Cloudflare Workers send to the
+	// internal endpoints. Empty means those endpoints reject every call.
+	WorkerSecret string
 }
 
 // LoadConfig reads the gateway configuration from the environment.
@@ -35,12 +42,16 @@ func loadConfig(l *config.Loader) (Config, error) {
 		CORSOrigins:   splitCSV(l.String("CORS_ALLOWED_ORIGINS", "")),
 		TraefikTarget: strings.TrimSpace(l.String("TRAEFIK_GRPC_TARGET", DefaultTraefikTarget)),
 		LogLevel:      l.String("LOG_LEVEL", "info"),
+		WorkerSecret:  strings.TrimSpace(l.String("WORKER_SHARED_SECRET", "")),
 	}
 	if err := l.Err(); err != nil {
 		return Config{}, err
 	}
 	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
 		return Config{}, fmt.Errorf("GATEWAY_HTTP_PORT must be a valid TCP port (1-65535): %d", cfg.HTTPPort)
+	}
+	if cfg.WorkerSecret != "" && len(cfg.WorkerSecret) < MinWorkerSecretLength {
+		return Config{}, fmt.Errorf("WORKER_SHARED_SECRET must be at least %d characters", MinWorkerSecretLength)
 	}
 	if len(cfg.CORSOrigins) == 0 {
 		cfg.CORSOrigins = append([]string(nil), defaultCORSOrigins...)
