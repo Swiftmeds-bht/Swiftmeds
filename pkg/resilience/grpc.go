@@ -3,6 +3,7 @@ package resilience
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -14,6 +15,10 @@ import (
 type Config struct {
 	Breaker BreakerConfig
 	Retry   RetryConfig
+	// RetryableMethod decides whether a method may be retried after a
+	// retryable failure. Zero uses a conservative name-based policy that
+	// excludes mutating RPCs such as CreateHold.
+	RetryableMethod func(method string) bool
 	// Timeout is the limit for each attempt, not for the whole call. Default 3s.
 	Timeout time.Duration
 	// MaxConcurrent is how many calls may run at once. Default 100.
@@ -40,6 +45,9 @@ func UnaryClientInterceptor(cfg Config) grpc.UnaryClientInterceptor {
 	if cfg.Retry.Retryable == nil {
 		cfg.Retry.Retryable = isRetryable
 	}
+	if cfg.RetryableMethod == nil {
+		cfg.RetryableMethod = isIdempotentMethod
+	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 3 * time.Second
 	}
@@ -51,13 +59,17 @@ func UnaryClientInterceptor(cfg Config) grpc.UnaryClientInterceptor {
 
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		err := bulkhead.Execute(func() error {
-			return Retry(ctx, cfg.Retry, func(ctx context.Context) error {
+			call := func(ctx context.Context) error {
 				return breaker.Execute(func() error {
 					return WithTimeout(ctx, cfg.Timeout, func(ctx context.Context) error {
 						return invoker(ctx, method, req, reply, cc, opts...)
 					})
 				})
-			})
+			}
+			if !cfg.RetryableMethod(method) {
+				return call(ctx)
+			}
+			return Retry(ctx, cfg.Retry, call)
 		})
 		return toStatus(err)
 	}
@@ -66,6 +78,22 @@ func UnaryClientInterceptor(cfg Config) grpc.UnaryClientInterceptor {
 // isRetryable allows a retry only for codes.Unavailable.
 func isRetryable(err error) bool {
 	return status.Code(err) == codes.Unavailable
+}
+
+// isIdempotentMethod keeps retries away from RPCs that commonly mutate state.
+// Unknown methods remain retryable so read/query RPCs do not need a central
+// registry in this shared package.
+func isIdempotentMethod(method string) bool {
+	name := method
+	if slash := strings.LastIndexByte(name, '/'); slash >= 0 {
+		name = name[slash+1:]
+	}
+	for _, prefix := range []string{"Create", "Update", "Delete", "Cancel", "Commit", "Reserve", "Release", "Consume", "Set", "Add"} {
+		if strings.HasPrefix(name, prefix) {
+			return false
+		}
+	}
+	return true
 }
 
 // isServerFault counts only problems on the server side or the network.
