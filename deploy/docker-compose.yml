@@ -120,6 +120,25 @@ services:
       - traefik.http.services.pricing.loadbalancer.server.port=${PRICING_GRPC_PORT:-50063}
       - traefik.http.services.pricing.loadbalancer.server.scheme=h2c
 
+  pharmacy-registry:
+    build:
+      context: ..
+      dockerfile: services/pharmacy-registry/Dockerfile
+    restart: unless-stopped
+    environment:
+      PHARMACY_REGISTRY_GRPC_PORT: ${PHARMACY_REGISTRY_GRPC_PORT:-50053}
+      PHARMACY_REGISTRY_DATABASE_URL: ${PHARMACY_REGISTRY_DATABASE_URL:?set PHARMACY_REGISTRY_DATABASE_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pharmacy-registry.rule=Host(`pharmacy-registry`)
+      - traefik.http.routers.pharmacy-registry.entrypoints=grpc
+      - traefik.http.services.pharmacy-registry.loadbalancer.server.port=${PHARMACY_REGISTRY_GRPC_PORT:-50053}
+      - traefik.http.services.pharmacy-registry.loadbalancer.server.scheme=h2c
+
   holds:
        build:
          context: ..

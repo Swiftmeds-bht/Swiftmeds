@@ -11,6 +11,7 @@ use (
 	./services/holds
 	./services/inventory
 	./services/pricing
+	./services/pharmacy-registry
 	./services/ranking
 	./services/search
 	./services/stock-sync
