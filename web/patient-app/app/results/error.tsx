@@ -11,9 +11,9 @@ export default function ResultsError({ error, reset }: { error: Error & { digest
   }, [error]);
 
   return (
-    <>
+    <div className="page">
       <h1>Results</h1>
       <SearchProblem kind="unexpected" onRetry={reset} />
-    </>
+    </div>
   );
 }

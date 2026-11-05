@@ -33,13 +33,14 @@ export default async function ResultsPage({ searchParams }: { searchParams: Sear
   }
 
   return (
-    <>
+    <div className="page">
       <h1>Results</h1>
       <SearchForm
         query={query}
         placeId={place.id}
         radiusM={radiusM}
         deviceLocation={location.fromDevice ? location.point : undefined}
+        variant="compact"
       />
       {query ? (
         // The key makes a new search show the loading state again instead of the old results.
@@ -55,6 +56,6 @@ export default async function ResultsPage({ searchParams }: { searchParams: Sear
       ) : (
         <p className="empty">Type a medicine name to search.</p>
       )}
-    </>
+    </div>
   );
 }

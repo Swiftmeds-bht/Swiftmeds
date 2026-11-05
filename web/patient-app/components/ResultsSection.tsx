@@ -3,6 +3,7 @@ import { formatDistance } from "@/lib/format";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "@/lib/rules";
 import type { GeoPoint } from "@/lib/types";
 
+import { InfoIcon } from "./Icons";
 import { ResultsList } from "./ResultsList";
 import { SearchProblem } from "./SearchProblem";
 
@@ -37,15 +38,17 @@ export async function ResultsSection({ query, point, label, radiusM, retryHref }
     <>
       {source === "demo" && (
         <p className="notice" role="note">
-          Showing demo data. Live search is used when GATEWAY_URL is set.
+          <InfoIcon />
+          <span>Showing demo data. Live search is used when GATEWAY_URL is set.</span>
         </p>
       )}
       {degraded.length > 0 && (
-        <p className="notice" role="note">
-          Some details are unavailable right now, so prices, freshness or the order may be incomplete.
+        <p className="notice notice-warning" role="note">
+          <InfoIcon />
+          <span>Some details are unavailable right now, so prices, freshness or the order may be incomplete.</span>
         </p>
       )}
-      <h2 className="sr-only">
+      <h2 className="results-heading">
         Pharmacies within {formatDistance(radiusM)} of {label}
       </h2>
       <ResultsList query={query} results={data.results} substitutes={data.substitutes} />
