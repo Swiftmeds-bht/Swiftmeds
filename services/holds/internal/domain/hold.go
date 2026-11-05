@@ -21,7 +21,6 @@ const (
 )
 
 // Hold is a short reservation of stock for one patient.
-// Pickup codes are added in SCRUM-53.
 type Hold struct {
 	ID              string
 	UserID          string
@@ -33,6 +32,7 @@ type Hold struct {
 	ExpiresAt       time.Time // zero until the hold becomes ACTIVE
 	StatusChangedAt time.Time // when the hold reached its current status
 	StatusReason    string    // set for REJECTED and CANCELLED
+	PickupCode      string    // set when the hold becomes ACTIVE; only the patient sees it
 }
 
 // NewHold validates and builds a PENDING hold.
@@ -66,8 +66,10 @@ func NewHold(id, userID, pharmacyID, productID string, quantity int, now time.Ti
 // and ErrInvalidTransition.
 
 // Reserve is the stock.reserved event: PENDING -> ACTIVE. The hold expires
-// holdFor after now, so the expiry time is fixed here and not before.
-func (h Hold) Reserve(now time.Time, holdFor time.Duration) (Hold, error) {
+// holdFor after now, so the expiry time is fixed here and not before. The
+// pickup code is chosen by the caller (see NewPickupCode) and is kept on the
+// hold from now on.
+func (h Hold) Reserve(now time.Time, holdFor time.Duration, pickupCode string) (Hold, error) {
 	moved, err := h.move(StockReserved, now)
 	if err != nil {
 		return Hold{}, err
@@ -75,7 +77,11 @@ func (h Hold) Reserve(now time.Time, holdFor time.Duration) (Hold, error) {
 	if holdFor <= 0 {
 		return Hold{}, ErrInvalidDuration
 	}
+	if pickupCode == "" {
+		return Hold{}, ErrMissingPickupCode
+	}
 	moved.ExpiresAt = now.Add(holdFor)
+	moved.PickupCode = pickupCode
 	return moved, nil
 }
 
@@ -89,8 +95,26 @@ func (h Hold) Reject(now time.Time, reason string) (Hold, error) {
 	return moved, nil
 }
 
-// Collect is the collect event: ACTIVE -> COLLECTED.
-func (h Hold) Collect(now time.Time) (Hold, error) {
+// Collect is the collect event: ACTIVE -> COLLECTED. Pharmacy staff hand over
+// the medicine only if the hold was made at their pharmacy, its time has not
+// run out, and the patient's pickup code matches. The status is checked first,
+// so collecting a hold twice always fails with ErrInvalidTransition.
+func (h Hold) Collect(now time.Time, pharmacyID, pickupCode string) (Hold, error) {
+	if _, err := Next(h.Status, Collect); err != nil {
+		return Hold{}, err
+	}
+	switch {
+	case pharmacyID == "":
+		return Hold{}, ErrMissingPharmacyID
+	case pharmacyID != h.PharmacyID:
+		return Hold{}, ErrWrongPharmacy
+	case !h.ExpiresAt.IsZero() && !now.Before(h.ExpiresAt):
+		return Hold{}, ErrHoldExpired
+	case NormalizePickupCode(pickupCode) == "":
+		return Hold{}, ErrMissingPickupCode
+	case !PickupCodeMatches(h.PickupCode, pickupCode):
+		return Hold{}, ErrWrongPickupCode
+	}
 	return h.move(Collect, now)
 }
 
