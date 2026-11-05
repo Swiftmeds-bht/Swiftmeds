@@ -1,7 +1,20 @@
 import Link from "next/link";
 
 import { formatDistance, formatPrice, formatQuantity, freshnessLabel } from "@/lib/format";
-import type { ProductResult } from "@/lib/types";
+import type { PharmacyOffer, ProductResult } from "@/lib/types";
+
+/** The reserve page for one offer. Names and price go along for display only. */
+export function reserveHref(product: ProductResult, offer: PharmacyOffer): string {
+  const params = new URLSearchParams({
+    product: product.productId,
+    pharmacy: offer.pharmacyId,
+    name: `${product.brandName} ${product.strength}`.trim(),
+    at: offer.pharmacyName,
+    available: String(offer.quantityAvailable),
+  });
+  if (offer.priceChhertum && offer.priceChhertum !== "0") params.set("price", offer.priceChhertum);
+  return `/reserve?${params}`;
+}
 
 function ProductCard({ product }: { product: ProductResult }) {
   const headingId = `product-${product.productId}`;
@@ -31,12 +44,17 @@ function ProductCard({ product }: { product: ProductResult }) {
                   </p>
                   <p className={`badge badge-${fresh.level}`}>{fresh.text}</p>
                 </div>
-                <dl className="offer-facts">
-                  <dt className="sr-only">Price</dt>
-                  <dd className="offer-price">{formatPrice(o.priceChhertum)}</dd>
-                  <dt className="sr-only">In stock</dt>
-                  <dd className="offer-qty">{formatQuantity(o.quantityAvailable)} in stock</dd>
-                </dl>
+                <div className="offer-side">
+                  <dl className="offer-facts">
+                    <dt className="sr-only">Price</dt>
+                    <dd className="offer-price">{formatPrice(o.priceChhertum)}</dd>
+                    <dt className="sr-only">In stock</dt>
+                    <dd className="offer-qty">{formatQuantity(o.quantityAvailable)} in stock</dd>
+                  </dl>
+                  <Link href={reserveHref(product, o)} className="button button-small">
+                    Reserve<span className="sr-only"> at {o.pharmacyName}</span>
+                  </Link>
+                </div>
               </li>
             );
           })}

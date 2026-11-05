@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 
+import { AccountNav } from "@/components/AccountNav";
+
 import "./globals.css";
 
 // Downloaded at build time and served with the app, so pages never call Google.
@@ -29,7 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="brand">
               Swift<span className="brand-accent">Med</span>
             </Link>
-            <span className="header-tagline">Medicine finder for Bhutan</span>
+            <div className="header-end">
+              <span className="header-tagline">Medicine finder for Bhutan</span>
+              <AccountNav />
+            </div>
           </div>
         </header>
         <main id="main" className="container">

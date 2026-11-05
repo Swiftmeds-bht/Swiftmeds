@@ -56,7 +56,6 @@ a:hover { color: var(--primary-hover); }
 .brand:hover { color: var(--text); }
 .brand-accent { color: var(--primary); }
 .header-tagline { color: var(--muted); font-size: 0.875rem; }
-@media (max-width: 26rem) { .header-tagline { display: none; } }
 .site-footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 1.25rem 0 1.5rem; font-size: 0.875rem; }
 
 .page { padding-top: 2rem; }
@@ -234,6 +233,89 @@ a:hover { color: var(--primary-hover); }
 .details dt { color: var(--muted); font-size: 0.9rem; }
 .details dd { margin: 0; font-weight: 500; }
 .detail-card + .notice { margin-top: 1rem; }
+
+/* --- Header account links --- */
+.header-end { display: flex; align-items: center; gap: 1.25rem; }
+.account-nav { display: flex; align-items: center; gap: 0.25rem; }
+.account-nav form { margin: 0; }
+.nav-link {
+  display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 0.6rem;
+  font-size: 0.9rem; font-weight: 500; color: var(--text); text-decoration: none; border-radius: var(--radius-sm);
+}
+.nav-link:hover { color: var(--primary); background: var(--surface); }
+.account-nav .link-button.nav-link { text-decoration: none; }
+@media (max-width: 40rem) { .header-tagline { display: none; } }
+
+/* --- Reserve link on a result --- */
+.offer-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
+.button-small { min-height: 2.75rem; padding: 0.35rem 1.1rem; font-size: 0.875rem; }
+@media (max-width: 30rem) {
+  .offer-side { flex-direction: row; align-items: center; justify-content: space-between; width: 100%; }
+}
+
+/* --- Forms: sign in, register, reserve --- */
+.auth-page, .reserve-page { max-width: 28rem; margin: 0 auto; }
+.auth-page .lead { margin-bottom: 1.25rem; }
+.auth-card, .reserve-card { padding: 1.5rem 1.25rem; margin-bottom: 1rem; }
+.auth-form, .reserve-form { display: grid; gap: 1rem; }
+.form-field { display: grid; gap: 0.35rem; }
+.form-field label { font-weight: 600; font-size: 0.9rem; }
+.form-field input, .form-field select {
+  font: inherit; color: var(--text); background: var(--bg); width: 100%;
+  min-height: 2.75rem; padding: 0.5rem 0.85rem;
+  border: 1px solid var(--input-border); border-radius: var(--radius-sm);
+}
+.form-error {
+  padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.9rem;
+  background: var(--low-bg); color: var(--low-text);
+}
+.button-block { width: 100%; }
+.button-danger { color: var(--low-text); border-color: var(--low-text); }
+.button-danger:hover { background: var(--low-bg); color: var(--low-text); }
+.auth-switch { text-align: center; font-size: 0.9rem; color: var(--muted); }
+.reserve-card .details { margin-top: 0; }
+.reserve-card .details div:first-child { border-top: 0; padding-top: 0; }
+
+/* --- Holds --- */
+.hold-page { max-width: 32rem; margin: 0 auto; }
+.hold-card { padding: 1.5rem 1.25rem; display: grid; gap: 1rem; }
+.hold-row { padding: 1.125rem 1.25rem; gap: 0.75rem; }
+.hold-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.hold-title { margin: 0 0 0.15rem; }
+.hold-detail .hold-title { font-size: clamp(1.4rem, 4vw, 1.75rem); }
+.hold-row .hold-title { font-size: 1.05rem; }
+.hold-row .hold-title a { color: var(--text); text-decoration: none; }
+.hold-row .hold-title a:hover { color: var(--primary); text-decoration: underline; }
+.hold-status { flex-shrink: 0; }
+/* On phones the status sits above the name, so the name keeps the full width. */
+@media (max-width: 30rem) {
+  .hold-head { flex-direction: column-reverse; gap: 0.6rem; }
+}
+.hold-status .badge { margin-top: 0; }
+.hold-message { color: var(--text); }
+.badge-neutral { background: var(--surface); color: var(--muted); }
+.badge-neutral::before { background: var(--muted); }
+
+.pickup {
+  display: grid; justify-items: center; gap: 0.25rem; text-align: center;
+  padding: 1.5rem 1rem; border-radius: var(--radius); background: var(--high-bg); border: 1px solid #a7e3cf;
+}
+.pickup-label { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--high-text); }
+.pickup-code {
+  font-size: clamp(2rem, 9vw, 2.75rem); font-weight: 700; letter-spacing: 0.06em; line-height: 1.2;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+.pickup-small { justify-items: start; text-align: left; padding: 0.85rem 1rem; }
+.pickup-small .pickup-code { font-size: 1.5rem; }
+.countdown { display: flex; align-items: baseline; gap: 0.4rem; color: var(--high-text); }
+.countdown-time { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.countdown-label { font-size: 0.9rem; }
+
+.cancel-form { display: grid; gap: 0.5rem; justify-items: start; }
+.hold-section { margin-top: 1.75rem; }
+.section-heading { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; }
+.hold-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.75rem; }
+.holds-page .empty p + p { margin-top: 0.5rem; }
 
 /* --- Not found --- */
 .not-found { text-align: center; padding: 4rem 0; }
