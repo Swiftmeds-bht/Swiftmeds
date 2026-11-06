@@ -34,11 +34,10 @@ func RoleFromContext(ctx context.Context) authv1.Role {
 }
 
 // Auth protects API routes while leaving explicitly public routes and the
-// worker-authenticated freshness endpoint available without a bearer token.
+// worker-authenticated internal endpoints available without a bearer token.
 func Auth(authenticator ports.Authenticator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isPublicRoute(r.URL.Path) || r.URL.Path == "/healthz" ||
-			r.URL.Path == "/api/v1/internal/freshness/decay" {
+		if isPublicRoute(r.URL.Path) || r.URL.Path == "/healthz" || isWorkerRoute(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -83,6 +82,13 @@ func bearerToken(header string) (string, bool) {
 		return "", false
 	}
 	return parts[1], true
+}
+
+// isWorkerRoute reports whether the path is called by a Cloudflare Worker. These
+// routes check the shared secret in X-Worker-Secret instead of a user token.
+// Only these exact paths are exempt.
+func isWorkerRoute(path string) bool {
+	return path == "/api/v1/internal/freshness/decay" || path == "/api/v1/internal/expiry/sweep"
 }
 
 func isPublicRoute(path string) bool {

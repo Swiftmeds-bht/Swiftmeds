@@ -1,0 +1,14 @@
+# Hold expiry Worker (SCRUM-63): every minute it calls the gateway, which asks
+# the Expiry service to expire every hold whose deadline has passed.
+name = "swiftmed-hold-expiry"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[triggers]
+# Every minute (UTC).
+crons = ["* * * * *"]
+
+# GATEWAY_URL and WORKER_SHARED_SECRET are not set here on purpose.
+#   Local:      copy .dev.vars.example to .dev.vars and fill it in.
+#   Deployed:   wrangler secret put WORKER_SHARED_SECRET
+#               and set GATEWAY_URL as a variable in the Cloudflare dashboard.

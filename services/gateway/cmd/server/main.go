@@ -16,6 +16,7 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
+	expiryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
@@ -60,6 +61,11 @@ func run() error {
 		return fmt.Errorf("freshness client: %w", err)
 	}
 	freshness := clients.NewFreshnessClient(freshnessv1.NewFreshnessServiceClient(freshnessConn))
+	expiryConn, err := conns.Connection(context.Background(), "expiry")
+	if err != nil {
+		return fmt.Errorf("expiry client: %w", err)
+	}
+	expiry := clients.NewExpiryClient(expiryv1.NewExpiryServiceClient(expiryConn))
 	authConn, err := conns.Connection(context.Background(), "auth")
 	if err != nil {
 		return fmt.Errorf("auth client: %w", err)
@@ -82,6 +88,7 @@ func run() error {
 		Addr: cfg.HTTPAddress(),
 		Handler: app.NewRouter(cfg, log,
 			app.WithFreshness(freshness),
+			app.WithExpiry(expiry),
 			app.WithAuth(auth),
 			app.WithSearch(clients.NewSearchClient(searchv1.NewSearchServiceClient(searchConn))),
 			app.WithGeo(clients.NewGeoClient(geov1.NewGeoServiceClient(geoConn))),

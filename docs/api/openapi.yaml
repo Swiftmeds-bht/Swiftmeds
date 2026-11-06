@@ -1519,17 +1519,23 @@ paths:
       operationId: runHoldExpirySweep
       summary: Expire every hold whose deadline has passed
       description: |
-        Called on a schedule by the hold-expiry worker. Safe to repeat. Each expired hold
-        releases its reserved stock.
-      x-status: planned
+        Called every minute by the hold-expiry worker (`workers/hold-expiry`). Safe to
+        repeat. Each expired hold releases its reserved stock. The caller sends the shared
+        secret in `X-Worker-Secret`. If the gateway has no `WORKER_SHARED_SECRET` set, every
+        call is rejected with 401.
+      security:
+        - workerSecret: []
+      x-status: implemented
       x-grpc: swiftmed.expiry.v1.ExpiryService/RunSweep
-      x-roles: [ROLE_ADMIN]
+      x-roles: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/AsOfRequest"
+            example:
+              asOf: "2026-11-05T07:00:00.000Z"
       responses:
         "200":
           description: The holds that were expired.
@@ -1537,12 +1543,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunSweepResponse"
+              example:
+                expiredHoldIds: ["3f2b8c1e-5a47-4d0e-9c1b-7a2e6d4f8b10"]
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+          description: The `X-Worker-Secret` header is missing or wrong, or the gateway has no secret configured.
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: unauthorized
         default:
           $ref: "#/components/responses/ServerError"
 components:
