@@ -13,6 +13,7 @@ type RouterOption func(*routes)
 
 type routes struct {
 	freshness  ports.DecayApplier
+	expiry     ports.HoldSweeper
 	auth       ports.Authenticator
 	search     ports.Searcher
 	geo        ports.NearbyPharmacyFinder
@@ -23,6 +24,12 @@ type routes struct {
 // it the route does not exist and the path answers 404.
 func WithFreshness(applier ports.DecayApplier) RouterOption {
 	return func(r *routes) { r.freshness = applier }
+}
+
+// WithExpiry adds the internal hold-expiry sweep endpoint (SCRUM-63). Without
+// it the route does not exist and the path answers 404.
+func WithExpiry(sweeper ports.HoldSweeper) RouterOption {
+	return func(r *routes) { r.expiry = sweeper }
 }
 
 // WithAuth adds the Auth service client used by protected API routes.
@@ -54,6 +61,9 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	})
 	if wired.freshness != nil {
 		mux.Handle("POST "+DecayPath, decayHandler(cfg.WorkerSecret, wired.freshness, logger))
+	}
+	if wired.expiry != nil {
+		mux.Handle("POST "+SweepPath, sweepHandler(cfg.WorkerSecret, wired.expiry, logger))
 	}
 	if wired.search != nil {
 		mux.Handle("GET /api/v1/search", searchHandler(wired.search, logger))

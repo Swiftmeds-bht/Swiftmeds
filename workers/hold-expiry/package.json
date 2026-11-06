@@ -1,0 +1,19 @@
+{
+  "name": "swiftmed-hold-expiry",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker that asks the gateway to expire holds whose deadline has passed, every minute.",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261104.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.157.0"
+  }
+}

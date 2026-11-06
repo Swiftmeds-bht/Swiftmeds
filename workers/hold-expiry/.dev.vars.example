@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) for `npm run dev`.
+# WORKER_SHARED_SECRET must equal the gateway's WORKER_SHARED_SECRET (at least 16 characters).
+GATEWAY_URL=http://localhost:8080
+WORKER_SHARED_SECRET=change-me-worker-secret
