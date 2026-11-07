@@ -29,7 +29,9 @@ func watchlistHandler(client ports.WatchlistClient, logger *slog.Logger) http.Ha
 				writeError(w, http.StatusBadRequest, "invalid watchlist request")
 				return
 			}
-			resp, err := client.Subscribe(callContext(r), &watchlistv1.SubscribeRequest{
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.Subscribe(ctx, &watchlistv1.SubscribeRequest{
 				UserId: identity.UserID, ProductId: body.ProductID, Location: body.Location, RadiusM: body.RadiusM,
 			})
 			if err != nil {
@@ -38,14 +40,18 @@ func watchlistHandler(client ports.WatchlistClient, logger *slog.Logger) http.Ha
 			}
 			writeProtoStatus(w, http.StatusCreated, resp.GetSubscription())
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/watchlist":
-			resp, err := client.ListSubscriptions(callContext(r), &watchlistv1.ListSubscriptionsRequest{UserId: identity.UserID})
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.ListSubscriptions(ctx, &watchlistv1.ListSubscriptionsRequest{UserId: identity.UserID})
 			if err != nil {
 				writeDownstreamError(w, logger, r, err)
 				return
 			}
 			writeProtoStatus(w, http.StatusOK, resp)
 		case r.Method == http.MethodDelete && r.PathValue("subscriptionId") != "":
-			_, err := client.Unsubscribe(callContext(r), &watchlistv1.UnsubscribeRequest{SubscriptionId: r.PathValue("subscriptionId"), UserId: identity.UserID})
+			ctx, cancel := callContext(r)
+			defer cancel()
+			_, err := client.Unsubscribe(ctx, &watchlistv1.UnsubscribeRequest{SubscriptionId: r.PathValue("subscriptionId"), UserId: identity.UserID})
 			if err != nil {
 				writeDownstreamError(w, logger, r, err)
 				return

@@ -38,7 +38,9 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 				writeError(w, http.StatusBadRequest, "invalid hold request")
 				return
 			}
-			resp, err := client.CreateHold(callContext(r), &holdsv1.CreateHoldRequest{
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.CreateHold(ctx, &holdsv1.CreateHoldRequest{
 				UserId: identity.UserID, PharmacyId: body.PharmacyID, ProductId: body.ProductID, Quantity: body.Quantity,
 			})
 			if err != nil {
@@ -64,7 +66,9 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 				writeError(w, http.StatusBadRequest, "invalid hold list parameters")
 				return
 			}
-			resp, err := client.ListHolds(callContext(r), req)
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.ListHolds(ctx, req)
 			if err != nil {
 				writeDownstreamError(w, logger, r, err)
 				return
@@ -82,7 +86,9 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 			if r.Body != nil && r.ContentLength != 0 && !decodeBody(w, r, &body) {
 				return
 			}
-			resp, err := client.CancelHold(callContext(r), &holdsv1.CancelHoldRequest{HoldId: r.PathValue("holdId"), UserId: identity.UserID, Reason: body.Reason})
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.CancelHold(ctx, &holdsv1.CancelHoldRequest{HoldId: r.PathValue("holdId"), UserId: identity.UserID, Reason: body.Reason})
 			if err != nil {
 				writeDownstreamError(w, logger, r, err)
 				return
@@ -97,7 +103,9 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 				writeError(w, http.StatusBadRequest, "invalid collect request")
 				return
 			}
-			resp, err := client.CollectHold(callContext(r), &holdsv1.CollectHoldRequest{HoldId: r.PathValue("holdId"), PharmacyId: identity.PharmacyID, PickupCode: body.PickupCode})
+			ctx, cancel := callContext(r)
+			defer cancel()
+			resp, err := client.CollectHold(ctx, &holdsv1.CollectHoldRequest{HoldId: r.PathValue("holdId"), PharmacyId: identity.PharmacyID, PickupCode: body.PickupCode})
 			if err != nil {
 				writeDownstreamError(w, logger, r, err)
 				return
@@ -111,7 +119,9 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 // field in its request. This prevents a patient from reading another patient's
 // hold even if the downstream service exposes the lookup by ID.
 func holdIDHandler(w http.ResponseWriter, r *http.Request, client ports.HoldsClient, logger *slog.Logger, identity requestIdentity) bool {
-	resp, err := client.GetHold(callContext(r), &holdsv1.GetHoldRequest{HoldId: r.PathValue("holdId")})
+	ctx, cancel := callContext(r)
+	defer cancel()
+	resp, err := client.GetHold(ctx, &holdsv1.GetHoldRequest{HoldId: r.PathValue("holdId")})
 	if err != nil {
 		writeDownstreamError(w, logger, r, err)
 		return false
@@ -174,9 +184,8 @@ func fillHoldListQuery(r *http.Request, req *holdsv1.ListHoldsRequest) error {
 	return nil
 }
 
-func callContext(r *http.Request) context.Context {
-	ctx, _ := context.WithTimeout(r.Context(), downstreamTimeout)
-	return ctx
+func callContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), downstreamTimeout)
 }
 
 func decodeBody(w http.ResponseWriter, r *http.Request, dst any) bool {

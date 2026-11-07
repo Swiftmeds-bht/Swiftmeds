@@ -26,7 +26,9 @@ func feedbackHandler(client ports.FeedbackClient, logger *slog.Logger) http.Hand
 			writeError(w, http.StatusBadRequest, "invalid feedback request")
 			return
 		}
-		resp, err := client.SubmitFeedback(callContext(r), &feedbackv1.SubmitFeedbackRequest{
+		ctx, cancel := callContext(r)
+		defer cancel()
+		resp, err := client.SubmitFeedback(ctx, &feedbackv1.SubmitFeedbackRequest{
 			HoldId: r.PathValue("holdId"), UserId: identity.UserID, WasInStock: body.WasInStock, Rating: body.Rating, Comment: strings.TrimSpace(body.Comment),
 		})
 		if err != nil {
