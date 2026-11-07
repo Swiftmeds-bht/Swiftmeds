@@ -989,7 +989,7 @@ paths:
         `GET /api/v1/holds/{holdId}` until the status is `HOLD_STATUS_ACTIVE` (the pickup
         code is then set) or `HOLD_STATUS_REJECTED` (not enough stock). The patient is the
         signed-in user.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/CreateHold
       x-roles: [ROLE_PATIENT]
       requestBody:
@@ -1034,7 +1034,7 @@ paths:
       description: |
         A patient sees their own holds. Pharmacy staff see the holds of their pharmacy,
         without pickup codes.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/ListHolds
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
       parameters:
@@ -1069,7 +1069,7 @@ paths:
         The patient who made the hold sees it, including `pickupCode`. Staff of the hold's
         pharmacy see it without `pickupCode`, because they enter the code the patient
         shows at the counter. Anyone else gets 404.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/GetHold
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
       parameters:
@@ -1107,7 +1107,7 @@ paths:
         The patient who made the hold cancels it and the reserved units go back to
         available stock. The contract allows this for an `HOLD_STATUS_ACTIVE` hold.
         Terminal holds cannot be changed.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/CancelHold
       x-roles: [ROLE_PATIENT]
       parameters:
@@ -1148,7 +1148,7 @@ paths:
         Pharmacy staff enter the code the patient shows. A wrong code is rejected and the
         hold stays `HOLD_STATUS_ACTIVE`. A hold can be collected only once. The hold must
         belong to the signed-in staff member's pharmacy.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/CollectHold
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
@@ -1200,7 +1200,7 @@ paths:
       description: |
         One feedback per hold, from the patient who made it. It feeds the pharmacy's trust
         score, which is one of the four ranking inputs.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.feedback.v1.FeedbackService/SubmitFeedback
       x-roles: [ROLE_PATIENT]
       parameters:
@@ -1250,7 +1250,7 @@ paths:
       description: |
         The patient is alerted once when the medicine comes back in stock within the radius.
         A notified subscription does not fire again.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.watchlist.v1.WatchlistService/Subscribe
       x-roles: [ROLE_PATIENT]
       requestBody:
@@ -1284,7 +1284,7 @@ paths:
       tags: [Watchlist]
       operationId: listSubscriptions
       summary: List the patient's watchlist
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.watchlist.v1.WatchlistService/ListSubscriptions
       x-roles: [ROLE_PATIENT]
       responses:
@@ -1334,7 +1334,7 @@ paths:
       operationId: unsubscribe
       summary: Stop watching a medicine
       description: The subscription must belong to the signed-in patient.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.watchlist.v1.WatchlistService/Unsubscribe
       x-roles: [ROLE_PATIENT]
       parameters:

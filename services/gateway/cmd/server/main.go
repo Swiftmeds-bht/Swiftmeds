@@ -17,10 +17,13 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	expiryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1"
+	feedbackv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
+	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
+	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/app"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/grpcx"
@@ -83,6 +86,18 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("substitution client: %w", err)
 	}
+	holdsConn, err := conns.Connection(context.Background(), "holds")
+	if err != nil {
+		return fmt.Errorf("holds client: %w", err)
+	}
+	watchlistConn, err := conns.Connection(context.Background(), "watchlist")
+	if err != nil {
+		return fmt.Errorf("watchlist client: %w", err)
+	}
+	feedbackConn, err := conns.Connection(context.Background(), "feedback")
+	if err != nil {
+		return fmt.Errorf("feedback client: %w", err)
+	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
@@ -93,6 +108,9 @@ func run() error {
 			app.WithSearch(clients.NewSearchClient(searchv1.NewSearchServiceClient(searchConn))),
 			app.WithGeo(clients.NewGeoClient(geov1.NewGeoServiceClient(geoConn))),
 			app.WithSubstitution(clients.NewSubstitutionClient(substitutionv1.NewSubstitutionServiceClient(substitutionConn))),
+			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
+			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
+			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

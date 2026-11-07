@@ -16,11 +16,13 @@ type contextKey uint8
 const (
 	userIDKey contextKey = iota
 	userRoleKey
+	pharmacyIDKey
 )
 
 func WithIdentity(ctx context.Context, identity ports.Identity) context.Context {
 	ctx = context.WithValue(ctx, userIDKey, identity.UserID)
-	return context.WithValue(ctx, userRoleKey, identity.Role)
+	ctx = context.WithValue(ctx, userRoleKey, identity.Role)
+	return context.WithValue(ctx, pharmacyIDKey, identity.PharmacyID)
 }
 
 func UserIDFromContext(ctx context.Context) string {
@@ -30,6 +32,11 @@ func UserIDFromContext(ctx context.Context) string {
 
 func RoleFromContext(ctx context.Context) authv1.Role {
 	value, _ := ctx.Value(userRoleKey).(authv1.Role)
+	return value
+}
+
+func PharmacyIDFromContext(ctx context.Context) string {
+	value, _ := ctx.Value(pharmacyIDKey).(string)
 	return value
 }
 

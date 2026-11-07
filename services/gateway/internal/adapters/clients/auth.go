@@ -28,5 +28,5 @@ func (a *AuthClient) ValidateToken(ctx context.Context, accessToken string) (por
 	if resp == nil || resp.GetUserId() == "" || resp.GetRole() == authv1.Role_ROLE_UNSPECIFIED {
 		return ports.Identity{}, status.Error(codes.Internal, "auth returned an incomplete identity")
 	}
-	return ports.Identity{UserID: resp.GetUserId(), Role: resp.GetRole()}, nil
+	return ports.Identity{UserID: resp.GetUserId(), Role: resp.GetRole(), PharmacyID: resp.GetPharmacyId()}, nil
 }
