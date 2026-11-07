@@ -50,15 +50,16 @@ func holdsHandler(client ports.HoldsClient, logger *slog.Logger) http.HandlerFun
 			writeProtoStatus(w, http.StatusAccepted, resp.GetHold())
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/holds":
 			req := &holdsv1.ListHoldsRequest{Page: &commonv1.PageRequest{}}
-			if identity.Role == authv1.Role_ROLE_PATIENT {
+			switch identity.Role {
+			case authv1.Role_ROLE_PATIENT:
 				req.UserId = identity.UserID
-			} else if identity.Role == authv1.Role_ROLE_PHARMACY_STAFF || identity.Role == authv1.Role_ROLE_ADMIN {
+			case authv1.Role_ROLE_PHARMACY_STAFF, authv1.Role_ROLE_ADMIN:
 				if identity.PharmacyID == "" {
 					writeError(w, http.StatusForbidden, "forbidden")
 					return
 				}
 				req.PharmacyId = identity.PharmacyID
-			} else {
+			default:
 				writeError(w, http.StatusForbidden, "forbidden")
 				return
 			}
