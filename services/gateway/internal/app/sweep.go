@@ -11,18 +11,26 @@ import (
 )
 
 const (
-	// SweepPath is called by the hold-expiry Cloudflare Worker (SCRUM-63).
+	// SweepPath is called by the hold-expiry Cloudflare Worker (SCRUM-62).
 	// It is the route runHoldExpirySweep in docs/api/openapi.yaml.
 	SweepPath = "/api/v1/internal/expiry/sweep"
 
-	sweepTimeout = 20 * time.Second
+	// sweepTimeout bounds one sweep. A sweep that does not finish keeps the work
+	// it did; the next scheduled call takes up the rest.
+	sweepTimeout = 10 * time.Second
+
+	// SweepCallTimeout is the limit for the gRPC call to Expiry, longer than the
+	// gateway's usual 800 ms because a sweep calls Holds once per due hold. It
+	// stays below sweepTimeout.
+	SweepCallTimeout = 8 * time.Second
 )
 
-// sweepHandler lets the Worker trigger a hold expiry sweep. It follows the same
-// rules as decayHandler: every call needs the shared secret in X-Worker-Secret,
-// with no secret configured every call is rejected, and the secret is checked
-// before the body is read. The body is {"asOf": "<RFC 3339>"}.
-func sweepHandler(secret string, sweeper ports.HoldSweeper, logger *slog.Logger) http.HandlerFunc {
+// sweepHandler lets the Worker trigger a hold-expiry sweep. It is guarded like
+// the freshness decay route: every call needs the shared secret in
+// X-Worker-Secret, with no secret configured every call is rejected, and the
+// secret is checked before the body is read. The body is the same as for decay:
+// {"asOf": "<RFC 3339>"}.
+func sweepHandler(secret string, sweeper ports.HoldExpirySweeper, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !secretMatches(secret, r.Header.Get(WorkerSecretHeader)) {
 			writeError(w, http.StatusUnauthorized, "unauthorized")
@@ -50,7 +58,6 @@ func sweepHandler(secret string, sweeper ports.HoldSweeper, logger *slog.Logger)
 			return
 		}
 		if expired == nil {
-			// An empty list is "[]", never null.
 			expired = []string{}
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string][]string{"expiredHoldIds": expired})

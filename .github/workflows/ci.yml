@@ -44,9 +44,23 @@ jobs:
           cache-dependency-path: "**/go.sum"
 
       - name: Install golangci-lint
+        shell: bash
         run: |
-          curl -sSfL https://golangci-lint.run/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if curl -sSfL https://golangci-lint.run/install.sh \
+              | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2; then
+              break
+            fi
+
+            if [[ "${attempt}" -eq 3 ]]; then
+              echo "Failed to install golangci-lint after ${attempt} attempts."
+              exit 1
+            fi
+
+            echo "Retrying golangci-lint install (${attempt}/3)..."
+            sleep 5
+          done
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Prepare coverage output

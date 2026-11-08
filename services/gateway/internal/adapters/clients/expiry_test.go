@@ -2,7 +2,7 @@ package clients
 
 import (
 	"context"
-	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -25,16 +25,16 @@ func (f *fakeExpiry) RunSweep(_ context.Context, in *expiryv1.RunSweepRequest, _
 	return f.resp, f.err
 }
 
-func TestRunSweepSendsAsOfAndReturnsTheExpiredIDs(t *testing.T) {
-	want := []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"}
-	fake := &fakeExpiry{resp: &expiryv1.RunSweepResponse{ExpiredHoldIds: want}}
-	asOf := time.Date(2026, 11, 5, 7, 0, 0, 0, time.UTC)
+func TestRunSweepSendsAsOfAndReturnsTheExpiredHolds(t *testing.T) {
+	fake := &fakeExpiry{resp: &expiryv1.RunSweepResponse{ExpiredHoldIds: []string{"h-1", "h-2"}}}
+	asOf := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
 
 	got, err := NewExpiryClient(fake).RunSweep(context.Background(), asOf)
+
 	if err != nil {
 		t.Fatalf("RunSweep() error = %v", err)
 	}
-	if !reflect.DeepEqual(got, want) {
+	if want := []string{"h-1", "h-2"}; !slices.Equal(got, want) {
 		t.Errorf("RunSweep() = %v, want %v", got, want)
 	}
 	if fake.req == nil || !fake.req.GetAsOf().AsTime().Equal(asOf) {
@@ -42,11 +42,22 @@ func TestRunSweepSendsAsOfAndReturnsTheExpiredIDs(t *testing.T) {
 	}
 }
 
-func TestRunSweepKeepsTheGRPCStatus(t *testing.T) {
-	fake := &fakeExpiry{err: status.Error(codes.Unavailable, "expiry is down")}
+func TestRunSweepReturnsAnEmptyListNotNil(t *testing.T) {
+	fake := &fakeExpiry{resp: &expiryv1.RunSweepResponse{}}
 
-	_, err := NewExpiryClient(fake).RunSweep(context.Background(), time.Now())
-	if status.Code(err) != codes.Unavailable {
-		t.Errorf("status code = %v, want Unavailable (err = %v)", status.Code(err), err)
+	got, err := NewExpiryClient(fake).RunSweep(context.Background(), time.Now())
+
+	if err != nil || got == nil || len(got) != 0 {
+		t.Errorf("got (%v, %v), want an empty non-nil list and no error", got, err)
+	}
+}
+
+func TestRunSweepReturnsTheGRPCErrorAsItIs(t *testing.T) {
+	fake := &fakeExpiry{err: status.Error(codes.Unavailable, "expiry down")}
+
+	got, err := NewExpiryClient(fake).RunSweep(context.Background(), time.Now())
+
+	if status.Code(err) != codes.Unavailable || got != nil {
+		t.Errorf("got (%v, %v), want (nil, Unavailable)", got, err)
 	}
 }

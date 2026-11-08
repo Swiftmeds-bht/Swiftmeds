@@ -61,7 +61,8 @@ func run() error {
 		return fmt.Errorf("freshness client: %w", err)
 	}
 	freshness := clients.NewFreshnessClient(freshnessv1.NewFreshnessServiceClient(freshnessConn))
-	expiryConn, err := conns.Connection(context.Background(), "expiry")
+	// A sweep calls Holds once per due hold, so Expiry gets a longer per-call limit.
+	expiryConn, err := conns.ConnectionWithTimeout(context.Background(), "expiry", app.SweepCallTimeout)
 	if err != nil {
 		return fmt.Errorf("expiry client: %w", err)
 	}

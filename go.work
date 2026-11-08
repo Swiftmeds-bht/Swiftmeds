@@ -5,6 +5,7 @@ use (
 	./proto/gen/go
 	./services/auth
 	./services/catalog
+	./services/expiry
 	./services/freshness
 	./services/gateway
 	./services/geo
