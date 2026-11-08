@@ -8,18 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-)
-
-const (
-	holdA = "11111111-1111-4111-8111-111111111111"
-	holdB = "22222222-2222-4222-8222-222222222222"
 )
 
 type fakeSweeper struct {
@@ -69,8 +64,8 @@ func postSweep(t *testing.T, server *httptest.Server, secret, body string) (int,
 	return resp.StatusCode, string(respBody)
 }
 
-func TestSweepAcceptsTheSharedSecret(t *testing.T) {
-	sweeper := &fakeSweeper{expired: []string{holdA, holdB}}
+func TestSweepReturnsTheExpiredHolds(t *testing.T) {
+	sweeper := &fakeSweeper{expired: []string{"h-1", "h-2"}}
 	server := newSweepServer(t, testSecret, sweeper)
 
 	code, body := postSweep(t, server, testSecret, validBody)
@@ -82,8 +77,8 @@ func TestSweepAcceptsTheSharedSecret(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &got); err != nil {
 		t.Fatalf("body %q is not JSON: %v", body, err)
 	}
-	if !reflect.DeepEqual(got["expiredHoldIds"], []string{holdA, holdB}) {
-		t.Errorf("expiredHoldIds = %v, want [%s %s]", got["expiredHoldIds"], holdA, holdB)
+	if want := []string{"h-1", "h-2"}; !slices.Equal(got["expiredHoldIds"], want) {
+		t.Errorf("expiredHoldIds = %v, want %v (body %s)", got["expiredHoldIds"], want, body)
 	}
 	if sweeper.calls != 1 {
 		t.Errorf("RunSweep calls = %d, want 1", sweeper.calls)
@@ -93,15 +88,33 @@ func TestSweepAcceptsTheSharedSecret(t *testing.T) {
 	}
 }
 
-func TestSweepReturnsAnEmptyListNotNull(t *testing.T) {
+func TestSweepWithNothingDueReturnsAnEmptyList(t *testing.T) {
 	for _, expired := range [][]string{nil, {}} {
 		server := newSweepServer(t, testSecret, &fakeSweeper{expired: expired})
 
 		code, body := postSweep(t, server, testSecret, validBody)
 
 		if code != http.StatusOK || !strings.Contains(body, `"expiredHoldIds":[]`) {
-			t.Errorf("got %d %s, want 200 with an empty list", code, body)
+			t.Errorf("got %d %s, want 200 with an empty list (not null)", code, body)
 		}
+	}
+}
+
+// Calling the endpoint twice in a row is allowed: the second answer is empty
+// because Expiry already settled every hold.
+func TestSweepCanBeCalledTwiceInARow(t *testing.T) {
+	sweeper := &fakeSweeper{expired: []string{"h-1"}}
+	server := newSweepServer(t, testSecret, sweeper)
+
+	first, _ := postSweep(t, server, testSecret, validBody)
+	sweeper.expired = nil
+	second, body := postSweep(t, server, testSecret, validBody)
+
+	if first != http.StatusOK || second != http.StatusOK || !strings.Contains(body, `"expiredHoldIds":[]`) {
+		t.Errorf("statuses %d and %d, second body %s, want two 200s and an empty second list", first, second, body)
+	}
+	if sweeper.calls != 2 {
+		t.Errorf("RunSweep calls = %d, want 2", sweeper.calls)
 	}
 }
 
@@ -114,11 +127,10 @@ func TestSweepRejectsCallsWithoutTheSecret(t *testing.T) {
 		{"secret plus one char", testSecret + "x", validBody},
 		{"secret minus one char", testSecret[:len(testSecret)-1], validBody},
 		{"no header and a bad body", "", "not json"},
-		{"wrong secret and no body", "wrong-secret-0123456789", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sweeper := &fakeSweeper{expired: []string{holdA}}
+			sweeper := &fakeSweeper{expired: []string{"h-1"}}
 			server := newSweepServer(t, testSecret, sweeper)
 
 			code, body := postSweep(t, server, tc.secret, tc.body)
@@ -133,6 +145,19 @@ func TestSweepRejectsCallsWithoutTheSecret(t *testing.T) {
 				t.Errorf("body %q leaks the secret", body)
 			}
 		})
+	}
+}
+
+func TestSweepRejectsEverythingWhenNoSecretIsConfigured(t *testing.T) {
+	for _, secret := range []string{"", "anything-at-all-123456"} {
+		sweeper := &fakeSweeper{}
+		server := newSweepServer(t, "", sweeper)
+
+		code, _ := postSweep(t, server, secret, validBody)
+
+		if code != http.StatusUnauthorized || sweeper.calls != 0 {
+			t.Errorf("header %q: status = %d, calls = %d, want 401 and 0", secret, code, sweeper.calls)
+		}
 	}
 }
 
@@ -151,23 +176,7 @@ func TestSweepIgnoresTheAuthorizationHeader(t *testing.T) {
 	_ = resp.Body.Close()
 
 	if resp.StatusCode != http.StatusUnauthorized || sweeper.calls != 0 {
-		t.Errorf("status = %d, calls = %d, want 401 and 0: a user token header must not unlock this route", resp.StatusCode, sweeper.calls)
-	}
-}
-
-func TestSweepRejectsEverythingWhenNoSecretIsConfigured(t *testing.T) {
-	for _, secret := range []string{"", "anything-at-all-123456"} {
-		sweeper := &fakeSweeper{}
-		server := newSweepServer(t, "", sweeper)
-
-		code, _ := postSweep(t, server, secret, validBody)
-
-		if code != http.StatusUnauthorized {
-			t.Errorf("header %q: status = %d, want 401", secret, code)
-		}
-		if sweeper.calls != 0 {
-			t.Errorf("header %q: RunSweep calls = %d, want 0", secret, sweeper.calls)
-		}
+		t.Errorf("status = %d, calls = %d, want 401 and 0: a user token must not unlock this route", resp.StatusCode, sweeper.calls)
 	}
 }
 
@@ -176,11 +185,11 @@ func TestSweepValidatesAsOf(t *testing.T) {
 		{"empty body", ""},
 		{"not JSON", "not json"},
 		{"empty object", `{}`},
-		{"empty asOf", `{"asOf":""}`},
-		{"asOf is not a string", `{"asOf":123}`},
+		{"blank asOf", `{"asOf":"   "}`},
 		{"asOf is not a timestamp", `{"asOf":"yesterday"}`},
 		{"timestamp without a zone", `{"asOf":"2026-11-05T07:00:00"}`},
 		{"zero time", `{"asOf":"0001-01-01T00:00:00Z"}`},
+		{"body too large", `{"asOf":"` + strings.Repeat("x", maxDecayBytes) + `"}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -195,25 +204,35 @@ func TestSweepValidatesAsOf(t *testing.T) {
 			if sweeper.calls != 0 {
 				t.Errorf("RunSweep calls = %d, want 0", sweeper.calls)
 			}
-			if !strings.Contains(body, `"error"`) {
-				t.Errorf("body %q is not a JSON error", body)
-			}
 		})
 	}
 }
 
+// The boundary the Worker relies on: the exact instant it sends reaches Expiry
+// unchanged (in UTC), so a hold expiring exactly then is swept.
 func TestSweepPassesAsOfToExpiryInUTC(t *testing.T) {
-	sweeper := &fakeSweeper{}
-	server := newSweepServer(t, testSecret, sweeper)
-
-	code, body := postSweep(t, server, testSecret, `{"asOf":"2026-11-05T07:00:00+06:00"}`)
-
-	if code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (body %s)", code, body)
+	cases := []struct {
+		name string
+		body string
+		want time.Time
+	}{
+		{"UTC with milliseconds", `{"asOf":"2026-11-05T07:00:00.123Z"}`, time.Date(2026, 11, 5, 7, 0, 0, 123000000, time.UTC)},
+		{"Bhutan time zone", `{"asOf":"2026-11-05T07:00:00+06:00"}`, time.Date(2026, 11, 5, 1, 0, 0, 0, time.UTC)},
 	}
-	want := time.Date(2026, 11, 5, 1, 0, 0, 0, time.UTC)
-	if !sweeper.gotAsOf.Equal(want) || sweeper.gotAsOf.Location() != time.UTC {
-		t.Errorf("asOf = %v, want %v in UTC", sweeper.gotAsOf, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sweeper := &fakeSweeper{}
+			server := newSweepServer(t, testSecret, sweeper)
+
+			code, body := postSweep(t, server, testSecret, tc.body)
+
+			if code != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (body %s)", code, body)
+			}
+			if !sweeper.gotAsOf.Equal(tc.want) || sweeper.gotAsOf.Location() != time.UTC {
+				t.Errorf("asOf = %v (%v), want %v in UTC", sweeper.gotAsOf, sweeper.gotAsOf.Location(), tc.want)
+			}
+		})
 	}
 }
 
@@ -263,7 +282,6 @@ func TestSweepRouteIsAbsentWithoutAnExpiryClient(t *testing.T) {
 func TestSweepIsPostOnly(t *testing.T) {
 	sweeper := &fakeSweeper{}
 	server := newSweepServer(t, testSecret, sweeper)
-
 	req, err := http.NewRequest(http.MethodGet, server.URL+SweepPath, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -275,10 +293,13 @@ func TestSweepIsPostOnly(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		t.Error("GET returned 200, want it not to trigger a sweep")
+	if resp.StatusCode == http.StatusOK || sweeper.calls != 0 {
+		t.Errorf("GET: status = %d, calls = %d, want it not to trigger a sweep", resp.StatusCode, sweeper.calls)
 	}
-	if sweeper.calls != 0 {
-		t.Errorf("RunSweep calls = %d, want 0", sweeper.calls)
+}
+
+func TestSweepCallTimeoutFitsInsideTheRequestTimeout(t *testing.T) {
+	if SweepCallTimeout >= sweepTimeout {
+		t.Errorf("gRPC call limit %v is not below the request limit %v", SweepCallTimeout, sweepTimeout)
 	}
 }

@@ -5,10 +5,9 @@ import (
 	"time"
 )
 
-// HoldSweeper asks the Expiry service to expire every hold whose deadline has
-// passed.
-type HoldSweeper interface {
-	// RunSweep expires the holds due at asOf and returns their IDs. It is safe
-	// to call again: holds that are already expired are not listed twice.
+// HoldExpirySweeper asks the Expiry service to expire the holds whose time has run out.
+type HoldExpirySweeper interface {
+	// RunSweep expires every hold that is due at asOf and returns their IDs.
+	// The list is empty, never nil, when no hold was due. Calling it again is safe.
 	RunSweep(ctx context.Context, asOf time.Time) ([]string, error)
 }

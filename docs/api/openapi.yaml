@@ -1519,10 +1519,13 @@ paths:
       operationId: runHoldExpirySweep
       summary: Expire every hold whose deadline has passed
       description: |
-        Called every minute by the hold-expiry worker (`workers/hold-expiry`). Safe to
-        repeat. Each expired hold releases its reserved stock. The caller sends the shared
-        secret in `X-Worker-Secret`. If the gateway has no `WORKER_SHARED_SECRET` set, every
-        call is rejected with 401.
+        Called on a schedule by the hold-expiry worker. Safe to repeat: a hold is expired and
+        listed once, so a second call right after the first returns an empty list. A hold that
+        expires exactly at `asOf` is expired. The caller sends the shared secret in
+        `X-Worker-Secret`. If the gateway has no `WORKER_SHARED_SECRET` set, every call is
+        rejected with 401. If Holds cannot be reached part-way, the holds already expired are
+        returned and the rest are taken by the next sweep; if nothing could be expired the call
+        fails with 503 or 504.
       security:
         - workerSecret: []
       x-status: implemented
@@ -1535,16 +1538,16 @@ paths:
             schema:
               $ref: "#/components/schemas/AsOfRequest"
             example:
-              asOf: "2026-11-05T07:00:00.000Z"
+              asOf: "2026-11-06T10:00:00.000Z"
       responses:
         "200":
-          description: The holds that were expired.
+          description: The holds that were expired by this call.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunSweepResponse"
               example:
-                expiredHoldIds: ["3f2b8c1e-5a47-4d0e-9c1b-7a2e6d4f8b10"]
+                expiredHoldIds: ["3f2b8c1e-5d7a-4c19-9a53-0e1b6f7d2a44"]
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":

@@ -13,7 +13,7 @@ type RouterOption func(*routes)
 
 type routes struct {
 	freshness  ports.DecayApplier
-	expiry     ports.HoldSweeper
+	expiry     ports.HoldExpirySweeper
 	auth       ports.Authenticator
 	search     ports.Searcher
 	geo        ports.NearbyPharmacyFinder
@@ -26,9 +26,9 @@ func WithFreshness(applier ports.DecayApplier) RouterOption {
 	return func(r *routes) { r.freshness = applier }
 }
 
-// WithExpiry adds the internal hold-expiry sweep endpoint (SCRUM-63). Without
+// WithExpiry adds the internal hold-expiry sweep endpoint (SCRUM-62). Without
 // it the route does not exist and the path answers 404.
-func WithExpiry(sweeper ports.HoldSweeper) RouterOption {
+func WithExpiry(sweeper ports.HoldExpirySweeper) RouterOption {
 	return func(r *routes) { r.expiry = sweeper }
 }
 
