@@ -195,6 +195,25 @@ func TestWatchlistHandlerUsesTokenUser(t *testing.T) {
 	}
 }
 
+func TestWatchlistHandlerSupportsListAndDelete(t *testing.T) {
+	handler := watchlistHandler(&fakeWatchlistClient{}, nil)
+
+	list := withIdentity(httptest.NewRequest(http.MethodGet, "/api/v1/watchlist", nil), ports.Identity{UserID: "user-1", Role: authv1.Role_ROLE_PATIENT})
+	rec := httptest.NewRecorder()
+	handler(rec, list)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list got %d, want 200", rec.Code)
+	}
+
+	deleteRequest := withIdentity(httptest.NewRequest(http.MethodDelete, "/api/v1/watchlist/s-1", nil), ports.Identity{UserID: "user-1", Role: authv1.Role_ROLE_PATIENT})
+	deleteRequest.SetPathValue("subscriptionId", "s-1")
+	rec = httptest.NewRecorder()
+	handler(rec, deleteRequest)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete got %d, want 204", rec.Code)
+	}
+}
+
 func TestWatchlistHandlerRejectsInvalidRequests(t *testing.T) {
 	handler := watchlistHandler(&fakeWatchlistClient{}, nil)
 	tests := []struct {
