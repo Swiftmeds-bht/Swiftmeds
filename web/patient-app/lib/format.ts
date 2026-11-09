@@ -22,7 +22,7 @@ export function freshnessLabel(score: number | undefined): { text: string; level
   const s = score ?? 0;
   if (s >= 0.75) return { text: "Stock confirmed recently", level: "high" };
   if (s >= 0.4) return { text: "Stock confirmed a while ago", level: "medium" };
-  return { text: "Stock not confirmed lately – call ahead", level: "low" };
+  return { text: "Stock not confirmed lately. Call ahead", level: "low" };
 }
 
 /** "1 unit" / "12 units". */

@@ -20,7 +20,7 @@ export async function AccountNav() {
           </form>
         </>
       ) : (
-        <Link href="/login" className="nav-link">
+        <Link href="/login" className="nav-link nav-link-boxed">
           Sign in
         </Link>
       )}

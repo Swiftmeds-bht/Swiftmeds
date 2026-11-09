@@ -28,7 +28,7 @@ export default async function ReservePage({ searchParams }: { searchParams: Sear
 
   if (!productId || !pharmacyId) {
     return (
-      <div className="page">
+      <div className="page narrow">
         <h1>Reserve</h1>
         <div className="problem" role="alert">
           <h2>Choose a pharmacy first</h2>
@@ -47,12 +47,13 @@ export default async function ReservePage({ searchParams }: { searchParams: Sear
   const demo = holdsBackend().source === "demo";
 
   return (
-    <div className="page reserve-page">
+    <div className="page narrow reserve-page">
       <Link href="/" className="back-link">
         <ArrowLeftIcon size={16} /> New search
       </Link>
       <h1>Reserve</h1>
-      <div className="card reserve-card">
+      <p className="lead">Check the details, choose how many, and we ask the pharmacy to hold them for you.</p>
+      <div className="panel reserve-card">
         <dl className="details">
           <div>
             <dt>Medicine</dt>
@@ -65,7 +66,7 @@ export default async function ReservePage({ searchParams }: { searchParams: Sear
           {price && (
             <div>
               <dt>Price each</dt>
-              <dd>{formatPrice(price)}</dd>
+              <dd className="num">{formatPrice(price)}</dd>
             </div>
           )}
         </dl>
@@ -75,6 +76,7 @@ export default async function ReservePage({ searchParams }: { searchParams: Sear
           productId={productId}
           maxQuantity={maxQuantity}
           returnTo={returnTo}
+          unitPriceChhertum={price || undefined}
         />
       </div>
       <p className="notice" role="note">

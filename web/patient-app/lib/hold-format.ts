@@ -18,6 +18,19 @@ export function statusInfo(status: string) {
   return STATUS_INFO[status as HoldStatus] ?? { label: "Unknown", tone: "neutral" as Tone, final: true };
 }
 
+/** How long after turning active a hold still plays the ticket's settle animation. */
+export const SETTLE_WINDOW_MS = 15_000;
+
+/**
+ * True when the hold became active within the last few seconds (the patient was watching it turn).
+ * Called while rendering a per-request server page, so "now" is when the patient's poll landed.
+ */
+export function justActivated(hold: Pick<Hold, "status" | "statusChangedAt">, now: number = Date.now()): boolean {
+  if (hold.status !== "HOLD_STATUS_ACTIVE" || !hold.statusChangedAt) return false;
+  const changed = Date.parse(hold.statusChangedAt);
+  return Number.isFinite(changed) && now - changed >= 0 && now - changed < SETTLE_WINDOW_MS;
+}
+
 /** "29:41" under an hour, "1 h 05 min" above, "0:00" once it is over. */
 export function formatRemaining(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
