@@ -34,14 +34,16 @@ export default async function ResultsPage({ searchParams }: { searchParams: Sear
 
   return (
     <div className="page">
-      <h1>Results</h1>
-      <SearchForm
-        query={query}
-        placeId={place.id}
-        radiusM={radiusM}
-        deviceLocation={location.fromDevice ? location.point : undefined}
-        variant="compact"
-      />
+      <h1>{query ? `Results for “${query}”` : "Results"}</h1>
+      <div className="search-panel-compact">
+        <SearchForm
+          query={query}
+          placeId={place.id}
+          radiusM={radiusM}
+          deviceLocation={location.fromDevice ? location.point : undefined}
+          variant="compact"
+        />
+      </div>
       {query ? (
         // The key makes a new search show the loading state again instead of the old results.
         <Suspense key={retry.toString()} fallback={<ResultsSkeleton />}>

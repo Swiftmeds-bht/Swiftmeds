@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import type { SearchErrorKind } from "@/lib/api";
 
+import { AlertIcon } from "./Icons";
+
 export type ProblemKind = SearchErrorKind | "unexpected";
 
 const MESSAGES: Record<ProblemKind, { title: string; body: string }> = {
@@ -43,6 +45,9 @@ export function SearchProblem({ kind, retryHref, onRetry }: Props) {
   const message = MESSAGES[kind];
   return (
     <div className="problem" role="alert">
+      <span className="problem-icon">
+        <AlertIcon size={20} />
+      </span>
       <h2>{message.title}</h2>
       <p>{message.body}</p>
       {onRetry ? (

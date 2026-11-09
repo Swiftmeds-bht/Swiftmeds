@@ -1,7 +1,33 @@
 import { describe, expect, it } from "vitest";
 
-import { STATUS_INFO, errorMessage, formatClock, formatRemaining, holdNames, statusInfo } from "./hold-format";
+import {
+  SETTLE_WINDOW_MS,
+  STATUS_INFO,
+  errorMessage,
+  formatClock,
+  formatRemaining,
+  holdNames,
+  justActivated,
+  statusInfo,
+} from "./hold-format";
 import { MOCK_PHARMACIES, MOCK_PRODUCTS } from "./mock-data";
+
+describe("justActivated", () => {
+  const now = Date.parse("2026-11-05T08:00:10Z");
+  const changed = "2026-11-05T08:00:05Z"; // 5 s ago
+
+  it("is true only for a hold that turned active moments ago", () => {
+    expect(justActivated({ status: "HOLD_STATUS_ACTIVE", statusChangedAt: changed }, now)).toBe(true);
+    expect(justActivated({ status: "HOLD_STATUS_ACTIVE", statusChangedAt: changed }, now + SETTLE_WINDOW_MS)).toBe(false);
+  });
+
+  it("is false for other statuses, a missing or bad time, and a time in the future", () => {
+    expect(justActivated({ status: "HOLD_STATUS_PENDING", statusChangedAt: changed }, now)).toBe(false);
+    expect(justActivated({ status: "HOLD_STATUS_ACTIVE" }, now)).toBe(false);
+    expect(justActivated({ status: "HOLD_STATUS_ACTIVE", statusChangedAt: "not a date" }, now)).toBe(false);
+    expect(justActivated({ status: "HOLD_STATUS_ACTIVE", statusChangedAt: "2026-11-05T08:01:00Z" }, now)).toBe(false);
+  });
+});
 
 describe("statusInfo", () => {
   it("gives every status its own label", () => {

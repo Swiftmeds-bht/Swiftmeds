@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
   const demo = holdsBackend().source === "demo";
 
   return (
-    <div className="page auth-page">
+    <div className="page narrow auth-page">
       <h1>Sign in</h1>
       <p className="lead">Sign in to reserve medicine and see your holds.</p>
       {first(sp.expired) && (
@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
           </span>
         </p>
       )}
-      <div className="card auth-card">
+      <div className="panel auth-card">
         <AuthForm mode="login" action={loginAction} next={next} />
       </div>
     </div>

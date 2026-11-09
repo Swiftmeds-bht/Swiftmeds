@@ -7,7 +7,7 @@ import { formatDistance } from "@/lib/format";
 import { DEFAULT_RADIUS_M, PLACES, RADII_M } from "@/lib/places";
 import type { GeoPoint } from "@/lib/types";
 
-import { SearchIcon } from "./Icons";
+import { MapPinIcon, SearchIcon } from "./Icons";
 import { LocationPicker } from "./LocationPicker";
 import { MedicineCombobox } from "./MedicineCombobox";
 
@@ -32,6 +32,24 @@ export function SearchForm({
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const compact = variant === "compact";
+  const placeLabel = PLACES.find((p) => p.id === placeId)?.label ?? PLACES[0].label;
+
+  const areaFields = (
+    <>
+      <LocationPicker placeId={placeId} deviceLocation={deviceLocation} />
+      <div className="field">
+        <label htmlFor="radius">Within</label>
+        <select id="radius" name="radius" defaultValue={String(radiusM)}>
+          {RADII_M.map((r) => (
+            <option key={r} value={r}>
+              {formatDistance(r)}
+            </option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,29 +66,25 @@ export function SearchForm({
       method="get"
       role="search"
       aria-label="Search for a medicine"
-      className={variant === "compact" ? "search-form search-form-compact" : "search-form"}
+      className={compact ? "search-form search-form-compact" : "search-form"}
       onSubmit={onSubmit}
     >
-      <div className="search-bar">
-        <SearchIcon size={20} />
-        <MedicineCombobox defaultValue={query} />
-        <button type="submit" className="button" disabled={pending}>
-          {pending ? "Searching…" : "Search"}
-        </button>
-      </div>
-      <div className="search-options">
-        <LocationPicker placeId={placeId} deviceLocation={deviceLocation} />
-        <div className="field">
-          <label htmlFor="radius">Within</label>
-          <select id="radius" name="radius" defaultValue={String(radiusM)}>
-            {RADII_M.map((r) => (
-              <option key={r} value={r}>
-                {formatDistance(r)}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <MedicineCombobox defaultValue={query} />
+      {compact ? <details className="search-area">
+          {/* Closed, the fields still submit: the area is one tap away, the results stay near the top. */}
+          <summary>
+            <MapPinIcon size={16} />
+            <span>
+              Near {deviceLocation ? "your location" : placeLabel}, within {formatDistance(radiusM)}
+            </span>
+            <span className="search-area-change">Change</span>
+          </summary>
+          <div className="search-area-fields">{areaFields}</div>
+        </details> : areaFields}
+      <button type="submit" className="button button-lg search-submit" disabled={pending}>
+        <SearchIcon size={18} />
+        {pending ? "Searching…" : "Search"}
+      </button>
     </form>
   );
 }

@@ -16,10 +16,10 @@ export default async function RegisterPage({ searchParams }: { searchParams: Sea
   if (await getSession()) redirect(next);
 
   return (
-    <div className="page auth-page">
+    <div className="page narrow auth-page">
       <h1>Create an account</h1>
       <p className="lead">You need an account to reserve medicine, so the pharmacy knows the hold is yours.</p>
-      <div className="card auth-card">
+      <div className="panel auth-card">
         <AuthForm mode="register" action={registerAction} next={next} />
       </div>
     </div>

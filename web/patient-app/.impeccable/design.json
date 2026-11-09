@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-09T12:30:00+01:00",
+  "title": "Design System: SwiftMed patient app",
+  "extensions": {
+    "colorMeta": {
+      "brand-teal": { "role": "primary", "displayName": "Brand Teal", "tonalRamp": ["#062f2c", "#0b3b37", "#115e59", "#0f766e", "#2f9488", "#6fbcb1", "#b8dcd4", "#e2f2ee"] },
+      "night-teal": { "role": "primary", "displayName": "Night Teal", "tonalRamp": ["#041c1a", "#082b28", "#0b3b37", "#14514c", "#2b6d67", "#5d958f", "#9cc0bb", "#d7e8e5"] },
+      "page-ground": { "role": "neutral", "displayName": "Page Ground", "tonalRamp": ["#10201e", "#2c3d3a", "#4a5d5a", "#7d8f8b", "#a9bcb7", "#dbe6e3", "#ecf3f1", "#f4f8f7"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "tonalRamp": ["#0a1514", "#10201e", "#2c3d3a", "#4a5d5a", "#7d8f8b", "#a9bcb7", "#dbe6e3", "#f4f8f7"] },
+      "fresh-green": { "role": "tertiary", "displayName": "Fresh Green", "tonalRamp": ["#0a3d25", "#0f5434", "#146c43", "#2a8a5c", "#59a97f", "#93cbab", "#c6e6d3", "#e6f5ec"] },
+      "aging-amber": { "role": "tertiary", "displayName": "Aging Amber", "tonalRamp": ["#4a2b00", "#6a3e00", "#8a5200", "#a86c12", "#c98f3c", "#e2b877", "#f3dcb2", "#fff4dc"] },
+      "stale-red": { "role": "tertiary", "displayName": "Stale Red", "tonalRamp": ["#5c120c", "#841b12", "#b42318", "#cc4a3e", "#e07a70", "#eeaaa3", "#f7d3cf", "#fdecea"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Home headline only, at most two lines on desktop." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles." },
+      "title": { "displayName": "Title", "purpose": "Product names, section headings, step names." },
+      "body": { "displayName": "Body", "purpose": "All reading text, 17px for older readers." },
+      "label": { "displayName": "Label", "purpose": "Field labels, nav links, button text." },
+      "code": { "displayName": "Pickup code", "purpose": "The pickup code on the ticket, tabular figures." }
+    },
+    "shadows": [
+      { "name": "resting", "value": "0 1px 2px rgba(11, 59, 55, 0.06)", "purpose": "Compact search panel, hold rows, outline buttons." },
+      { "name": "panel", "value": "0 1px 2px rgba(11, 59, 55, 0.05), 0 10px 28px -14px rgba(11, 59, 55, 0.22)", "purpose": "Results, forms, the hold card." },
+      { "name": "lifted", "value": "0 2px 4px rgba(11, 59, 55, 0.06), 0 18px 40px -18px rgba(11, 59, 55, 0.32)", "purpose": "The suggestions list." },
+      { "name": "ticket", "value": "0 14px 30px -18px rgba(11, 59, 55, 0.7)", "purpose": "The pickup ticket." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "All state transitions and the code settle." },
+      { "name": "code-settle", "value": "0.8s ease-out, from opacity 0.25, translateY 0.35em, blur 3px", "purpose": "The one authored moment: a hold turns active. Off under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone-stack", "value": "32rem" },
+      { "name": "form-row", "value": "40rem" },
+      { "name": "tagline", "value": "44rem" },
+      { "name": "steps-row", "value": "48rem" },
+      { "name": "results-form-row", "value": "58rem" },
+      { "name": "home-split", "value": "62rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action in a row: Search, Reserve on the best match, Sign in.",
+      "html": "<button class=\"ds-btn-primary\">Reserve</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; min-height:44px; padding:9px 22px; font:650 16px/1.2 Figtree, system-ui, sans-serif; color:#fff; background:#0f766e; border:1px solid #0f766e; border-radius:10px; box-shadow:0 1px 2px rgba(11,59,55,.18), inset 0 1px 0 rgba(255,255,255,.12); cursor:pointer; transition:background-color .18s cubic-bezier(.16,1,.3,1), transform .12s; } .ds-btn-primary:hover { background:#115e59; border-color:#115e59; } .ds-btn-primary:focus-visible { outline:3px solid #0b3b37; outline-offset:2px; } .ds-btn-primary:active { transform:translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions: Reserve on other rows, Open in map.",
+      "html": "<button class=\"ds-btn-outline\">Reserve</button>",
+      "css": ".ds-btn-outline { display:inline-flex; align-items:center; min-height:44px; padding:9px 22px; font:650 16px/1.2 Figtree, system-ui, sans-serif; color:#0f766e; background:#fff; border:1px solid #7d8f8b; border-radius:10px; box-shadow:0 1px 2px rgba(11,59,55,.06); cursor:pointer; } .ds-btn-outline:hover { background:#e2f2ee; border-color:#0f766e; color:#115e59; } .ds-btn-outline:focus-visible { outline:3px solid #0b3b37; outline-offset:2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above, hint below, teal focus with a blue ring.",
+      "html": "<label class=\"ds-field\"><span>Medicine name</span><input placeholder=\"e.g. Paracetamol\"></label>",
+      "css": ".ds-field { display:grid; gap:6px; font:600 15.8px/1.5 Figtree, system-ui, sans-serif; color:#10201e; } .ds-field input { min-height:48px; padding:10px 14px; font:400 17px Figtree, system-ui, sans-serif; color:#10201e; background:#fff; border:1px solid #7d8f8b; border-radius:10px; } .ds-field input::placeholder { color:#4a5d5a; } .ds-field input:hover { border-color:#10201e; } .ds-field input:focus-visible { outline:none; border-color:#0f766e; box-shadow:0 0 0 3px #0b3b37; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "chip-status-ready",
+      "description": "Hold state as a tinted pill in its meaning colour.",
+      "html": "<span class=\"ds-chip\">Ready to collect</span>",
+      "css": ".ds-chip { display:inline-flex; align-items:center; padding:4px 11px; font:650 14px Figtree, system-ui, sans-serif; color:#146c43; background:#e6f5ec; border-radius:999px; }"
+    },
+    {
+      "name": "Freshness Ramp",
+      "kind": "custom",
+      "refersTo": "fresh-green",
+      "description": "Three bars filled by freshness level, plus words; reads without colour.",
+      "html": "<p class=\"ds-fresh\"><span class=\"ds-bars\"><i></i><i></i><i></i></span>Stock confirmed recently</p>",
+      "css": ".ds-fresh { display:inline-flex; align-items:center; gap:8px; margin:0; font:600 15px Figtree, system-ui, sans-serif; color:#146c43; } .ds-bars { display:inline-flex; align-items:flex-end; gap:2px; height:15px; } .ds-bars i { display:block; width:4px; border-radius:1px; background:currentColor; } .ds-bars i:nth-child(1){height:40%} .ds-bars i:nth-child(2){height:70%} .ds-bars i:nth-child(3){height:100%}"
+    },
+    {
+      "name": "Pickup Ticket",
+      "kind": "custom",
+      "refersTo": "pickup-ticket",
+      "description": "The code the patient shows at the counter, with a notched tear line and the time left.",
+      "html": "<div class=\"ds-ticket\"><div class=\"ds-top\"><p class=\"ds-lbl\">Pickup code</p><p class=\"ds-code\">4 8 2 9 1 3</p></div><div class=\"ds-tear\"></div><p class=\"ds-time\"><b>29:41</b> left until 14:30</p></div>",
+      "css": ".ds-ticket { width:340px; background:#0f766e; color:#fff; border-radius:16px; overflow:hidden; font-family:Figtree, system-ui, sans-serif; box-shadow:0 14px 30px -18px rgba(11,59,55,.7); text-align:center; } .ds-top { padding:20px 20px 18px; } .ds-lbl { margin:0; font-weight:600; font-size:15px; color:#def3ee; } .ds-code { margin:0; font-weight:750; font-size:46px; letter-spacing:.06em; font-variant-numeric:tabular-nums; } .ds-tear { position:relative; margin:0 22px; border-top:2px dashed rgba(255,255,255,.42); } .ds-tear::before, .ds-tear::after { content:''; position:absolute; top:-13px; width:26px; height:26px; border-radius:50%; background:#fff; } .ds-tear::before { left:-35px; } .ds-tear::after { right:-35px; } .ds-time { margin:0; padding:15px 20px 18px; color:#def3ee; } .ds-time b { color:#fff; font-size:22px; font-variant-numeric:tabular-nums; }"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "refersTo": "panel",
+      "description": "Brand mark and wordmark, plain links, Sign in as a bordered pill.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\"><span></span>SwiftMed</a><a class=\"ds-link\">My holds</a><a class=\"ds-link ds-pill\">Sign in</a></nav>",
+      "css": ".ds-nav { display:flex; align-items:center; gap:4px; height:64px; padding:0 20px; background:#fff; border-bottom:1px solid #dbe6e3; font-family:Figtree, system-ui, sans-serif; } .ds-brand { display:inline-flex; align-items:center; gap:9px; margin-right:auto; font-weight:750; font-size:20px; letter-spacing:-.03em; color:#10201e; } .ds-brand span { width:28px; height:28px; border-radius:8px; background:#0f766e; } .ds-link { display:inline-flex; align-items:center; min-height:44px; padding:0 14px; font-weight:600; color:#10201e; border-radius:999px; text-decoration:none; } .ds-link:hover { background:#ecf3f1; color:#115e59; } .ds-pill { border:1px solid #dbe6e3; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Pharmacist",
+    "overview": "SwiftMed behaves like a good pharmacist at the counter: clear, kind and exact. Every screen answers the patient's question first (where the medicine is, how far away, how sure we are), in plain words and steady type, and keeps everything else quiet. It is the category standard for a consumer health app, executed at the craft level of Zocdoc and One Medical, with SwiftMed's teal as its one voice.",
+    "keyCharacteristics": [
+      "One accent (teal); state colours only where they mean something.",
+      "Figtree throughout, with tabular figures for distance, price, stock, code and time.",
+      "Labels always visible above fields; large body text (17px) for older readers.",
+      "Two radii: 10px controls, 16px panels; chips are full pills.",
+      "Soft depth tinted toward the teal; one authored motion (the code settling into place)."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Teal is the only accent. Green, amber, red and blue appear only to state freshness, hold state, an error or a notice, never as decoration.", "section": "colors" },
+      { "name": "The Tested Pair Rule", "body": "Every text and colour pairing is listed in web/patient-app/lib/contrast.test.ts and must pass WCAG AA. A new token is not done until its pairs are added there.", "section": "colors" },
+      { "name": "The Counted Figures Rule", "body": "Every number a patient compares or reads out (distance, price, stock, code, time left) is set in tabular lining figures.", "section": "typography" },
+      { "name": "The No Eyebrow Rule", "body": "Headings speak for themselves. No small uppercase tracked labels above them.", "section": "typography" },
+      { "name": "The No Nested Cards Rule", "body": "A panel never holds another panel. Inside a panel, group with hairline dividers and tinted rows.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do answer first: distance, price, stock and freshness are visible on every result without opening anything.",
+      "Do keep labels visible above every field and pair every icon with words.",
+      "Do keep touch targets at least 44px and body text at 17px.",
+      "Do mark demo data, degraded services and errors in a notice, every time.",
+      "Do add new colour pairs to lib/contrast.test.ts before using them."
+    ],
+    "donts": [
+      "Don't add a second accent colour or use green, amber or red decoratively.",
+      "Don't use eyebrow labels, section numbers as decoration, dot badges, or equal icon-card grids.",
+      "Don't put a panel inside a panel.",
+      "Don't add a dark theme without a use-scene reason; the code is shown at a counter in daylight.",
+      "Don't use placeholder text as a label, or text smaller than 15px for anything a patient must read."
+    ]
+  }
+}

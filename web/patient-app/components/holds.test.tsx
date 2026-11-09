@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MOCK_PHARMACIES, MOCK_PRODUCTS } from "@/lib/mock-data";
@@ -52,7 +52,8 @@ describe("HoldCard", () => {
 
   it("shows an active hold's pickup code, time left and a Cancel button", async () => {
     const { container } = render(<HoldCard hold={active} cancelAction={noop} />);
-    expect(screen.getByText("4 8 2 9 1 3")).toBeTruthy();
+    // Drawn digit by digit (each digit animates on its own), spaced for the eye.
+    expect(container.querySelector(".pickup-code")?.textContent).toBe("4 8 2 9 1 3");
     expect(screen.getByText("4, 8, 2, 9, 1, 3")).toBeTruthy(); // read digit by digit
     expect(screen.getByText("30:00")).toBeTruthy();
     expect(screen.getByText(/until 14:30/)).toBeTruthy();
@@ -135,6 +136,18 @@ describe("ReserveForm", () => {
   it("always offers at least one unit", () => {
     render(<ReserveForm action={noop} pharmacyId="ph" productId="pr" maxQuantity={0} returnTo="/reserve" />);
     expect((screen.getByLabelText("How many?") as HTMLSelectElement).options).toHaveLength(1);
+  });
+
+  it("shows the total to pay, and updates it with the number of units", () => {
+    render(<ReserveForm action={noop} pharmacyId="ph" productId="pr" maxQuantity={5} returnTo="/reserve" unitPriceChhertum="1400" />);
+    expect(screen.getByText("Nu. 14.00")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("How many?"), { target: { value: "3" } });
+    expect(screen.getByText("Nu. 42.00")).toBeTruthy();
+  });
+
+  it("shows no total when the pharmacy listed no price", () => {
+    render(<ReserveForm action={noop} pharmacyId="ph" productId="pr" maxQuantity={5} returnTo="/reserve" />);
+    expect(screen.queryByText(/To pay at the counter/)).toBeNull();
   });
 });
 

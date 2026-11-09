@@ -6,18 +6,28 @@ import type { Hold } from "@/lib/types";
 
 import { AutoRefresh } from "./AutoRefresh";
 import { CancelHoldForm } from "./CancelHoldForm";
+import { LoaderIcon } from "./Icons";
 import { Countdown } from "./Countdown";
+import { PickupTicket } from "./PickupTicket";
 
 interface Props {
   hold: Hold;
   cancelAction: (state: FormState, form: FormData) => Promise<FormState>;
   /** "detail": the hold page, with the pickup code large. "row": one entry in My holds. */
   variant?: "detail" | "row";
+  /** The hold turned active moments ago: play the ticket's one-time settle. */
+  justActivated?: boolean;
 }
 
 function StatusPill({ status }: { status: string }) {
   const info = statusInfo(status);
-  return <span className={`badge badge-${info.tone}`}>{info.label}</span>;
+  return (
+    <span className={`badge badge-${info.tone}`}>
+      {/* Pending is live: a turning loader, not a decorative dot. */}
+      {status === "HOLD_STATUS_PENDING" && <LoaderIcon size={14} />}
+      {info.label}
+    </span>
+  );
 }
 
 function Message({ hold }: { hold: Hold }) {
@@ -49,7 +59,7 @@ function Message({ hold }: { hold: Hold }) {
   }
 }
 
-export function HoldCard({ hold, cancelAction, variant = "detail" }: Props) {
+export function HoldCard({ hold, cancelAction, variant = "detail", justActivated = false }: Props) {
   const names = holdNames(hold);
   const detail = variant === "detail";
   const active = hold.status === "HOLD_STATUS_ACTIVE";
@@ -59,36 +69,30 @@ export function HoldCard({ hold, cancelAction, variant = "detail" }: Props) {
   const selfHref = `/holds/${encodeURIComponent(hold.holdId)}`;
 
   return (
-    <article className={`card hold-card hold-${variant}`} aria-labelledby={`hold-${hold.holdId}`}>
+    <article className={`panel hold-card hold-${variant}`} aria-labelledby={`hold-${hold.holdId}`}>
       <div className="hold-head">
-        <div>
-          <Heading id={`hold-${hold.holdId}`} className="hold-title">
-            {detail ? names.medicine : <Link href={selfHref}>{names.medicine}</Link>}
-          </Heading>
+        <Heading id={`hold-${hold.holdId}`} className="hold-title">
+          {detail ? names.medicine : <Link href={selfHref}>{names.medicine}</Link>}
+        </Heading>
+        <div className="hold-meta">
+          {/* Live region: screen readers hear the new status when the page refreshes. */}
+          <div role="status" aria-live="polite" className="hold-status">
+            <StatusPill status={hold.status} />
+          </div>
           <p className="muted">
             {quantity && `${quantity} · `}
             {names.pharmacy}
             {detail && names.address ? `, ${names.address}` : ""}
           </p>
         </div>
-        {/* Live region: screen readers hear the new status when the page refreshes. */}
-        <div role="status" aria-live="polite" className="hold-status">
-          <StatusPill status={hold.status} />
-        </div>
       </div>
 
       {detail && <Message hold={hold} />}
 
       {active && hold.pickupCode && (
-        <div className={detail ? "pickup" : "pickup pickup-small"}>
-          <p className="pickup-label">Pickup code</p>
-          <p className="pickup-code" aria-hidden="true">
-            {hold.pickupCode.split("").join(" ")}
-          </p>
-          {/* Read digit by digit, not as "four hundred eighty-two thousand…". */}
-          <p className="sr-only">{hold.pickupCode.split("").join(", ")}</p>
+        <PickupTicket code={hold.pickupCode} small={!detail} settle={detail && justActivated}>
           {hold.expiresAt && <Countdown expiresAt={hold.expiresAt} />}
-        </div>
+        </PickupTicket>
       )}
 
       {detail && hold.status === "HOLD_STATUS_PENDING" && <AutoRefresh />}

@@ -29,7 +29,7 @@ export default async function HoldsPage() {
   const past = holds.filter((h) => statusInfo(h.status).final);
 
   return (
-    <div className="page holds-page">
+    <div className="page narrow holds-page">
       <h1>My holds</h1>
       <p className="muted">Signed in as {session.email}</p>
 
@@ -52,7 +52,7 @@ export default async function HoldsPage() {
         <>
           <section aria-labelledby="current-heading" className="hold-section">
             <h2 id="current-heading" className="section-heading">
-              Current
+              Current <span className="section-count">{current.length}</span>
             </h2>
             {current.some((h) => h.status === "HOLD_STATUS_PENDING") && <AutoRefresh />}
             {current.length === 0 ? (
@@ -70,7 +70,7 @@ export default async function HoldsPage() {
           {past.length > 0 && (
             <section aria-labelledby="past-heading" className="hold-section">
               <h2 id="past-heading" className="section-heading">
-                Past
+                Past <span className="section-count">{past.length}</span>
               </h2>
               <ul className="hold-list">
                 {past.map((h) => (
