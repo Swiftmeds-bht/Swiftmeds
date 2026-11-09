@@ -87,3 +87,41 @@ func TestHoldHandlerCancelAllowsEmptyBody(t *testing.T) {
 		t.Fatalf("got reason %q, want empty reason", fake.cancel.GetReason())
 	}
 }
+
+func TestHoldHandlerRejectsInvalidRequestBodies(t *testing.T) {
+	tests := []struct {
+		name   string
+		req    *http.Request
+		holdID bool
+	}{
+		{
+			name: "create without body",
+			req: withIdentity(
+				httptest.NewRequest(http.MethodPost, "/api/v1/holds", nil),
+				ports.Identity{UserID: "user-1", Role: authv1.Role_ROLE_PATIENT},
+			),
+		},
+		{
+			name: "cancel with malformed JSON",
+			req: withIdentity(
+				httptest.NewRequest(http.MethodPost, "/api/v1/holds/h-1/cancel", strings.NewReader("{")),
+				ports.Identity{UserID: "user-1", Role: authv1.Role_ROLE_PATIENT},
+			),
+			holdID: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.holdID {
+				tt.req.SetPathValue("holdId", "h-1")
+			}
+			rec := httptest.NewRecorder()
+			holdsHandler(&fakeHoldsClient{}, nil)(rec, tt.req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("got %d, want 400", rec.Code)
+			}
+		})
+	}
+}
