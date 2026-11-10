@@ -3,10 +3,6 @@
 Next.js app where patients search for a medicine and see which nearby pharmacies
 have it in stock. Owner: Pema. Responsive: works on phones and desktops.
 
-The visual design (colours, type, components and rules) is recorded in
-[`DESIGN.md`](DESIGN.md), and the users and product constraints behind it are
-in [`PRODUCT.md`](PRODUCT.md). Read both before adding a screen.
-
 ## Pages
 
 | Route | What it shows |
