@@ -37,3 +37,13 @@ var (
 	// ErrInvalidPageToken means the page token was not made by this service.
 	ErrInvalidPageToken = errors.New("page_token is not valid")
 )
+
+// Errors from the saga's calls to other systems.
+var (
+	// ErrInventoryUnavailable means a call to Inventory failed, so the hold was
+	// not changed. The caller may try again: every Inventory call is safe to repeat.
+	ErrInventoryUnavailable = errors.New("stock service is not available")
+	// ErrRequestNotSent means CreateHold could not publish hold.requested. The
+	// hold is rejected instead of being left PENDING for ever, and the patient may try again.
+	ErrRequestNotSent = errors.New("could not send the stock reservation request")
+)

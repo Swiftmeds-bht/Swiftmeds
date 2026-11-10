@@ -153,9 +153,16 @@ services:
          HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
          HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
          HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
+         # Reservation saga: hold.requested and hold.confirmed go out, and stock.reserved and
+         # stock.unavailable come in, over RabbitMQ. Cancel, expire and collect call Inventory
+         # through Traefik, which routes by :authority (the service name).
+         RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+         HOLDS_UPSTREAM: ${HOLDS_UPSTREAM:-traefik:50051}
          LOG_LEVEL: ${LOG_LEVEL:-info}
        depends_on:
          postgres:
+           condition: service_healthy
+         rabbitmq:
            condition: service_healthy
        labels:
          - traefik.enable=true

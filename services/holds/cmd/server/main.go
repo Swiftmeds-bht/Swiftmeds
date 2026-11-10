@@ -1,11 +1,13 @@
 // Command server runs the Holds service.
 //
-// main only wires things together: config -> logger -> adapters -> app -> gRPC server.
+// main only wires things together: config -> logger -> adapters -> app -> gRPC server
+// and the RabbitMQ consumer of the reservation saga.
 // Run "server healthcheck" to check a running instance (used by the Docker HEALTHCHECK).
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,14 +17,21 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	amqp "github.com/rabbitmq/amqp091-go"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/messaging"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/migrate"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/resilience"
 	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
+	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/adapters/clients"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/adapters/grpc"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/adapters/postgres"
+	rabbitmqadapter "github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/adapters/rabbitmq"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/app"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/migrations"
 )
@@ -49,6 +58,10 @@ func run() error {
 	databaseURL := cfg.Required("HOLDS_DATABASE_URL")
 	maxActive := cfg.Int("HOLDS_MAX_ACTIVE_PER_USER", app.DefaultMaxActivePerUser)
 	holdDuration := cfg.Duration("HOLDS_HOLD_DURATION", app.DefaultHoldDuration)
+	rabbitURL := cfg.Required("RABBITMQ_URL")
+	// Calls to Inventory go through Traefik, which routes by :authority (the service name).
+	upstream := cfg.String("HOLDS_UPSTREAM", "traefik:50051")
+	callTimeout := cfg.Duration("HOLDS_CALL_TIMEOUT", 3*time.Second)
 	logLevel := cfg.String("LOG_LEVEL", "info")
 	if err := cfg.Err(); err != nil {
 		return fmt.Errorf("config: %w", err)
@@ -83,21 +96,107 @@ func run() error {
 	}
 	log.Info("database migrations up to date", slog.Int("applied", len(applied)), slog.Any("versions", applied))
 
-	// Cancelled on Ctrl+C or when Docker stops the container (SIGTERM).
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	// The table that remembers which event IDs were already handled.
+	if err := messaging.EnsureSchema(startCtx, sqlDB); err != nil {
+		return fmt.Errorf("messaging deduplication schema: %w", err)
+	}
 
-	// Outbound adapters -> use cases -> inbound adapter.
+	rabbitConn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		return fmt.Errorf("RabbitMQ connection: %w", err)
+	}
+	defer func() { _ = rabbitConn.Close() }()
+	publisherChannel, err := rabbitConn.Channel()
+	if err != nil {
+		return fmt.Errorf("RabbitMQ publisher channel: %w", err)
+	}
+	defer func() { _ = publisherChannel.Close() }()
+	consumerChannel, err := rabbitConn.Channel()
+	if err != nil {
+		return fmt.Errorf("RabbitMQ consumer channel: %w", err)
+	}
+	defer func() { _ = consumerChannel.Close() }()
+
+	// Release and commit are safe to repeat, so the client may retry them.
+	inventoryConn, err := grpc.NewClient(upstream,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithAuthority("inventory"),
+		grpc.WithChainUnaryInterceptor(resilience.UnaryClientInterceptor(resilience.Config{
+			Timeout: callTimeout,
+			Retry:   resilience.RetryConfig{MaxAttempts: 3, BaseDelay: 100 * time.Millisecond},
+		})),
+	)
+	if err != nil {
+		return fmt.Errorf("inventory client: %w", err)
+	}
+	defer func() { _ = inventoryConn.Close() }()
+
+	messagePublisher, err := messaging.NewPublisher(publisherChannel)
+	if err != nil {
+		return fmt.Errorf("event publisher: %w", err)
+	}
+	eventPublisher, err := rabbitmqadapter.NewPublisher(messagePublisher)
+	if err != nil {
+		return fmt.Errorf("holds event publisher: %w", err)
+	}
+	deduper, err := messaging.NewPostgresDeduper(sqlDB)
+	if err != nil {
+		return fmt.Errorf("event deduper: %w", err)
+	}
+
+	// Outbound adapters -> use cases -> inbound adapters.
 	repo := postgres.NewRepository(db)
-	svc := app.NewService(repo, app.Config{MaxActivePerUser: maxActive, HoldDuration: holdDuration}, time.Now)
+	svc := app.NewService(repo, app.Config{MaxActivePerUser: maxActive, HoldDuration: holdDuration}, time.Now,
+		app.WithInventory(clients.NewInventory(inventoryConn)),
+		app.WithEvents(eventPublisher))
 	log.Info("holds settings",
 		slog.Int("max_active_per_user", maxActive),
-		slog.Duration("hold_duration", holdDuration))
+		slog.Duration("hold_duration", holdDuration),
+		slog.String("upstream", upstream))
+
+	stockConsumer, err := rabbitmqadapter.NewStockConsumer(consumerChannel, deduper, svc, log)
+	if err != nil {
+		return fmt.Errorf("stock event consumer: %w", err)
+	}
 
 	srv := grpcx.NewServer(log)
 	holdsv1.RegisterHoldsServiceServer(srv, grpcadapter.NewHandler(svc))
 
-	return srv.Serve(ctx, fmt.Sprintf(":%d", port))
+	// Cancelled on Ctrl+C or when Docker stops the container (SIGTERM).
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	runtimeErrors := make(chan error, 2)
+	go func() { runtimeErrors <- srv.Serve(ctx, fmt.Sprintf(":%d", port)) }()
+	go func() { runtimeErrors <- stockConsumer.Start(ctx) }()
+	return waitForRuntime(ctx, stop, runtimeErrors)
+}
+
+// waitForRuntime waits for the gRPC server and the event consumer. If either one
+// stops, it stops the other too, so the container restarts instead of running
+// half alive (for example answering calls but no longer reading events).
+func waitForRuntime(ctx context.Context, stop context.CancelFunc, runtimeErrors <-chan error) error {
+	firstErr := <-runtimeErrors
+	if ctx.Err() != nil {
+		stop()
+		secondErr := <-runtimeErrors
+		for _, err := range []error{firstErr, secondErr} {
+			if err != nil && !errors.Is(err, context.Canceled) {
+				return fmt.Errorf("holds runtime shutdown: %w", err)
+			}
+		}
+		return nil
+	}
+
+	stop()
+	secondErr := <-runtimeErrors
+	if firstErr != nil {
+		return fmt.Errorf("holds runtime: %w", firstErr)
+	}
+	if secondErr != nil {
+		return fmt.Errorf("holds runtime: %w", secondErr)
+	}
+	return errors.New("holds runtime stopped unexpectedly")
 }
 
 func healthcheck() int {
