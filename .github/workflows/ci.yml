@@ -120,3 +120,27 @@ jobs:
           name: coverage-reports
           path: coverage/
           if-no-files-found: ignore
+
+  saga-integration:
+    name: Saga integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      # Starts Postgres and RabbitMQ with testcontainers (Docker is on the runner),
+      # builds Holds and Inventory with -race and runs the saga scenarios (SCRUM-56).
+      - name: Run saga integration tests
+        working-directory: tests/integration
+        env:
+          GOWORK: "off"
+        run: go test -tags integration -race -count=1 -v ./...
