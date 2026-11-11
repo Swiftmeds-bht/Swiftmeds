@@ -100,8 +100,10 @@ Excluded by the project proposal (Section 2A), so not tested:
 
 | Concern | Tool/process |
 |---|---|
-| Go unit tests | `go test ./...` per Go module; repository `make test` (CI runs every module with `GOWORK=off`) |
-| Go integration tests | Build tag `integration` and a live dependency from `make up`, e.g. `POSTGRES_URL=... go test -tags integration ./migrate/` (pkg/migrate) and `RABBITMQ_URL=amqp://swiftmed:change-me@localhost:5672/ go test -run Integration ./messaging/` (pkg/messaging). Without the variable the test is skipped, not failed |
+| Go unit tests | `go test ./...` per Go module; repository `make test` (CI runs every module with `GOWORK=off` and `-race`) |
+| Go integration tests | Build tag `integration` plus a live Postgres or RabbitMQ, one URL variable per suite (e.g. `HOLDS_TEST_DATABASE_URL`, `RABBITMQ_URL`). Without its variable a test is skipped. `scripts/integration-tests.sh` runs them all with `-race -v`; CI's **Go integration tests** job starts Postgres and RabbitMQ, sets every variable and fails if any test skips (SCRUM-116) |
+| Saga integration tests | `tests/integration` (SCRUM-56): Postgres and RabbitMQ in testcontainers, the real Holds and Inventory; CI job **Saga integration tests** |
+| Web app and Workers | CI jobs **Web app** (patient app: lint, typecheck, Vitest, build) and **Workers** (typecheck and tests for each Cloudflare Worker) |
 | Coverage gate | `make coverage`: domain and app packages of the core services must reach 80% (CI runs the same script) |
 | Static quality gate | `make lint` and the CI configuration |
 | Service dependencies | Docker Compose with Postgres, RabbitMQ, and Traefik |
@@ -304,10 +306,11 @@ events (SCRUM-57), Expiry (SCRUM-62), Feedback (SCRUM-64), Watchlist (SCRUM-59),
 gateway reservation routes (SCRUM-54) and the patient reserve screens (SCRUM-60).
 This table adds to 7.2; rows there still hold.
 
-CI runs two jobs on every PR: **Go checks** (vet, golangci-lint, unit tests and the
-coverage gate for every module) and **Saga integration tests** (SCRUM-56:
-`tests/integration`, Postgres and RabbitMQ in testcontainers, the real Holds and
-Inventory built with `-race`).
+At the end of Sprint 4, CI ran two jobs on every PR: **Go checks** (vet,
+golangci-lint, unit tests and the coverage gate for every module) and **Saga
+integration tests** (SCRUM-56: `tests/integration`, Postgres and RabbitMQ in
+testcontainers, the real Holds and Inventory built with `-race`). Sprint 5 adds
+`-race` to the unit tests and three more jobs (SCRUM-116, see section 4).
 
 | Test case / area | Automated now | Where |
 |---|---|---|
