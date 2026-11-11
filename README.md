@@ -28,6 +28,10 @@ Tutors: Mr. Pema Namgay and Mr. Nima
 - **Cloudflare Workers** run scheduled jobs: expiring reservations and decaying stock freshness.
 - **Next.js** powers the patient web app and the pharmacy dashboard.
 
+Diagrams (system context, containers, events, the reservation saga) are in
+[docs/architecture](docs/architecture/README.md), and the reasons behind the main
+choices are in the [architecture decision records](docs/adr/README.md).
+
 ```
 proto/      gRPC and event contracts (generated code goes in proto/gen/go)
 pkg/        shared Go code: resilience, messaging, grpcx, auth, logger, config
