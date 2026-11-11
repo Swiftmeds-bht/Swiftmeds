@@ -107,7 +107,12 @@ local PostgreSQL and RabbitMQ data volumes.
 make test               # unit tests in every Go module
 make lint               # golangci-lint in every Go module
 make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
+./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (set the *_URL variables, see ci.yml)
 ```
+
+CI (`.github/workflows/ci.yml`) runs five jobs on every PR: **Go checks** (vet, lint,
+unit tests with `-race`, coverage gate), **Go integration tests**, **Saga integration
+tests**, **Web app** (patient app lint, typecheck, tests, build) and **Workers**.
 
 ### Adding a service
 
