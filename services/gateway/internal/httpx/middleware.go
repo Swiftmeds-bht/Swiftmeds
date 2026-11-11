@@ -105,6 +105,10 @@ func (r *statusRecorder) Write(body []byte) (int, error) {
 	return written, err
 }
 
+// Unwrap lets http.ResponseController reach the real writer, so a streaming
+// handler (the watchlist alert stream) can flush each event through this wrapper.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 func newRequestID() string {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err == nil {

@@ -1310,7 +1310,13 @@ paths:
         `StockAlert` as JSON. The stream stays open until the client closes it, so it is not
         cut off by a write timeout. A browser `EventSource` cannot send an `Authorization`
         header, so web clients read this stream with `fetch`.
-      x-status: planned
+
+        Each alert is one event: `id:` is the subscription ID, `event: alert`, and `data:`
+        the `StockAlert` JSON. An idle stream sends a `: ping` comment every 15 seconds so
+        proxies keep it open. If Watchlist fails, the stream ends with an `event: error`
+        whose `data` is `{"error": "..."}`. Alerts that arrive while the client is away are
+        kept and sent on the next connection, each once.
+      x-status: implemented
       x-grpc: swiftmed.watchlist.v1.WatchlistService/StreamAlerts
       x-roles: [ROLE_PATIENT]
       responses:

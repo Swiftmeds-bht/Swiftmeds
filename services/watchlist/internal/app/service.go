@@ -18,11 +18,13 @@ type Service struct {
 	geo   ports.PharmacyLocator
 	now   func() time.Time
 	newID func() string
+	hub   *hub
+	poll  time.Duration
 }
 
 // NewService wires the use cases. Pass time.Now and NewID in production, fixed ones in tests.
 func NewService(repo ports.SubscriptionRepository, geo ports.PharmacyLocator, now func() time.Time, newID func() string) *Service {
-	return &Service{repo: repo, geo: geo, now: now, newID: newID}
+	return &Service{repo: repo, geo: geo, now: now, newID: newID, hub: newHub(), poll: DefaultAlertPoll}
 }
 
 // Subscribe asks to be told when productID is in stock near a point. Subscribing
@@ -105,6 +107,7 @@ func (s *Service) HandleStockIncreased(ctx context.Context, e domain.StockIncrea
 		}
 		if saved {
 			alerts = append(alerts, a)
+			s.hub.notify(a.UserID) // wake the user's open alert streams
 		}
 	}
 	return alerts, nil

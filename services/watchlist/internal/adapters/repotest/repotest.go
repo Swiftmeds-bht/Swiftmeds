@@ -145,7 +145,69 @@ func Run(t *testing.T, newRepo Factory) {
 	t.Run("notify for a missing subscription saves nothing", func(t *testing.T) {
 		repo := newRepo(t)
 		mustNotify(t, repo, alert("al-1", sub("gone", "user-1", "pr-1", t0), "ph-1", t0), false)
+		assertAlertIDs(t, mustPending(t, repo, "user-1"))
 	})
+
+	t.Run("pending alerts are the user's undelivered ones, oldest first", func(t *testing.T) {
+		repo := newRepo(t)
+		a, b, other := sub("a", "user-1", "pr-1", t0), sub("b", "user-1", "pr-2", t0), sub("c", "user-2", "pr-1", t0)
+		for _, s := range []domain.Subscription{a, b, other} {
+			mustCreate(t, repo, s)
+		}
+		mustNotify(t, repo, alert("al-late", a, "ph-1", t0.Add(2*time.Hour)), true)
+		mustNotify(t, repo, alert("al-early", b, "ph-1", t0.Add(time.Hour)), true)
+		mustNotify(t, repo, alert("al-other", other, "ph-1", t0.Add(time.Hour)), true)
+
+		got := mustPending(t, repo, "user-1")
+		assertAlertIDs(t, got, "al-early", "al-late")
+		want := alert("al-early", b, "ph-1", t0.Add(time.Hour))
+		if g := got[0]; g.ID != want.ID || g.SubscriptionID != want.SubscriptionID || g.UserID != want.UserID ||
+			g.ProductID != want.ProductID || g.PharmacyID != want.PharmacyID ||
+			g.QuantityAvailable != want.QuantityAvailable || !g.OccurredAt.Equal(want.OccurredAt) {
+			t.Errorf("PendingAlerts[0] = %+v, want %+v", g, want)
+		}
+	})
+
+	t.Run("a delivered alert is no longer pending, and marking twice is fine", func(t *testing.T) {
+		repo := newRepo(t)
+		s := sub("sub-1", "user-1", "pr-1", t0)
+		mustCreate(t, repo, s)
+		mustNotify(t, repo, alert("al-1", s, "ph-1", t0.Add(time.Hour)), true)
+
+		for range 2 {
+			if err := repo.MarkDelivered(ctx, "al-1", t0.Add(2*time.Hour)); err != nil {
+				t.Fatalf("MarkDelivered: %v", err)
+			}
+		}
+		assertAlertIDs(t, mustPending(t, repo, "user-1"))
+	})
+
+	t.Run("marking an unknown alert is not an error", func(t *testing.T) {
+		if err := newRepo(t).MarkDelivered(ctx, "nope", t0); err != nil {
+			t.Fatalf("MarkDelivered(unknown): %v", err)
+		}
+	})
+}
+
+func mustPending(t *testing.T, repo ports.SubscriptionRepository, user string) []domain.Alert {
+	t.Helper()
+	got, err := repo.PendingAlerts(context.Background(), user)
+	if err != nil {
+		t.Fatalf("PendingAlerts: %v", err)
+	}
+	return got
+}
+
+func assertAlertIDs(t *testing.T, got []domain.Alert, want ...string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("got %d alerts %+v, want %v", len(got), got, want)
+	}
+	for i := range want {
+		if got[i].ID != want[i] {
+			t.Errorf("position %d: got %s, want %s", i, got[i].ID, want[i])
+		}
+	}
 }
 
 func mustCreate(t *testing.T, repo ports.SubscriptionRepository, s domain.Subscription) (domain.Subscription, bool) {

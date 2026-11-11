@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
 import Link from "next/link";
 
-import { AccountNav } from "@/components/AccountNav";
+import { AccountNav, SignedInAlerts } from "@/components/AccountNav";
 import { BrandMark } from "@/components/Icons";
 
 import "./globals.css";
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="brand-mark">
                   <BrandMark />
                 </span>
-                SwiftMed
+                <span className="brand-name">SwiftMed</span>
               </Link>
               <span className="header-tagline">Medicine finder for Bhutan</span>
             </div>
@@ -49,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p className="muted">SwiftMed shows availability only. It does not give medical advice.</p>
           </div>
         </footer>
+        <SignedInAlerts />
       </body>
     </html>
   );

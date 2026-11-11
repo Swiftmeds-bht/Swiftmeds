@@ -3,6 +3,8 @@ package clients
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
 )
@@ -24,4 +26,7 @@ func (c *WatchlistClient) Unsubscribe(ctx context.Context, req *watchlistv1.Unsu
 }
 func (c *WatchlistClient) ListSubscriptions(ctx context.Context, req *watchlistv1.ListSubscriptionsRequest) (*watchlistv1.ListSubscriptionsResponse, error) {
 	return c.client.ListSubscriptions(ctx, req)
+}
+func (c *WatchlistClient) StreamAlerts(ctx context.Context, req *watchlistv1.StreamAlertsRequest) (grpc.ServerStreamingClient[watchlistv1.StockAlert], error) {
+	return c.client.StreamAlerts(ctx, req)
 }

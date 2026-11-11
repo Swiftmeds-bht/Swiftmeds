@@ -1,3 +1,4 @@
+import { watchAction } from "@/app/actions";
 import { SearchError, searchMedicines } from "@/lib/api";
 import { formatDistance } from "@/lib/format";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "@/lib/rules";
@@ -51,7 +52,12 @@ export async function ResultsSection({ query, point, label, radiusM, retryHref }
       <h2 className="results-heading">
         Pharmacies within {formatDistance(radiusM)} of {label}
       </h2>
-      <ResultsList query={query} results={data.results} substitutes={data.substitutes} />
+      <ResultsList
+        query={query}
+        results={data.results}
+        substitutes={data.substitutes}
+        watch={{ action: watchAction, point, radiusM, returnTo: retryHref }}
+      />
     </>
   );
 }

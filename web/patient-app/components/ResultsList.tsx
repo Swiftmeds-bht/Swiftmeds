@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { formatDistance, formatPrice, formatQuantity, freshnessLabel } from "@/lib/format";
-import type { PharmacyOffer, ProductResult } from "@/lib/types";
+import type { GeoPoint, PharmacyOffer, ProductResult } from "@/lib/types";
 
 import { CheckIcon, MapPinIcon } from "./Icons";
+import { WatchButton } from "./WatchButton";
 
 /** The reserve page for one offer. Names and price go along for display only. */
 export function reserveHref(product: ProductResult, offer: PharmacyOffer): string {
@@ -33,7 +34,15 @@ function Freshness({ score }: { score: number | undefined }) {
   );
 }
 
-function ProductCard({ product }: { product: ProductResult }) {
+/** What a "Notify me" button needs: the searched place, and the action to call. */
+export interface WatchOptions {
+  action: React.ComponentProps<typeof WatchButton>["action"];
+  point: GeoPoint;
+  radiusM: number;
+  returnTo: string;
+}
+
+function ProductCard({ product, watch }: { product: ProductResult; watch?: WatchOptions }) {
   const headingId = `product-${product.productId}`;
   return (
     <section className="product" aria-labelledby={headingId}>
@@ -44,7 +53,19 @@ function ProductCard({ product }: { product: ProductResult }) {
         <p className="generic">{product.genericName}</p>
       </div>
       {product.offers.length === 0 ? (
-        <p className="empty">Not in stock at any pharmacy in this area.</p>
+        <div className="empty-offers">
+          <p className="empty">Not in stock at any pharmacy in this area.</p>
+          {watch && (
+            <WatchButton
+              action={watch.action}
+              productId={product.productId}
+              medicine={`${product.brandName} ${product.strength}`.trim()}
+              point={watch.point}
+              radiusM={watch.radiusM}
+              returnTo={watch.returnTo}
+            />
+          )}
+        </div>
       ) : (
         <ol className="offers" aria-label={`Pharmacies with ${product.brandName}, best match first`}>
           {product.offers.map((o, index) => {
@@ -93,9 +114,11 @@ interface Props {
   query: string;
   results: ProductResult[];
   substitutes: ProductResult[];
+  /** When given, medicines nobody has get a "Notify me when it is back" button. */
+  watch?: WatchOptions;
 }
 
-export function ResultsList({ query, results, substitutes }: Props) {
+export function ResultsList({ query, results, substitutes, watch }: Props) {
   if (results.length === 0) {
     return (
       <div className="no-match" role="status">
@@ -116,7 +139,7 @@ export function ResultsList({ query, results, substitutes }: Props) {
         <p className="hint">Best match first, by distance, how recently stock was confirmed, and pharmacy reliability.</p>
       )}
       {results.map((r) => (
-        <ProductCard key={r.productId} product={r} />
+        <ProductCard key={r.productId} product={r} watch={watch} />
       ))}
       {substitutes.length > 0 && (
         <section aria-labelledby="substitutes-heading" className="substitutes">

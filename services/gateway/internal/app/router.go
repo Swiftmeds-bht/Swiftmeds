@@ -100,6 +100,7 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		mux.Handle("POST /api/v1/watchlist", watchlistHandler(wired.watchlist, logger))
 		mux.Handle("GET /api/v1/watchlist", watchlistHandler(wired.watchlist, logger))
 		mux.Handle("DELETE /api/v1/watchlist/{subscriptionId}", watchlistHandler(wired.watchlist, logger))
+		mux.Handle("GET /api/v1/watchlist/alerts", alertsHandler(wired.watchlist, logger, AlertHeartbeat))
 	}
 	if wired.feedback != nil {
 		mux.Handle("POST /api/v1/holds/{holdId}/feedback", feedbackHandler(wired.feedback, logger))
