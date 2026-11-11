@@ -297,6 +297,39 @@ How the first run (46 killed, 1 lived, 8 not covered; 97.9% efficacy) was brough
 
 Gate: `.gremlins.yaml` fails the run below 95% efficacy or 95% mutant coverage.
 
+### 7.4 Automation status at the end of Sprint 4
+
+Sprint 4 built the reservation path: the Holds saga (SCRUM-61), Inventory's saga
+events (SCRUM-57), Expiry (SCRUM-62), Feedback (SCRUM-64), Watchlist (SCRUM-59), the
+gateway reservation routes (SCRUM-54) and the patient reserve screens (SCRUM-60).
+This table adds to 7.2; rows there still hold.
+
+CI runs two jobs on every PR: **Go checks** (vet, golangci-lint, unit tests and the
+coverage gate for every module) and **Saga integration tests** (SCRUM-56:
+`tests/integration`, Postgres and RabbitMQ in testcontainers, the real Holds and
+Inventory built with `-race`).
+
+| Test case / area | Automated now | Where |
+|---|---|---|
+| TC-010 Create hold | Yes (UT: quantity 0 and 6 rejected at the gateway; IT: `PENDING` → `ACTIVE` with a pickup code, stock reserved, `hold.confirmed` sent) | `services/gateway/internal/app` (`TestHoldHandlerCreateRejectsOutOfRangeQuantity`), `tests/integration/saga` |
+| TC-011 Hold boundary duration | Yes (UT: a hold expiring exactly now is expired, injected clock; IT: an early `ExpireHold` is refused and keeps the stock) | `services/expiry/internal/app` (`TestAHoldExpiringExactlyNowIsExpired`, `TestHoldBoundaryWithAnInjectedClock`), `tests/integration/saga` |
+| TC-012 Concurrent holds | Yes (IT: exactly one winner for the last unit; stock never negative under reserve and release) | `services/inventory/internal/adapters/postgres` (integration, SCRUM-37) |
+| TC-013 Idempotent hold retry | Yes (UT: the same event twice, and the same answer under a new event ID, change nothing; IT: replayed `hold.requested` and `stock.reserved` leave one reservation) | `services/holds/internal/adapters/rabbitmq`, `services/inventory/internal/adapters/rabbitmq` (`TestDuplicateHoldRequestedDeliveryReservesOnce`), `tests/integration/saga` |
+| TC-014 Collect with code | Yes (UT: wrong code refused, collecting twice fails, stock committed before the hold changes) | `services/holds/internal/{domain,app}` |
+| TC-015 Expire hold | Yes (UT: a sweep run twice expires each hold once; IT: expiry releases the stock, a second call changes nothing) | `services/expiry/internal/app`, `tests/integration/saga` |
+| TC-016 Cancel hold | Yes (UT: cancelling twice releases once, another patient never reaches Inventory; IT: cancel releases the stock) | `services/holds/internal/app`, `tests/integration/saga` |
+| TC-023 Watchlist lifecycle | Yes (UT: subscribe, duplicate returns the first, unsubscribe; IT: the same contract against Postgres) | `services/watchlist/internal/{domain,app,adapters}` |
+| TC-024 Return-stock notification | Partly (UT: `stock.increased` alerts only nearby subscribers, each once). Delivery to the app is SCRUM-71 (Sprint 5) | `services/watchlist/internal/app` |
+| TC-028 Role authorization | Partly (UT: missing token 401, wrong role 403, identity added to the request) | `services/gateway/internal/httpx` |
+| TC-031 Saga failure/retry | Yes (UT: each event path, duplicates, retries; IT: rejected and duplicate paths end to end) | `services/holds/internal/adapters/rabbitmq`, `tests/integration/saga` |
+| TC-032 RabbitMQ contract | Yes (IT: the saga's routing keys and payloads observed on `swiftmed.events`) | `tests/integration/saga` |
+| TC-033 Feedback/accuracy | Partly (UT: only a collected hold, once per hold, one `feedback.submitted`). The Trust side is SCRUM-73 (Sprint 5) | `services/feedback/internal/app` |
+| TC-035 / TC-036 Load profiles | Scripts only (k6 search and reservation burst with thresholds in the scripts). Results are not recorded yet | `tests/load` (SCRUM-77) |
+| TC-037 Patient accessibility | Partly (UT: axe on the search, results, hold, sign-in and reserve components) | `web/patient-app/components` |
+
+Not yet covered in Sprint 4: TC-026 and TC-038 (pharmacy dashboard: SCRUM-58 and
+SCRUM-70 carried over to Sprint 5).
+
 ## 8. Risk-based integration order
 
 1. **P0 foundation:** protobuf/event contracts, configuration, logging,
