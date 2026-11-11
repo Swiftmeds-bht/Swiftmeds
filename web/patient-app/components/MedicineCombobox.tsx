@@ -5,6 +5,8 @@ import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH, suggestionQuery } from "@/lib/rules";
 import type { Suggestion } from "@/lib/types";
 
+import { SearchIcon } from "./Icons";
+
 const DEBOUNCE_MS = 250;
 
 interface Props {
@@ -92,9 +94,11 @@ export function MedicineCombobox({ defaultValue = "" }: Props) {
   }
 
   return (
-    <div className="field field-wide combobox">
+    <div className="field combobox">
       <label htmlFor={inputId}>Medicine name</label>
-      <input
+      <div className="input-wrap">
+        <SearchIcon size={20} />
+        <input
         id={inputId}
         name="q"
         type="text"
@@ -120,7 +124,8 @@ export function MedicineCombobox({ defaultValue = "" }: Props) {
         autoCapitalize="off"
         spellCheck={false}
         enterKeyHint="search"
-      />
+        />
+      </div>
       <p id={hintId} className="hint">
         Brand or generic name.
       </p>

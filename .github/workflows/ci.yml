@@ -44,9 +44,23 @@ jobs:
           cache-dependency-path: "**/go.sum"
 
       - name: Install golangci-lint
+        shell: bash
         run: |
-          curl -sSfL https://golangci-lint.run/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if curl -sSfL https://golangci-lint.run/install.sh \
+              | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2; then
+              break
+            fi
+
+            if [[ "${attempt}" -eq 3 ]]; then
+              echo "Failed to install golangci-lint after ${attempt} attempts."
+              exit 1
+            fi
+
+            echo "Retrying golangci-lint install (${attempt}/3)..."
+            sleep 5
+          done
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Prepare coverage output
@@ -106,3 +120,27 @@ jobs:
           name: coverage-reports
           path: coverage/
           if-no-files-found: ignore
+
+  saga-integration:
+    name: Saga integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      # Starts Postgres and RabbitMQ with testcontainers (Docker is on the runner),
+      # builds Holds and Inventory with -race and runs the saga scenarios (SCRUM-56).
+      - name: Run saga integration tests
+        working-directory: tests/integration
+        env:
+          GOWORK: "off"
+        run: go test -tags integration -race -count=1 -v ./...

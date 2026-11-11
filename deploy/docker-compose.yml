@@ -153,9 +153,16 @@ services:
          HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
          HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
          HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
+         # Reservation saga: hold.requested and hold.confirmed go out, and stock.reserved and
+         # stock.unavailable come in, over RabbitMQ. Cancel, expire and collect call Inventory
+         # through Traefik, which routes by :authority (the service name).
+         RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+         HOLDS_UPSTREAM: ${HOLDS_UPSTREAM:-traefik:50051}
          LOG_LEVEL: ${LOG_LEVEL:-info}
        depends_on:
          postgres:
+           condition: service_healthy
+         rabbitmq:
            condition: service_healthy
        labels:
          - traefik.enable=true
@@ -264,6 +271,31 @@ services:
       - traefik.http.services.inventory.loadbalancer.server.port=${INVENTORY_GRPC_PORT:-50056}
       - traefik.http.services.inventory.loadbalancer.server.scheme=h2c
 
+  expiry:
+    build:
+      context: ..
+      dockerfile: services/expiry/Dockerfile
+    restart: unless-stopped
+    environment:
+      EXPIRY_GRPC_PORT: ${EXPIRY_GRPC_PORT:-50066}
+      EXPIRY_DATABASE_URL: ${EXPIRY_DATABASE_URL:?set EXPIRY_DATABASE_URL in .env}
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      EXPIRY_HOLDS_UPSTREAM: ${EXPIRY_HOLDS_UPSTREAM:-traefik:50051}
+      EXPIRY_HOLDS_CALL_TIMEOUT: ${EXPIRY_HOLDS_CALL_TIMEOUT:-2s}
+      EXPIRY_HOLD_DURATION: ${EXPIRY_HOLD_DURATION:-2h}
+      EXPIRY_SWEEP_BATCH_SIZE: ${EXPIRY_SWEEP_BATCH_SIZE:-50}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.expiry.rule=Host(`expiry`)
+      - traefik.http.routers.expiry.entrypoints=grpc
+      - traefik.http.services.expiry.loadbalancer.server.port=${EXPIRY_GRPC_PORT:-50066}
+      - traefik.http.services.expiry.loadbalancer.server.scheme=h2c
   geo:
     build:
       context: ..
@@ -323,6 +355,60 @@ services:
       - traefik.http.routers.search.entrypoints=grpc
       - traefik.http.services.search.loadbalancer.server.port=${SEARCH_GRPC_PORT:-50060}
       - traefik.http.services.search.loadbalancer.server.scheme=h2c
+
+  watchlist:
+    build:
+      context: ..
+      dockerfile: services/watchlist/Dockerfile
+    restart: unless-stopped
+    environment:
+      WATCHLIST_GRPC_PORT: ${WATCHLIST_GRPC_PORT:-50064}
+      WATCHLIST_DATABASE_URL: ${WATCHLIST_DATABASE_URL:?set WATCHLIST_DATABASE_URL in .env}
+      # Consumes stock.increased; asks Geo (through Traefik) which subscribers are in range.
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      WATCHLIST_UPSTREAM: traefik:50051
+      WATCHLIST_GEO_TIMEOUT: ${WATCHLIST_GEO_TIMEOUT:-2s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.watchlist.rule=Host(`watchlist`)
+      - traefik.http.routers.watchlist.entrypoints=grpc
+      - traefik.http.services.watchlist.loadbalancer.server.port=${WATCHLIST_GRPC_PORT:-50064}
+      - traefik.http.services.watchlist.loadbalancer.server.scheme=h2c
+
+  feedback:
+    build:
+      context: ..
+      dockerfile: services/feedback/Dockerfile
+    restart: unless-stopped
+    environment:
+      FEEDBACK_GRPC_PORT: ${FEEDBACK_GRPC_PORT:-50067}
+      FEEDBACK_DATABASE_URL: ${FEEDBACK_DATABASE_URL:?set FEEDBACK_DATABASE_URL in .env}
+      # Publishes feedback.submitted; asks Holds (through Traefik) whether a hold was collected.
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      FEEDBACK_UPSTREAM: traefik:50051
+      FEEDBACK_HOLDS_TIMEOUT: ${FEEDBACK_HOLDS_TIMEOUT:-2s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.feedback.rule=Host(`feedback`)
+      - traefik.http.routers.feedback.entrypoints=grpc
+      - traefik.http.services.feedback.loadbalancer.server.port=${FEEDBACK_GRPC_PORT:-50067}
+      - traefik.http.services.feedback.loadbalancer.server.scheme=h2c
 
   freshness:
     build:

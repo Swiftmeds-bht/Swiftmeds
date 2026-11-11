@@ -126,6 +126,10 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrHoldExpired),
 		errors.Is(err, domain.ErrNotYetExpired):
 		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, domain.ErrInventoryUnavailable),
+		errors.Is(err, domain.ErrRequestNotSent):
+		// The hold was not changed (or, for CreateHold, was rejected): the patient can try again.
+		return status.Error(codes.Unavailable, "stock service is not available, please try again")
 	case errors.Is(err, domain.ErrConflict),
 		errors.Is(err, domain.ErrPickupCodeTaken):
 		// Someone else got there first. The caller may read the hold again and retry.

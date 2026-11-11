@@ -29,21 +29,37 @@ describe("WCAG 2.1 AA contrast of the colour tokens", () => {
   // [foreground, background, minimum ratio]
   const pairs: [string, string, number][] = [
     ["text", "bg", 4.5],
+    ["text", "canvas", 4.5], // page text on the page ground
     ["text", "surface", 4.5],
     ["muted", "bg", 4.5],
-    ["muted", "surface", 4.5],
+    ["muted", "canvas", 4.5],
+    ["muted", "surface", 4.5], // disabled select
     ["primary", "bg", 4.5], // links and outline button
+    ["primary", "canvas", 4.5], // links on the page ground
     ["primary-hover", "bg", 4.5], // hovered links
     ["primary-text", "primary", 4.5], // button
     ["primary-text", "primary-hover", 4.5], // hovered button
-    ["primary", "high-bg", 4.5], // hovered outline button
+    ["primary-hover", "primary-soft", 4.5], // hovered outline button, strength chip, Best match
+    ["text", "primary-soft", 4.5], // best-match row, note under the steps
+    ["muted", "primary-soft", 4.5], // address in the best-match row
+    ["band-text", "band", 4.5], // home headline
+    ["band-muted", "band", 4.5], // home lead and example caption
+    ["ticket-text", "ticket", 4.5], // pickup code and countdown
+    ["ticket-muted", "ticket", 4.5], // "Pickup code" and "left, until 14:30"
     ["high-text", "high-bg", 4.5],
     ["medium-text", "medium-bg", 4.5],
     ["low-text", "low-bg", 4.5],
-    ["low-text", "bg", 4.5], // error heading
+    ["high-text", "bg", 4.5], // freshness on a result
+    ["medium-text", "bg", 4.5],
+    ["low-text", "bg", 4.5], // freshness, Cancel hold button
+    ["high-text", "primary-soft", 4.5], // freshness in the best-match row
+    ["medium-text", "primary-soft", 4.5],
+    ["low-text", "primary-soft", 4.5],
     ["info-text", "info-bg", 4.5], // notice banner
     ["focus", "bg", 3], // focus outline (non-text)
-    ["input-border", "bg", 3], // search bar and select borders (non-text)
+    ["focus", "canvas", 3], // focus outline on the page ground (non-text)
+    ["focus-on-band", "band", 3], // focus outline on the home band (non-text)
+    ["input-border", "bg", 3], // field and select borders (non-text)
   ];
   it.each(pairs)("%s on %s >= %s:1", (fg, bg, min) => {
     expect(contrast(token(fg), token(bg))).toBeGreaterThanOrEqual(min);

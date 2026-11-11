@@ -13,6 +13,7 @@ type Authenticator interface {
 
 // Identity is the authenticated user information needed by the HTTP layer.
 type Identity struct {
-	UserID string
-	Role   authv1.Role
+	UserID     string
+	Role       authv1.Role
+	PharmacyID string
 }

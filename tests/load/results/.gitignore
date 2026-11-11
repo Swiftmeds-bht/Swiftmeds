@@ -1,0 +1,2 @@
+# Full k6 JSON summaries are large; keep only the Markdown summaries.
+*.json

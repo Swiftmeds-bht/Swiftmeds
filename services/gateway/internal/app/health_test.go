@@ -21,6 +21,18 @@ func TestCheckHealthAgainstRouter(t *testing.T) {
 	}
 }
 
+func TestNewRouterRegistersConfiguredHoldRoutes(t *testing.T) {
+	handler := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, slog.Default(), WithHolds(&fakeHoldsClient{}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/holds", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("holds route got %d, want 401 from the authentication guard", rec.Code)
+	}
+}
+
 func TestCheckHealthFailsWhenNothingListens(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	url := server.URL

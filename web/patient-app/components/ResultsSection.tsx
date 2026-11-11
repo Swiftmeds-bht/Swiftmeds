@@ -39,7 +39,7 @@ export async function ResultsSection({ query, point, label, radiusM, retryHref }
       {source === "demo" && (
         <p className="notice" role="note">
           <InfoIcon />
-          <span>Showing demo data. Live search is used when GATEWAY_URL is set.</span>
+          <span>Showing demo data, not live stock.</span>
         </p>
       )}
       {degraded.length > 0 && (

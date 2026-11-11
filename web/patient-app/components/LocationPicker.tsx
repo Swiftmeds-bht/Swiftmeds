@@ -5,6 +5,8 @@ import { useId, useState, useSyncExternalStore } from "react";
 import { PLACES, roundCoordinate } from "@/lib/places";
 import type { GeoPoint } from "@/lib/types";
 
+import { LocateIcon, MapPinIcon } from "./Icons";
+
 type Status = "idle" | "locating" | "found" | "denied" | "timeout" | "unavailable";
 
 const MESSAGES: Record<Status, string> = {
@@ -81,10 +83,12 @@ export function LocationPicker({ placeId, deviceLocation }: Props) {
       {canLocate &&
         (device ? (
           <button type="button" className="link-button" onClick={useTown}>
+            <MapPinIcon size={16} />
             Use a town instead
           </button>
         ) : (
           <button type="button" className="link-button" onClick={locate} disabled={status === "locating"}>
+            <LocateIcon size={16} />
             Use my location
           </button>
         ))}
