@@ -14,6 +14,7 @@ have it in stock. Owner: Pema. Responsive: works on phones and desktops.
 | `/reserve?product=…&pharmacy=…` | Confirm a reservation: medicine, pharmacy, price, how many units (1 to 5, no more than in stock), and the total to pay at the counter, which updates with the number of units. Opened from Reserve on a result |
 | `/holds/[id]` | One hold: "Checking stock" (refreshes every 2 s), then the pickup code on a ticket with a countdown, or why it was not held, expired or cancelled. When a hold has just turned active (status changed in the last 15 s), the code's digits rise into place once; reloads do not replay it, and reduced motion turns it off |
 | `/holds` | My holds: current (with Cancel) and past |
+| `/watchlist` | Medicines the patient asked to be told about: Waiting or Back in stock, with Remove |
 | `/login`, `/register` | Sign in and create an account. Both return to the page that asked, e.g. the reservation |
 
 The search form is a plain `GET` form, so it works without JavaScript and every
@@ -78,6 +79,33 @@ the server's memory and are lost on restart. Sign in as `patient@demo.bt` /
 for 30 minutes. It is rejected when more units are asked for than are left, or when
 the pharmacy had only its last unit (the demo pretends someone else got it first,
 so the rejected screen can be seen: reserve "Demo Paracetamol Syrup" at Thimphu 01).
+
+## Back-in-stock alerts (SCRUM-71)
+
+When no pharmacy in the searched area has a medicine, its card offers **Notify me
+when it is back**. That puts the medicine and the searched area (point and radius)
+on the patient's watchlist (`POST /api/v1/watchlist`). While the patient is signed
+in, every page listens for alerts, and one appears in the corner as soon as a
+pharmacy in the area gets the medicine: no refresh needed.
+
+```
+browser EventSource ──> /api/alerts (this app) ──> gateway GET /api/v1/watchlist/alerts ──> Watchlist StreamAlerts
+          (cookie)                (bearer token, server side)        (SSE)                        (gRPC stream)
+```
+
+- The browser cannot send the access token with `EventSource`, and must not see
+  it, so `app/api/alerts/route.ts` reads the session cookie and calls the gateway
+  itself (`lib/watchlist.ts`, `lib/sse.ts`).
+- A comment line every 15 s keeps proxies from closing a quiet stream. When the
+  browser leaves, the route aborts the gateway request, which ends the gRPC stream.
+- `components/AlertListener.tsx` reconnects after a dropped connection (2 s, then
+  doubling up to 60 s), and stops once the session has ended. Alerts that arrived
+  while the patient was away are sent on the next connection.
+
+**Demo mode** (`lib/watchlist.ts`, `DemoWatchlist`): a watched medicine "comes
+back" 10 seconds after pressing Notify me, at a demo pharmacy that stocks it. To
+see it, search "Demo Paracetamol 500" near Thimphu within 1 km, press Notify me,
+and wait.
 
 ## Data
 

@@ -10,6 +10,7 @@ import { errorMessage } from "@/lib/hold-format";
 import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
 import { safeNext } from "@/lib/session";
 import type { Session } from "@/lib/types";
+import { watchlistBackend } from "@/lib/watchlist";
 
 export interface FormState {
   error?: string;
@@ -95,6 +96,43 @@ export async function createHoldAction(_prev: FormState, form: FormData): Promis
     return failure(err);
   }
   redirect(`/holds/${encodeURIComponent(holdId)}`);
+}
+
+export interface WatchState extends FormState {
+  /** Set once the medicine is on the watchlist. */
+  watching?: boolean;
+}
+
+/** "Notify me when it is back": watches one medicine around the searched place. */
+export async function watchAction(_prev: WatchState, form: FormData): Promise<WatchState> {
+  const returnTo = text(form, "returnTo");
+  const session = await sessionOrSignIn(returnTo);
+  const latitude = Number(text(form, "lat"));
+  const longitude = Number(text(form, "lng"));
+  const radiusM = Number(text(form, "radius"));
+  const productId = text(form, "productId");
+  if (!productId || !Number.isFinite(latitude) || !Number.isFinite(longitude) || !(radiusM > 0)) {
+    return { error: "Search again, then press Notify me." };
+  }
+  try {
+    await watchlistBackend().subscribe(session, { productId, location: { latitude, longitude }, radiusM });
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
+    return failure(err);
+  }
+  return { watching: true };
+}
+
+export async function unwatchAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const session = await sessionOrSignIn("/watchlist");
+  try {
+    await watchlistBackend().unsubscribe(session, text(form, "subscriptionId"));
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain("/watchlist");
+    // Already gone is what the patient wanted.
+    if (!(err instanceof HoldError && err.kind === "not_found")) return failure(err);
+  }
+  redirect("/watchlist");
 }
 
 export async function cancelHoldAction(_prev: FormState, form: FormData): Promise<FormState> {

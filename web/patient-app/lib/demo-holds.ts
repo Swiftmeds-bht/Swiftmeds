@@ -113,6 +113,11 @@ export class DemoHolds implements HoldsBackend {
     return this.view(hold);
   }
 
+  /** The signed-in demo user's ID; also used by the demo watchlist. */
+  async userOf(session: Session): Promise<string> {
+    return this.user(session);
+  }
+
   private async user(session: Session): Promise<string> {
     const userId = this.tokens.get(session.accessToken);
     if (!userId || userId !== session.userId) throw holdError("unauthorized", "Please sign in again");

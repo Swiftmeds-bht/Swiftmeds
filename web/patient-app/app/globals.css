@@ -118,6 +118,13 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
 @media (max-width: 44rem) { .header-tagline { display: none; } }
 
 .account-nav { display: flex; align-items: center; gap: 0.25rem; }
+.account-nav .nav-link { white-space: nowrap; }
+/* Signed in, a phone fits the mark and three links: the name stays for screen readers. */
+@media (max-width: 26rem) {
+  .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .account-nav { gap: 0; }
+  .account-nav .nav-link { padding: 0 0.6rem; font-size: 0.9375rem; }
+}
 .account-nav form { margin: 0; }
 .nav-link {
   display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 0.85rem;
@@ -356,6 +363,9 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .strength { font-size: 0.875rem; font-weight: 600; color: var(--primary-hover); background: var(--primary-soft); border-radius: 999px; padding: 0.1rem 0.6rem; letter-spacing: 0; }
 .generic { color: var(--muted); font-size: 0.9875rem; margin-top: 0.1rem; }
 .product > .empty { border: 0; border-radius: 0; text-align: left; padding: 1.15rem 1.25rem; }
+/* Out of stock everywhere nearby: the line, then "Notify me when it is back". */
+.empty-offers { display: grid; gap: 0.75rem; justify-items: start; padding: 1.15rem 1.25rem; }
+.empty-offers > .empty { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: none; }
 
 .offers { list-style: none; padding: 0; margin: 0; }
 .offer {
@@ -522,6 +532,40 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .section-heading { font-size: 1.1875rem; margin-bottom: 0.85rem; display: flex; align-items: baseline; gap: 0.5rem; }
 .section-count { color: var(--muted); font-weight: 500; font-size: 0.9875rem; }
 .hold-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.85rem; }
+
+/* ---------- Watchlist (SCRUM-71) ---------- */
+.watch-form { display: grid; gap: 0.5rem; justify-items: start; }
+.watch-done { color: var(--high-text); background: var(--high-bg); border-radius: var(--r-control); padding: 0.6rem 0.85rem; font-size: 0.9875rem; }
+.watch-done a { color: inherit; font-weight: 600; }
+.watchlist-page.narrow { max-width: 34rem; }
+.watch-list { list-style: none; padding: 0; margin: 1.25rem 0 0; display: grid; gap: 0.85rem; }
+.watch-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem 1rem; align-items: start;
+  padding: 1.15rem 1.25rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-sm);
+}
+.watch-row > div:first-child { display: grid; gap: 0.4rem; justify-items: start; min-width: 0; }
+.watch-name { font-size: 1.125rem; font-weight: 650; overflow-wrap: anywhere; }
+.watch-meta { font-size: 0.9375rem; }
+.watch-side { display: grid; gap: 0.5rem; justify-items: end; }
+@media (max-width: 30rem) { .watch-row { grid-template-columns: minmax(0, 1fr); } .watch-side { justify-items: start; grid-auto-flow: column; } }
+
+/* Live back-in-stock alerts, over every page while signed in. */
+.alert-stack {
+  position: fixed; z-index: 50; right: 1rem; bottom: 1rem; left: 1rem;
+  display: grid; gap: 0.75rem; justify-items: end; pointer-events: none;
+}
+.alert-toast {
+  pointer-events: auto; width: min(100%, 24rem); display: grid; gap: 0.35rem;
+  padding: 1rem 1.15rem; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-left: 4px solid var(--high-text); border-radius: var(--r-panel); box-shadow: var(--shadow);
+}
+.alert-title { font-weight: 650; }
+.alert-body { color: var(--muted); font-size: 0.9875rem; }
+.alert-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.4rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .alert-toast { animation: toast-in 0.35s var(--ease-out) both; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+}
 
 /* ---------- Not found ---------- */
 .not-found { text-align: center; padding-top: clamp(3rem, 10vw, 6rem); }

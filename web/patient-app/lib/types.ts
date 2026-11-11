@@ -82,6 +82,26 @@ export interface CreateHoldInput {
   quantity: number;
 }
 
+/** "Tell me when this is back in stock near me" (openapi.yaml Subscription). */
+export interface WatchSubscription {
+  subscriptionId: string;
+  productId: string;
+  location?: GeoPoint;
+  radiusM?: number;
+  createdAt?: string;
+  /** Set once the alert fired; the subscription does not fire again. */
+  notifiedAt?: string;
+}
+
+/** One back-in-stock alert from the alert stream (openapi.yaml StockAlert). */
+export interface StockAlert {
+  subscriptionId: string;
+  productId: string;
+  pharmacyId: string;
+  quantityAvailable: number;
+  occurredAt: string;
+}
+
 /** The signed-in patient, kept in an httpOnly cookie (lib/session.ts). */
 export interface Session {
   userId: string;
