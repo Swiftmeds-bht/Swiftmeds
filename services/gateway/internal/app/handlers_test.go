@@ -13,6 +13,7 @@ import (
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/httpx"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -172,6 +173,18 @@ func TestHoldHandlersRejectForbiddenRoles(t *testing.T) {
 
 type fakeWatchlistClient struct {
 	subscribe *watchlistv1.SubscribeRequest
+	stream    *fakeAlertStream
+	openErr   error
+	streamReq *watchlistv1.StreamAlertsRequest
+}
+
+func (f *fakeWatchlistClient) StreamAlerts(ctx context.Context, req *watchlistv1.StreamAlertsRequest) (grpc.ServerStreamingClient[watchlistv1.StockAlert], error) {
+	f.streamReq = req
+	if f.openErr != nil {
+		return nil, f.openErr
+	}
+	f.stream.ctx = ctx
+	return f.stream, nil
 }
 
 func (f *fakeWatchlistClient) Subscribe(_ context.Context, req *watchlistv1.SubscribeRequest) (*watchlistv1.SubscribeResponse, error) {
