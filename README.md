@@ -60,8 +60,18 @@ docs/       SRS, ADRs, API spec, test plan
 cp .env.example .env    # then change the secrets
 make proto              # generate gRPC code
 make up                 # start all services, Postgres, RabbitMQ and Traefik
+make seed               # load repeatable demo medicines, pharmacies, stock and synthetic prices
 make down               # stop everything
 ```
+
+`make seed` starts the services whose migrations own the demo data, waits for
+those migrations, and imports the pharmacy, Geo, Inventory, and Pricing
+fixtures. Catalog medicines are loaded by the Catalog migration and are not
+imported again. Pharmacy CSV phone, address, and dzongkhag values are fixture
+metadata because the current Pharmacy Registry schema does not store them.
+Pricing uses deterministic synthetic values from `deploy/seed/prices.demo.csv`;
+these are not real prices. The import is transactional and safe to repeat
+without truncating tables or removing active reservations.
 
 The gateway listens on `http://localhost:8080`; its health check is available at
 `http://localhost:8080/healthz`. The Traefik dashboard is available at
