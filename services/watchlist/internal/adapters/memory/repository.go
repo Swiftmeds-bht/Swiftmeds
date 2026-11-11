@@ -6,6 +6,7 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/watchlist/internal/domain"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/watchlist/internal/ports"
@@ -14,13 +15,14 @@ import (
 var _ ports.SubscriptionRepository = (*Repository)(nil)
 
 type Repository struct {
-	mu     sync.Mutex
-	subs   map[string]domain.Subscription
-	alerts []domain.Alert
+	mu        sync.Mutex
+	subs      map[string]domain.Subscription
+	alerts    []domain.Alert
+	delivered map[string]bool
 }
 
 func NewRepository() *Repository {
-	return &Repository{subs: map[string]domain.Subscription{}}
+	return &Repository{subs: map[string]domain.Subscription{}, delivered: map[string]bool{}}
 }
 
 func (r *Repository) Create(_ context.Context, s domain.Subscription) (domain.Subscription, bool, error) {
@@ -72,6 +74,31 @@ func (r *Repository) Notify(_ context.Context, a domain.Alert) (bool, error) {
 	r.subs[s.ID] = s
 	r.alerts = append(r.alerts, a)
 	return true, nil
+}
+
+func (r *Repository) PendingAlerts(_ context.Context, userID string) ([]domain.Alert, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []domain.Alert{}
+	for _, a := range r.alerts {
+		if a.UserID == userID && !r.delivered[a.ID] {
+			out = append(out, a)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if !out[i].OccurredAt.Equal(out[j].OccurredAt) {
+			return out[i].OccurredAt.Before(out[j].OccurredAt)
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out, nil
+}
+
+func (r *Repository) MarkDelivered(_ context.Context, alertID string, _ time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.delivered[alertID] = true
+	return nil
 }
 
 // Alerts returns a copy of the saved alerts (for tests).

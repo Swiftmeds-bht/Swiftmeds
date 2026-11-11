@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -17,7 +18,6 @@ import (
 )
 
 // Handler implements watchlistv1.WatchlistServiceServer.
-// StreamAlerts is not implemented yet (SCRUM-71); the embedded type answers UNIMPLEMENTED.
 type Handler struct {
 	watchlistv1.UnimplementedWatchlistServiceServer
 	svc *app.Service
@@ -56,6 +56,29 @@ func (h *Handler) ListSubscriptions(ctx context.Context, req *watchlistv1.ListSu
 		out = append(out, toProto(s))
 	}
 	return &watchlistv1.ListSubscriptionsResponse{Subscriptions: out}, nil
+}
+
+// StreamAlerts keeps the stream open and sends each back-in-stock alert for the
+// user (SCRUM-71). It ends when the client cancels; the gateway does that when
+// the browser disconnects.
+func (h *Handler) StreamAlerts(req *watchlistv1.StreamAlertsRequest, stream grpc.ServerStreamingServer[watchlistv1.StockAlert]) error {
+	err := h.svc.StreamAlerts(stream.Context(), req.GetUserId(), func(a domain.Alert) error {
+		return stream.Send(alertToProto(a))
+	})
+	if err != nil {
+		return toStatus(err)
+	}
+	return nil
+}
+
+func alertToProto(a domain.Alert) *watchlistv1.StockAlert {
+	return &watchlistv1.StockAlert{
+		SubscriptionId:    a.SubscriptionID,
+		ProductId:         a.ProductID,
+		PharmacyId:        a.PharmacyID,
+		QuantityAvailable: a.QuantityAvailable,
+		OccurredAt:        timestamppb.New(a.OccurredAt),
+	}
 }
 
 func toProto(s domain.Subscription) *watchlistv1.Subscription {

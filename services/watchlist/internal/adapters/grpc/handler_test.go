@@ -99,9 +99,9 @@ func TestErrorCodes(t *testing.T) {
 			_, err := h.ListSubscriptions(ctx, &watchlistv1.ListSubscriptionsRequest{})
 			return err
 		}, codes.InvalidArgument},
-		{"stream alerts is not built yet", func() error {
-			return h.StreamAlerts(&watchlistv1.StreamAlertsRequest{UserId: "user-1"}, nil)
-		}, codes.Unimplemented},
+		{"stream alerts without user", func() error {
+			return h.StreamAlerts(&watchlistv1.StreamAlertsRequest{}, &fakeStream{ctx: context.Background()})
+		}, codes.InvalidArgument},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
