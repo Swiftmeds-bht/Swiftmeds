@@ -82,7 +82,7 @@ flowchart TB
         holds["holds"]
         expiry["expiry"]
         feedback["feedback"]
-        trust["trust<br/>(scaffold)"]
+        trust["trust"]
         freshness["freshness"]
     end
 
@@ -103,6 +103,7 @@ flowchart TB
     expiry <-->|"events"| rabbit
     watchlist <-->|"events"| rabbit
     feedback -->|"events"| rabbit
+    trust <-->|"events"| rabbit
 
     identity --- postgres
     catalogStock --- postgres
@@ -110,7 +111,7 @@ flowchart TB
     reservations --- postgres
 
     classDef planned stroke-dasharray: 5 5
-    class notification,analytics,trust planned
+    class notification,analytics planned
 ```
 
 The browser never talks to the gateway directly: the patient app's server code
@@ -144,12 +145,12 @@ yet, and the service is not in Compose.
 | holds | 50065 | `holds_db` | inventory (`ReleaseReservation`, `CommitReservation`) | publishes `hold.requested`, `hold.confirmed`; consumes `stock.reserved`, `stock.unavailable` |
 | expiry | 50066 | `expiry_db` | holds (`ExpireHold`) | consumes `hold.confirmed` |
 | feedback | 50067 | `feedback_db` | holds | publishes `feedback.submitted` |
-| trust | 50068 | `trust_db` (reserved) | scaffold | planned consumer of `feedback.submitted` |
+| trust | 50068 | `trust_db` | none | consumes `feedback.submitted` |
 | freshness | 50069 | `freshness_db` | none | none |
 
 Search needs only Catalog, Geo and Inventory. Freshness, Pricing, Trust, Pharmacy
-Registry, Ranking and Substitution are optional: if one does not answer (Trust is
-not running yet), results still come back and Search lists the missing service in
+Registry, Ranking and Substitution are optional: if one does not answer (for
+Trust, every offer then gets the neutral trust 0.5), results still come back and Search lists the missing service in
 its `degraded` field (`services/search/internal/app/service.go`).
 
 ## 3. Data ownership
@@ -176,6 +177,7 @@ flowchart LR
         holdsDb[("holds_db")]
         expiryDb[("expiry_db")]
         feedbackDb[("feedback_db")]
+        trustDb[("trust_db")]
         freshnessDb[("freshness_db")]
     end
 
@@ -191,13 +193,14 @@ flowchart LR
     holds --> holdsDb
     expiry --> expiryDb
     feedback --> feedbackDb
+    trust --> trustDb
     freshness --> freshnessDb
 
     stateless["gateway, search, ranking, substitution<br/>own no data"]
 ```
 
-`notification_db`, `analytics_db`, `substitution_db` and `trust_db` are created
-too, ready for those services.
+`notification_db`, `analytics_db` and `substitution_db` are created too, ready
+for those services.
 
 ## 4. Events
 
@@ -215,7 +218,7 @@ flowchart LR
     expiry["expiry"]
     watchlist["watchlist"]
     feedback["feedback"]
-    trust["trust (scaffold)"]
+    trust["trust"]
     notification["notification (scaffold)"]
 
     holds -->|"hold.requested<br/>queue inventory.hold-requested"| inventory
@@ -223,10 +226,10 @@ flowchart LR
     holds -->|"hold.confirmed<br/>queue expiry.hold-confirmed"| expiry
     inventory -->|"stock.increased<br/>queue watchlist.stock-increased"| watchlist
     holds -.->|"hold.confirmed"| notification
-    feedback -.->|"feedback.submitted"| trust
+    feedback -->|"feedback.submitted<br/>queue trust.feedback-submitted"| trust
 
     classDef planned stroke-dasharray: 5 5
-    class trust,notification planned
+    class notification planned
 ```
 
 ## 5. Scheduled jobs
