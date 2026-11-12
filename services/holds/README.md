@@ -78,7 +78,8 @@ stock would stay "reserved" for ever.)
 **Idempotent consumers.** Two layers:
 
 1. `pkg/messaging` records each processed `event_id` in Postgres (`swiftmed_processed_events`) and
-   acknowledges a repeat without running the handler. A failing event is retried 3 times, then
+   acknowledges a repeat without running the handler. The check and the record are one atomic
+   claim, so two copies delivered at once cannot both run it. A failing event is retried 3 times, then
    dead-lettered (`holds.stock-events.dlq`).
 2. The handlers are safe on their own, because the same answer can come back under a new `event_id`.
    Every row of the table above is a no-op or a repeat of something already done.

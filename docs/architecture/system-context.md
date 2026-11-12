@@ -209,7 +209,11 @@ All events are protobuf messages on the topic exchange `swiftmed.events`
 consumer declares its own durable queue and a dead-letter queue. A delivery is
 skipped if its message ID (the event ID) is already in that service's
 `swiftmed_processed_events` table, retried up to 3 times on error, then sent to
-`<queue>.dlq` (`pkg/messaging/consumer.go`).
+`<queue>.dlq` (`pkg/messaging/consumer.go`). The check is one atomic claim: the
+consumer inserts the event ID with `ON CONFLICT DO NOTHING` inside a transaction
+that stays open while the handler runs, commits it on success and rolls it back
+on failure, so two copies of a message never run the handler at the same time
+and a failed or interrupted delivery is not lost (`pkg/messaging/deduper.go`).
 
 ```mermaid
 flowchart LR

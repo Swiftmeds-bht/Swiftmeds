@@ -28,6 +28,8 @@ speak HTTP and JSON and should not need generated gRPC code or HTTP/2 trailers.
   receive the user ID in the request message and do not see tokens.
 - Gateway calls get a per-attempt timeout (800 ms by default) and one retry
   (`pkg/resilience`, used in `services/gateway/internal/grpcx/factory.go`).
+  Only read-only RPCs are retried; every RPC's decision is listed in
+  `pkg/resilience/methods.go`, and a test fails if a new RPC has none.
 - `.proto` files are frozen after Sprint 1; any change needs the architecture
   lead's approval (README, "Branch rules").
 

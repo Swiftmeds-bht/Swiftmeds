@@ -160,6 +160,7 @@ jobs:
       PG: "postgres://swiftmed:change-me@127.0.0.1:5432"
       RABBITMQ_URL: "amqp://swiftmed:change-me@127.0.0.1:5672/"
       POSTGRES_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/migrate_test?sslmode=disable"
+      MESSAGING_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/messaging_test?sslmode=disable"
       EXPIRY_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/expiry_test?sslmode=disable"
       FEEDBACK_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/feedback_test?sslmode=disable"
       GEO_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/geo_test?sslmode=disable"
@@ -182,7 +183,7 @@ jobs:
 
       - name: Create the test databases
         run: |
-          for db in migrate_test expiry_test feedback_test geo_test holds_test inventory_test pricing_test trust_test watchlist_test; do
+          for db in migrate_test messaging_test expiry_test feedback_test geo_test holds_test inventory_test pricing_test trust_test watchlist_test; do
             psql "${PG}/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db}"
           done
 
