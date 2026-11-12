@@ -5,7 +5,7 @@
 // show, or redirects on success. redirect() throws, so it is never inside try.
 import { redirect } from "next/navigation";
 
-import { clearSession, getSession, saveSession } from "@/lib/auth";
+import { clearSession, getSession, saveSession, withFreshToken } from "@/lib/auth";
 import { errorMessage } from "@/lib/hold-format";
 import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
 import { safeNext } from "@/lib/session";
@@ -85,11 +85,8 @@ export async function createHoldAction(_prev: FormState, form: FormData): Promis
 
   let holdId: string;
   try {
-    const hold = await holdsBackend().createHold(session, {
-      pharmacyId: text(form, "pharmacyId"),
-      productId: text(form, "productId"),
-      quantity,
-    });
+    const input = { pharmacyId: text(form, "pharmacyId"), productId: text(form, "productId"), quantity };
+    const hold = await withFreshToken(session, (s) => holdsBackend().createHold(s, input));
     holdId = hold.holdId;
   } catch (err) {
     if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
@@ -115,7 +112,7 @@ export async function watchAction(_prev: WatchState, form: FormData): Promise<Wa
     return { error: "Search again, then press Notify me." };
   }
   try {
-    await watchlistBackend().subscribe(session, { productId, location: { latitude, longitude }, radiusM });
+    await withFreshToken(session, (s) => watchlistBackend().subscribe(s, { productId, location: { latitude, longitude }, radiusM }));
   } catch (err) {
     if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
     return failure(err);
@@ -126,7 +123,8 @@ export async function watchAction(_prev: WatchState, form: FormData): Promise<Wa
 export async function unwatchAction(_prev: FormState, form: FormData): Promise<FormState> {
   const session = await sessionOrSignIn("/watchlist");
   try {
-    await watchlistBackend().unsubscribe(session, text(form, "subscriptionId"));
+    const subscriptionId = text(form, "subscriptionId");
+    await withFreshToken(session, (s) => watchlistBackend().unsubscribe(s, subscriptionId));
   } catch (err) {
     if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain("/watchlist");
     // Already gone is what the patient wanted.
@@ -140,7 +138,7 @@ export async function cancelHoldAction(_prev: FormState, form: FormData): Promis
   const returnTo = safeNext(text(form, "returnTo"), `/holds/${encodeURIComponent(holdId)}`);
   const session = await sessionOrSignIn(returnTo);
   try {
-    await holdsBackend().cancelHold(session, holdId);
+    await withFreshToken(session, (s) => holdsBackend().cancelHold(s, holdId));
   } catch (err) {
     if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
     return failure(err);

@@ -4,6 +4,7 @@
 // access token never reaches the browser.
 import { demoBackend } from "./demo-holds";
 import { HoldError, type HoldsBackend } from "./holds-core";
+import { tokenFields } from "./refresh";
 import type { Hold } from "./types";
 
 export { HoldError, MAX_HOLD_QUANTITY, type HoldErrorKind, type HoldsBackend } from "./holds-core";
@@ -108,12 +109,13 @@ export function gatewayBackend(options: GatewayOptions): HoldsBackend {
     async login(email, password) {
       const body = (await call("POST", "/api/v1/auth/login", "login", { body: { email, password } })) as {
         userId?: string;
-        tokens?: { accessToken?: string; accessTokenExpiresAt?: string };
+        tokens?: Parameters<typeof tokenFields>[0];
       } | null;
-      if (!body?.userId || !body.tokens?.accessToken) {
+      const tokens = tokenFields(body?.tokens);
+      if (typeof body?.userId !== "string" || !body.userId || !tokens) {
         throw new HoldError("server", "The gateway sent a login answer without a user or token");
       }
-      return { userId: body.userId, email, accessToken: body.tokens.accessToken, expiresAt: body.tokens.accessTokenExpiresAt };
+      return { userId: body.userId, email, ...tokens };
     },
 
     async createHold(session, input) {
