@@ -19,6 +19,8 @@ api:
   # Serves the dashboard without auth on the "traefik" entrypoint. Local dev only.
   insecure: true
 
+ping: {}
+
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
