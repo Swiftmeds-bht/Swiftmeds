@@ -115,11 +115,11 @@ func (f *Upstream) BatchGetPrices(_ context.Context, req *pricingv1.BatchGetPric
 	return out, nil
 }
 
-func (f *Upstream) GetTrustScores(_ context.Context, req *trustv1.GetTrustScoresRequest) (*trustv1.GetTrustScoresResponse, error) {
+func (f *Upstream) BatchGetTrust(_ context.Context, req *trustv1.BatchGetTrustRequest) (*trustv1.BatchGetTrustResponse, error) {
 	if err := f.check("trust"); err != nil {
 		return nil, err
 	}
-	out := &trustv1.GetTrustScoresResponse{}
+	out := &trustv1.BatchGetTrustResponse{}
 	for _, id := range req.GetPharmacyIds() {
 		out.Scores = append(out.Scores, &trustv1.TrustScore{PharmacyId: id, Score: 0.7})
 	}

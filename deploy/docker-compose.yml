@@ -411,6 +411,31 @@ services:
       - traefik.http.services.feedback.loadbalancer.server.port=${FEEDBACK_GRPC_PORT:-50067}
       - traefik.http.services.feedback.loadbalancer.server.scheme=h2c
 
+  trust:
+    build:
+      context: ..
+      dockerfile: services/trust/Dockerfile
+    restart: unless-stopped
+    environment:
+      TRUST_GRPC_PORT: ${TRUST_GRPC_PORT:-50068}
+      TRUST_DATABASE_URL: ${TRUST_DATABASE_URL:?set TRUST_DATABASE_URL in .env}
+      # Consumes feedback.submitted; Search reads the scores (BatchGetTrust) for Ranking.
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      TRUST_HALF_LIFE: ${TRUST_HALF_LIFE:-720h}
+      TRUST_PRIOR_WEIGHT: ${TRUST_PRIOR_WEIGHT:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.trust.rule=Host(`trust`)
+      - traefik.http.routers.trust.entrypoints=grpc
+      - traefik.http.services.trust.loadbalancer.server.port=${TRUST_GRPC_PORT:-50068}
+      - traefik.http.services.trust.loadbalancer.server.scheme=h2c
+
   freshness:
     build:
       context: ..

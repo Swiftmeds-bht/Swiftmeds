@@ -110,7 +110,7 @@ info:
     `Inventory.CommitReservation`, `Inventory.ReleaseReservation`,
     `Notification.SendNotification`, `PharmacyRegistry.BatchGetPharmacies`,
     `Pricing.BatchGetPrices`, `Ranking.RankOffers` and
-    `Trust.GetTrustScores`. Substitutes reach the patient inside the search response.
+    `Trust.GetTrust`, `Trust.BatchGetTrust`. Substitutes reach the patient inside the search response.
 servers:
   - url: http://{host}:{port}
     description: Local development (`make up`, or `docker compose -f deploy/docker-compose.yml up -d`)
