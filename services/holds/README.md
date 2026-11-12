@@ -151,7 +151,16 @@ go test -cover ./...
 # Repository contract tests against Postgres (use a throwaway database; it empties the holds table):
 HOLDS_TEST_DATABASE_URL=postgres://swiftmed:change-me@localhost:5432/holds_test?sslmode=disable \
   go test -tags integration ./internal/adapters/postgres/
+
+# Mutation testing (SCRUM-113), settings in .gremlins.yaml; or `make mutation` from the repo root:
+GOWORK=off gremlins unleash ./internal/domain
+GOWORK=off gremlins unleash ./internal/app
 ```
+
+Mutation scores (Gremlins v0.5.0, every mutator): domain 95.2% efficacy (20 killed, 1 equivalent
+mutant lived, 13 in tagless `switch` cases that Go's coverage profile cannot see), app 98.3% (57 killed,
+1 equivalent lived, 1 constant not coverable). Details:
+[docs/test-plan.md §7.3](../../docs/test-plan.md).
 
 ### End-to-end saga test
 
