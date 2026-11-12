@@ -6,6 +6,7 @@ import {
   distanceM,
   fetchSuggestions,
   getPharmacy,
+  lookupPharmacy,
   mockSearch,
   mockSuggest,
   searchMedicines,
@@ -199,5 +200,73 @@ describe("getPharmacy", () => {
   it("finds seed pharmacies and returns undefined for unknown IDs", () => {
     expect(getPharmacy("40000000-0000-4000-8000-000000000011")?.name).toBe("Demo Pharmacy Phuentsholing 01");
     expect(getPharmacy("nope")).toBeUndefined();
+  });
+});
+
+describe("lookupPharmacy", () => {
+  const id = "9b2d7a54-5c0e-4a77-8b11-6d2f3b1c4e20";
+  const live = {
+    pharmacyId: id,
+    name: "Druk Pharmacy",
+    phone: "+975 2 322 000",
+    address: "Norzin Lam, Thimphu",
+    dzongkhag: "Thimphu",
+    location: { latitude: 27.4728, longitude: 89.639 },
+    status: "VERIFICATION_STATUS_VERIFIED",
+  };
+  const answer = (status: number, body: unknown, contentType = "application/json") =>
+    new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers: { "content-type": contentType } });
+  const gateway = (res: Response | (() => Promise<Response>)) => {
+    const fetchFn = vi.fn<typeof fetch>(typeof res === "function" ? res : async () => res);
+    return { fetchFn, opts: { gatewayUrl: "http://gateway:8080", fetchFn } };
+  };
+
+  it("uses demo data in demo mode", async () => {
+    expect(await lookupPharmacy("40000000-0000-4000-8000-000000000011", { gatewayUrl: "" })).toMatchObject({
+      status: "found",
+      source: "demo",
+      pharmacy: { name: "Demo Pharmacy Phuentsholing 01" },
+    });
+    expect(await lookupPharmacy("nope", { gatewayUrl: "" })).toEqual({ status: "not_found" });
+  });
+
+  it("reads the pharmacy from the gateway in gateway mode, never the demo data", async () => {
+    const { fetchFn, opts } = gateway(answer(200, { ...live, ownerUserId: "secret", licenseNumber: "L-1" }));
+    const result = await lookupPharmacy(id, opts);
+    expect(fetchFn.mock.calls[0][0]).toBe(`http://gateway:8080/api/v1/pharmacies/${id}`);
+    expect(result).toEqual({
+      status: "found",
+      source: "gateway",
+      pharmacy: { pharmacyId: id, name: "Druk Pharmacy", phone: "+975 2 322 000", address: "Norzin Lam, Thimphu", dzongkhag: "Thimphu", location: live.location },
+    });
+
+    // A demo pharmacy ID is not answered from demo data when a gateway is set.
+    const demoId = "40000000-0000-4000-8000-000000000011";
+    const other = gateway(answer(404, { code: 5, message: "pharmacy not found" }));
+    expect(await lookupPharmacy(demoId, other.opts)).toEqual({ status: "not_found" });
+  });
+
+  it("does not show pharmacies that are not verified", async () => {
+    const { opts } = gateway(answer(200, { ...live, status: "VERIFICATION_STATUS_SUSPENDED" }));
+    expect(await lookupPharmacy(id, opts)).toEqual({ status: "not_found" });
+  });
+
+  it("says not available while the gateway has no such route for patients", async () => {
+    for (const res of [answer(404, "404 page not found\n", "text/plain; charset=utf-8"), answer(401, { message: "missing token" }), answer(501, {})]) {
+      expect(await lookupPharmacy(id, gateway(res).opts)).toEqual({ status: "unavailable", kind: "not_available" });
+    }
+  });
+
+  it("says unavailable when the gateway is down, slow or broken", async () => {
+    const down = gateway(async () => {
+      throw new TypeError("fetch failed");
+    });
+    expect(await lookupPharmacy(id, down.opts)).toEqual({ status: "unavailable", kind: "unreachable" });
+    const slow = gateway(async () => {
+      throw new DOMException("t", "TimeoutError");
+    });
+    expect(await lookupPharmacy(id, slow.opts)).toEqual({ status: "unavailable", kind: "timeout" });
+    expect(await lookupPharmacy(id, gateway(answer(503, {})).opts)).toEqual({ status: "unavailable", kind: "server" });
+    expect(await lookupPharmacy(id, gateway(answer(200, { pharmacyId: id })).opts)).toEqual({ status: "unavailable", kind: "server" });
   });
 });
