@@ -27,9 +27,12 @@ func (f *fakeInvoker) invoke(_ context.Context, _ string, _, _ any, _ *grpc.Clie
 	return nil
 }
 
+// readMethod is a read-only RPC, so the default policy may retry it.
+const readMethod = "/swiftmed.catalog.v1.CatalogService/GetProduct"
+
 func call(t *testing.T, in grpc.UnaryClientInterceptor, invoker grpc.UnaryInvoker) error {
 	t.Helper()
-	return in(context.Background(), "/svc/Method", nil, nil, nil, invoker)
+	return in(context.Background(), readMethod, nil, nil, nil, invoker)
 }
 
 func unavailable() error { return status.Error(codes.Unavailable, "down") }
@@ -98,6 +101,45 @@ func TestInterceptorNeverRetriesCreateHold(t *testing.T) {
 	}
 	if f.calls != 1 {
 		t.Fatalf("calls = %d, want 1 for non-idempotent CreateHold", f.calls)
+	}
+}
+
+// Writes the old name-prefix policy let through (SCRUM-132), and a method in no list.
+func TestInterceptorNeverRetriesWritesOrUnknownMethods(t *testing.T) {
+	for _, method := range []string{
+		"/swiftmed.holds.v1.HoldsService/CollectHold",
+		"/swiftmed.inventory.v1.InventoryService/BulkSetStock",
+		"/swiftmed.auth.v1.AuthService/RefreshToken",
+		"/swiftmed.feedback.v1.FeedbackService/SubmitFeedback",
+		"/swiftmed.notification.v1.NotificationService/SendNotification",
+		"/swiftmed.watchlist.v1.WatchlistService/Subscribe",
+		"/svc/UnknownMethod",
+	} {
+		t.Run(method, func(t *testing.T) {
+			f := &fakeInvoker{results: []error{unavailable(), nil}}
+			in := UnaryClientInterceptor(Config{Retry: fastRetry(5)})
+
+			err := in(context.Background(), method, nil, nil, nil, f.invoke)
+
+			if status.Code(err) != codes.Unavailable || f.calls != 1 {
+				t.Fatalf("code = %v, calls = %d; want Unavailable after 1 call", status.Code(err), f.calls)
+			}
+		})
+	}
+}
+
+func TestInterceptorUsesCustomRetryableMethod(t *testing.T) {
+	f := &fakeInvoker{results: []error{unavailable(), nil}}
+	in := UnaryClientInterceptor(Config{
+		Retry:           fastRetry(3),
+		RetryableMethod: func(string) bool { return true },
+	})
+
+	if err := in(context.Background(), "/svc/UnknownMethod", nil, nil, nil, f.invoke); err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if f.calls != 2 {
+		t.Fatalf("calls = %d, want 2", f.calls)
 	}
 }
 
