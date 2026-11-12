@@ -2,7 +2,8 @@ syntax = "proto3";
 
 // Trust: each pharmacy's accuracy record. Owner: Sherab.
 // Consumes FeedbackSubmitted; "was in stock" raises the score, "not in stock" lowers it.
-// New pharmacies start at a neutral score until they have enough feedback.
+// Recent feedback counts more than old feedback. New pharmacies start at the
+// neutral score (0.5) until they have feedback.
 package swiftmed.trust.v1;
 
 import "google/protobuf/timestamp.proto";
@@ -10,22 +11,35 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/trust/v1;trustv1";
 
 service TrustService {
-  rpc GetTrustScores(GetTrustScoresRequest) returns (GetTrustScoresResponse);
+  rpc GetTrust(GetTrustRequest) returns (GetTrustResponse);
+  // Search calls this once per search with every pharmacy that has an offer.
+  rpc BatchGetTrust(BatchGetTrustRequest) returns (BatchGetTrustResponse);
 }
 
 message TrustScore {
   string pharmacy_id = 1;
+  // 0.0 (never accurate) to 1.0 (always accurate); 0.5 is neutral.
   double score = 2;
   int32 feedback_count = 3;
   int32 in_stock_count = 4;
+  // When the newest feedback was given. Unset for a pharmacy with no feedback.
   google.protobuf.Timestamp updated_at = 5;
 }
 
-message GetTrustScoresRequest {
+message GetTrustRequest {
+  string pharmacy_id = 1;
+}
+
+message GetTrustResponse {
+  // An unknown pharmacy gets the neutral score.
+  TrustScore score = 1;
+}
+
+message BatchGetTrustRequest {
   repeated string pharmacy_ids = 1;
 }
 
-message GetTrustScoresResponse {
-  // Every requested ID is returned; unknown pharmacies get the neutral score.
+message BatchGetTrustResponse {
+  // One per requested ID, in request order; unknown pharmacies get the neutral score.
   repeated TrustScore scores = 1;
 }

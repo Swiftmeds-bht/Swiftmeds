@@ -6,7 +6,8 @@
 
 // Trust: each pharmacy's accuracy record. Owner: Sherab.
 // Consumes FeedbackSubmitted; "was in stock" raises the score, "not in stock" lowers it.
-// New pharmacies start at a neutral score until they have enough feedback.
+// Recent feedback counts more than old feedback. New pharmacies start at the
+// neutral score (0.5) until they have feedback.
 
 package trustv1
 
@@ -27,11 +28,13 @@ const (
 )
 
 type TrustScore struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PharmacyId    string                 `protobuf:"bytes,1,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
-	Score         float64                `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
-	FeedbackCount int32                  `protobuf:"varint,3,opt,name=feedback_count,json=feedbackCount,proto3" json:"feedback_count,omitempty"`
-	InStockCount  int32                  `protobuf:"varint,4,opt,name=in_stock_count,json=inStockCount,proto3" json:"in_stock_count,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	PharmacyId string                 `protobuf:"bytes,1,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	// 0.0 (never accurate) to 1.0 (always accurate); 0.5 is neutral.
+	Score         float64 `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
+	FeedbackCount int32   `protobuf:"varint,3,opt,name=feedback_count,json=feedbackCount,proto3" json:"feedback_count,omitempty"`
+	InStockCount  int32   `protobuf:"varint,4,opt,name=in_stock_count,json=inStockCount,proto3" json:"in_stock_count,omitempty"`
+	// When the newest feedback was given. Unset for a pharmacy with no feedback.
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -102,28 +105,117 @@ func (x *TrustScore) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
-type GetTrustScoresRequest struct {
+type GetTrustRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PharmacyId    string                 `protobuf:"bytes,1,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTrustRequest) Reset() {
+	*x = GetTrustRequest{}
+	mi := &file_trust_v1_trust_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTrustRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTrustRequest) ProtoMessage() {}
+
+func (x *GetTrustRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_trust_v1_trust_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTrustRequest.ProtoReflect.Descriptor instead.
+func (*GetTrustRequest) Descriptor() ([]byte, []int) {
+	return file_trust_v1_trust_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetTrustRequest) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+type GetTrustResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// An unknown pharmacy gets the neutral score.
+	Score         *TrustScore `protobuf:"bytes,1,opt,name=score,proto3" json:"score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTrustResponse) Reset() {
+	*x = GetTrustResponse{}
+	mi := &file_trust_v1_trust_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTrustResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTrustResponse) ProtoMessage() {}
+
+func (x *GetTrustResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_trust_v1_trust_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTrustResponse.ProtoReflect.Descriptor instead.
+func (*GetTrustResponse) Descriptor() ([]byte, []int) {
+	return file_trust_v1_trust_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetTrustResponse) GetScore() *TrustScore {
+	if x != nil {
+		return x.Score
+	}
+	return nil
+}
+
+type BatchGetTrustRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PharmacyIds   []string               `protobuf:"bytes,1,rep,name=pharmacy_ids,json=pharmacyIds,proto3" json:"pharmacy_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetTrustScoresRequest) Reset() {
-	*x = GetTrustScoresRequest{}
-	mi := &file_trust_v1_trust_proto_msgTypes[1]
+func (x *BatchGetTrustRequest) Reset() {
+	*x = BatchGetTrustRequest{}
+	mi := &file_trust_v1_trust_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetTrustScoresRequest) String() string {
+func (x *BatchGetTrustRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetTrustScoresRequest) ProtoMessage() {}
+func (*BatchGetTrustRequest) ProtoMessage() {}
 
-func (x *GetTrustScoresRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_trust_v1_trust_proto_msgTypes[1]
+func (x *BatchGetTrustRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_trust_v1_trust_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,41 +226,41 @@ func (x *GetTrustScoresRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetTrustScoresRequest.ProtoReflect.Descriptor instead.
-func (*GetTrustScoresRequest) Descriptor() ([]byte, []int) {
-	return file_trust_v1_trust_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use BatchGetTrustRequest.ProtoReflect.Descriptor instead.
+func (*BatchGetTrustRequest) Descriptor() ([]byte, []int) {
+	return file_trust_v1_trust_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetTrustScoresRequest) GetPharmacyIds() []string {
+func (x *BatchGetTrustRequest) GetPharmacyIds() []string {
 	if x != nil {
 		return x.PharmacyIds
 	}
 	return nil
 }
 
-type GetTrustScoresResponse struct {
+type BatchGetTrustResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Every requested ID is returned; unknown pharmacies get the neutral score.
+	// One per requested ID, in request order; unknown pharmacies get the neutral score.
 	Scores        []*TrustScore `protobuf:"bytes,1,rep,name=scores,proto3" json:"scores,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetTrustScoresResponse) Reset() {
-	*x = GetTrustScoresResponse{}
-	mi := &file_trust_v1_trust_proto_msgTypes[2]
+func (x *BatchGetTrustResponse) Reset() {
+	*x = BatchGetTrustResponse{}
+	mi := &file_trust_v1_trust_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetTrustScoresResponse) String() string {
+func (x *BatchGetTrustResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetTrustScoresResponse) ProtoMessage() {}
+func (*BatchGetTrustResponse) ProtoMessage() {}
 
-func (x *GetTrustScoresResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_trust_v1_trust_proto_msgTypes[2]
+func (x *BatchGetTrustResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_trust_v1_trust_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,12 +271,12 @@ func (x *GetTrustScoresResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetTrustScoresResponse.ProtoReflect.Descriptor instead.
-func (*GetTrustScoresResponse) Descriptor() ([]byte, []int) {
-	return file_trust_v1_trust_proto_rawDescGZIP(), []int{2}
+// Deprecated: Use BatchGetTrustResponse.ProtoReflect.Descriptor instead.
+func (*BatchGetTrustResponse) Descriptor() ([]byte, []int) {
+	return file_trust_v1_trust_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetTrustScoresResponse) GetScores() []*TrustScore {
+func (x *BatchGetTrustResponse) GetScores() []*TrustScore {
 	if x != nil {
 		return x.Scores
 	}
@@ -204,13 +296,19 @@ const file_trust_v1_trust_proto_rawDesc = "" +
 	"\x0efeedback_count\x18\x03 \x01(\x05R\rfeedbackCount\x12$\n" +
 	"\x0ein_stock_count\x18\x04 \x01(\x05R\finStockCount\x129\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\":\n" +
-	"\x15GetTrustScoresRequest\x12!\n" +
-	"\fpharmacy_ids\x18\x01 \x03(\tR\vpharmacyIds\"O\n" +
-	"\x16GetTrustScoresResponse\x125\n" +
-	"\x06scores\x18\x01 \x03(\v2\x1d.swiftmed.trust.v1.TrustScoreR\x06scores2u\n" +
-	"\fTrustService\x12e\n" +
-	"\x0eGetTrustScores\x12(.swiftmed.trust.v1.GetTrustScoresRequest\x1a).swiftmed.trust.v1.GetTrustScoresResponseBBZ@github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/trust/v1;trustv1b\x06proto3"
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"2\n" +
+	"\x0fGetTrustRequest\x12\x1f\n" +
+	"\vpharmacy_id\x18\x01 \x01(\tR\n" +
+	"pharmacyId\"G\n" +
+	"\x10GetTrustResponse\x123\n" +
+	"\x05score\x18\x01 \x01(\v2\x1d.swiftmed.trust.v1.TrustScoreR\x05score\"9\n" +
+	"\x14BatchGetTrustRequest\x12!\n" +
+	"\fpharmacy_ids\x18\x01 \x03(\tR\vpharmacyIds\"N\n" +
+	"\x15BatchGetTrustResponse\x125\n" +
+	"\x06scores\x18\x01 \x03(\v2\x1d.swiftmed.trust.v1.TrustScoreR\x06scores2\xc7\x01\n" +
+	"\fTrustService\x12S\n" +
+	"\bGetTrust\x12\".swiftmed.trust.v1.GetTrustRequest\x1a#.swiftmed.trust.v1.GetTrustResponse\x12b\n" +
+	"\rBatchGetTrust\x12'.swiftmed.trust.v1.BatchGetTrustRequest\x1a(.swiftmed.trust.v1.BatchGetTrustResponseBBZ@github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/trust/v1;trustv1b\x06proto3"
 
 var (
 	file_trust_v1_trust_proto_rawDescOnce sync.Once
@@ -224,23 +322,28 @@ func file_trust_v1_trust_proto_rawDescGZIP() []byte {
 	return file_trust_v1_trust_proto_rawDescData
 }
 
-var file_trust_v1_trust_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_trust_v1_trust_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_trust_v1_trust_proto_goTypes = []any{
-	(*TrustScore)(nil),             // 0: swiftmed.trust.v1.TrustScore
-	(*GetTrustScoresRequest)(nil),  // 1: swiftmed.trust.v1.GetTrustScoresRequest
-	(*GetTrustScoresResponse)(nil), // 2: swiftmed.trust.v1.GetTrustScoresResponse
-	(*timestamppb.Timestamp)(nil),  // 3: google.protobuf.Timestamp
+	(*TrustScore)(nil),            // 0: swiftmed.trust.v1.TrustScore
+	(*GetTrustRequest)(nil),       // 1: swiftmed.trust.v1.GetTrustRequest
+	(*GetTrustResponse)(nil),      // 2: swiftmed.trust.v1.GetTrustResponse
+	(*BatchGetTrustRequest)(nil),  // 3: swiftmed.trust.v1.BatchGetTrustRequest
+	(*BatchGetTrustResponse)(nil), // 4: swiftmed.trust.v1.BatchGetTrustResponse
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_trust_v1_trust_proto_depIdxs = []int32{
-	3, // 0: swiftmed.trust.v1.TrustScore.updated_at:type_name -> google.protobuf.Timestamp
-	0, // 1: swiftmed.trust.v1.GetTrustScoresResponse.scores:type_name -> swiftmed.trust.v1.TrustScore
-	1, // 2: swiftmed.trust.v1.TrustService.GetTrustScores:input_type -> swiftmed.trust.v1.GetTrustScoresRequest
-	2, // 3: swiftmed.trust.v1.TrustService.GetTrustScores:output_type -> swiftmed.trust.v1.GetTrustScoresResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 0: swiftmed.trust.v1.TrustScore.updated_at:type_name -> google.protobuf.Timestamp
+	0, // 1: swiftmed.trust.v1.GetTrustResponse.score:type_name -> swiftmed.trust.v1.TrustScore
+	0, // 2: swiftmed.trust.v1.BatchGetTrustResponse.scores:type_name -> swiftmed.trust.v1.TrustScore
+	1, // 3: swiftmed.trust.v1.TrustService.GetTrust:input_type -> swiftmed.trust.v1.GetTrustRequest
+	3, // 4: swiftmed.trust.v1.TrustService.BatchGetTrust:input_type -> swiftmed.trust.v1.BatchGetTrustRequest
+	2, // 5: swiftmed.trust.v1.TrustService.GetTrust:output_type -> swiftmed.trust.v1.GetTrustResponse
+	4, // 6: swiftmed.trust.v1.TrustService.BatchGetTrust:output_type -> swiftmed.trust.v1.BatchGetTrustResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_trust_v1_trust_proto_init() }
@@ -254,7 +357,7 @@ func file_trust_v1_trust_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_trust_v1_trust_proto_rawDesc), len(file_trust_v1_trust_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -7,7 +7,7 @@
 // Search: the patient's "who has this medicine near me?" query. Owner: Pema. Core service.
 // Owns no data. Orchestrates:
 //   Catalog.ResolveName -> Geo.FindNearbyPharmacies -> Inventory.BatchGetStock
-//   -> Pricing.BatchGetPrices + Freshness.GetFreshness + Trust.GetTrustScores
+//   -> Pricing.BatchGetPrices + Freshness.GetFreshness + Trust.BatchGetTrust
 //   -> Ranking.RankOffers -> (if nothing found) Substitution.GetSubstitutes
 // Target: p95 < 2 s at 100 concurrent users.
 
