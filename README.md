@@ -21,12 +21,12 @@ Tutors: Mr. Pema Namgay and Mr. Nima
 
 ## Architecture
 
-- **20 Go microservices**, each with its own Postgres database and a hexagonal (ports and adapters) layout.
+- **20 Go microservices** planned, each with its own Postgres database (except Gateway, Search, Ranking and Substitution, which own no data) and a hexagonal (ports and adapters) layout. 18 are built and run in Docker Compose; `services/analytics` and `services/notification` are still empty scaffolds and are not in `go.work` or the Compose file yet.
 - **REST in, gRPC out:** clients call the API gateway over REST, and services talk to each other over gRPC.
 - **RabbitMQ** carries events. The reservation saga (Holds and Inventory) runs on choreographed events.
 - **Traefik** handles service discovery and round-robin load balancing.
 - **Cloudflare Workers** run scheduled jobs: expiring reservations and decaying stock freshness.
-- **Next.js** powers the patient web app and the pharmacy dashboard.
+- **Next.js** powers the patient web app (`web/patient-app`). The pharmacy dashboard (`web/pharmacy-dashboard`) is not built yet (SCRUM-58, SCRUM-70).
 
 Diagrams (system context, containers, events, the reservation saga) are in
 [docs/architecture](docs/architecture/README.md), and the reasons behind the main
@@ -37,10 +37,11 @@ proto/      gRPC and event contracts (generated code goes in proto/gen/go)
 pkg/        shared Go code: resilience, messaging, grpcx, auth, logger, config
 services/   one folder per microservice
 workers/    Cloudflare Workers (TypeScript)
-web/        patient-app and pharmacy-dashboard
-deploy/     Docker Compose, Traefik, RabbitMQ, Postgres init
-tests/      e2e (Cypress), load (k6), features (Gherkin)
-docs/       SRS, ADRs, API spec, test plan
+web/        patient-app (pharmacy-dashboard is a placeholder for now)
+deploy/     Docker Compose, Traefik, RabbitMQ, Postgres init, demo seed data
+scripts/    proto generation, coverage gate, integration and mutation test runners
+tests/      integration (reservation saga), load (k6); e2e and features are placeholders
+docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test plan
 ```
 
 ## How to run
@@ -63,7 +64,7 @@ docs/       SRS, ADRs, API spec, test plan
 ```bash
 cp .env.example .env    # then change the secrets
 make proto              # generate gRPC code
-make up                 # start all services, Postgres, RabbitMQ and Traefik
+make up                 # build and start every service in deploy/docker-compose.yml, Postgres, RabbitMQ and Traefik
 make seed               # load repeatable demo medicines, pharmacies, stock and synthetic prices
 make down               # stop everything
 ```
@@ -82,34 +83,49 @@ The gateway listens on `http://localhost:8080`; its health check is available at
 `http://localhost:8081/dashboard/`, and the RabbitMQ management UI is available at
 `http://localhost:15672`. Run `make help` to list all targets.
 
-Gateway API routes use `Authorization: Bearer <access-token>`. Search, nearby,
-and login routes are public. Other API routes validate the token through Auth;
-pharmacy and admin routes additionally require their respective roles. Missing
-or invalid credentials return `401`, insufficient roles return `403`, and an
-unavailable Auth service returns `503`.
+Gateway API routes use `Authorization: Bearer <access-token>`. The public routes
+are `GET /api/v1/search`, `GET /api/v1/pharmacies/nearby` and
+`GET /api/v1/medicines/{id}/alternatives`. The holds, watchlist and feedback
+routes validate the token through Auth; pharmacy and admin routes additionally
+require their respective roles. Missing or invalid credentials return `401`,
+insufficient roles return `403`, and an unavailable Auth service returns `503`.
+The two `/api/v1/internal/...` routes called by the Cloudflare Workers check the
+`X-Worker-Secret` header (`WORKER_SHARED_SECRET` in `.env`) instead of a token.
 
-On Windows PowerShell, if `make` is not installed, use Docker Compose directly:
+The gateway has **no login or register routes yet** (SCRUM-115).
+`POST /api/v1/auth/login` is described in `docs/api/openapi.yaml`, but the gateway
+answers `404` until SCRUM-115 is merged, so you cannot get an access token
+through the gateway today.
+
+On Windows PowerShell, if `make` is not installed, use Docker Compose directly
+from the repository root. Pass `--env-file .env` as `make` does: Compose
+otherwise looks for `.env` in `deploy/` (the folder of the Compose file) and
+fails with `required variable ... is missing a value`.
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d
-docker compose -f deploy/docker-compose.yml ps
-docker compose -f deploy/docker-compose.yml down
+docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+docker compose -f deploy/docker-compose.yml --env-file .env ps
+docker compose -f deploy/docker-compose.yml --env-file .env down
 ```
 
 Search and Inventory are discovered by Traefik through Docker labels and use
 round-robin load balancing. To run two replicas of each service:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d --scale search=2 --scale inventory=2
-docker compose -f deploy/docker-compose.yml logs -f search inventory traefik
+docker compose -f deploy/docker-compose.yml --env-file .env up -d --scale search=2 --scale inventory=2
+docker compose -f deploy/docker-compose.yml --env-file .env logs -f search inventory traefik
 ```
 
 The active backends are visible in the Traefik dashboard at
 `http://localhost:8081/dashboard/`. Stopping one replica removes it from
-Traefik's backend list while the remaining replica continues serving requests:
+Traefik's backend list while the remaining replica continues serving requests.
+`docker compose stop` takes service names (it would stop every `search`
+replica), so stop one replica container by name. The Compose project is called
+`deploy`, so the containers are `deploy-search-1`, `deploy-search-2` and so on:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml stop search-1
+docker compose -f deploy/docker-compose.yml --env-file .env ps search   # list the replica names
+docker stop deploy-search-2
 ```
 
 Do not add `-v` to the `down` command unless you intentionally want to delete the
@@ -121,8 +137,27 @@ local PostgreSQL and RabbitMQ data volumes.
 make test               # unit tests in every Go module
 make lint               # golangci-lint in every Go module
 make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
-./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (set the *_URL variables, see ci.yml)
+./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (see below)
 ```
+
+`./scripts/integration-tests.sh` runs every `//go:build integration` package. Each
+test reads its database or broker URL from its own variable (for example
+`HOLDS_TEST_DATABASE_URL`, `RABBITMQ_URL`) and **skips** when it is not set. To
+really run them, create the test databases and export the variables exactly as
+the `integration` job in `.github/workflows/ci.yml` does.
+
+The reservation saga tests start their own Postgres and RabbitMQ with
+testcontainers (Docker must be running):
+
+```bash
+cd tests/integration
+GOWORK=off go test -tags integration -race -count=1 -v ./...
+```
+
+Load tests use k6; see [tests/load/README.md](tests/load/README.md). The k6
+results (SCRUM-76, SCRUM-77) have not been recorded yet. They will go in the
+[Results table](tests/load/README.md#results) of that README and in the test
+summary report.
 
 CI (`.github/workflows/ci.yml`) runs five jobs on every PR: **Go checks** (vet, lint,
 unit tests with `-race`, coverage gate), **Go integration tests**, **Saga integration

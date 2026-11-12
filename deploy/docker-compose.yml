@@ -42,7 +42,7 @@ services:
     # (that would make RabbitMQ skip creating this user); pkg/messaging declares
     # the swiftmed.events exchange and the queues itself.
     # The user is created only when the volume is new: after changing the
-    # password, run `docker compose -f deploy/docker-compose.yml down -v`.
+    # password, run `docker compose -f deploy/docker-compose.yml --env-file .env down -v`.
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-swiftmed}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-change-me}
