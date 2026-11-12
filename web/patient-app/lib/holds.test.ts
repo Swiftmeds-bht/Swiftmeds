@@ -63,7 +63,18 @@ describe("gateway backend", () => {
       email: "tashi@example.bt",
       accessToken: "a",
       expiresAt: "2026-11-05T09:15:00Z",
+      refreshToken: "r",
     });
+  });
+
+  it("assumes the default lifetime when the login answer has no expiry", async () => {
+    const { backend } = backendReturning(json(200, { userId: "u-1", tokens: { accessToken: "a" } }));
+    const before = Date.now();
+    const session = await backend.login("tashi@example.bt", "pw-123456");
+    expect(session.refreshToken).toBeUndefined();
+    const ttl = Date.parse(session.expiresAt ?? "") - before;
+    expect(ttl).toBeGreaterThanOrEqual(15 * 60 * 1000 - 1000);
+    expect(ttl).toBeLessThanOrEqual(15 * 60 * 1000 + 1000);
   });
 
   it("rejects a login answer without a token", async () => {

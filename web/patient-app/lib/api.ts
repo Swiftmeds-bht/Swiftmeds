@@ -6,6 +6,7 @@ import { MOCK_PHARMACIES, MOCK_PRODUCTS, MOCK_STOCK } from "./mock-data";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "./rules";
 import type {
   GeoPoint,
+  PharmacyDetails,
   PharmacyOffer,
   PharmacySummary,
   ProductResult,
@@ -144,8 +145,80 @@ export async function fetchSuggestions(prefix: string, options: ApiOptions = {})
   }
 }
 
+/** A demo pharmacy from the seed data. */
 export function getPharmacy(id: string): PharmacySummary | undefined {
   return MOCK_PHARMACIES.find((p) => p.pharmacyId === id);
+}
+
+export type PharmacyLookup =
+  | { status: "found"; source: DataSource; pharmacy: PharmacyDetails }
+  | { status: "not_found" }
+  /** The gateway cannot give pharmacy details right now (or has no such route yet). Never replaced by demo data. */
+  | { status: "unavailable"; kind: SearchErrorKind };
+
+/** Builds GET /api/v1/pharmacies/{pharmacyId} */
+export function pharmacyUrl(gatewayUrl: string, pharmacyId: string): string {
+  return new URL(`/api/v1/pharmacies/${encodeURIComponent(pharmacyId)}`, gatewayUrl).toString();
+}
+
+/**
+ * One pharmacy for the pharmacy page: from the gateway (openapi.yaml getPharmacy,
+ * public) when GATEWAY_URL is set, else from the demo data. Only verified
+ * pharmacies are shown to patients.
+ */
+export async function lookupPharmacy(pharmacyId: string, options: ApiOptions = {}): Promise<PharmacyLookup> {
+  const opts = { ...defaultOptions(), ...options };
+  if (!opts.gatewayUrl) {
+    const p = getPharmacy(pharmacyId);
+    return p ? { status: "found", source: "demo", pharmacy: p } : { status: "not_found" };
+  }
+  if (!pharmacyId) return { status: "not_found" };
+
+  let res: Response;
+  try {
+    res = await (opts.fetchFn ?? fetch)(pharmacyUrl(opts.gatewayUrl, pharmacyId), {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+  } catch (cause) {
+    const name = (cause as { name?: unknown } | null)?.name;
+    return { status: "unavailable", kind: name === "TimeoutError" || name === "AbortError" ? "timeout" : "unreachable" };
+  }
+  if (res.status === 404) {
+    // The route answers a JSON error for an unknown pharmacy. A plain-text 404 is
+    // the gateway's catch-all: the route is not mounted yet.
+    const json = (res.headers.get("content-type") ?? "").includes("application/json");
+    return json ? { status: "not_found" } : { status: "unavailable", kind: "not_available" };
+  }
+  // The route is public in the spec; 401/403 means the gateway does not serve it to patients yet.
+  if (res.status === 401 || res.status === 403) return { status: "unavailable", kind: "not_available" };
+  if (!res.ok) return { status: "unavailable", kind: errorForStatus(res.status).kind };
+
+  let body: Record<string, unknown> | null;
+  try {
+    body = (await res.json()) as Record<string, unknown> | null;
+  } catch {
+    return { status: "unavailable", kind: "server" };
+  }
+  const pharmacy = asPharmacyDetails(body);
+  if (!pharmacy) return { status: "unavailable", kind: "server" };
+  if (body?.status !== undefined && body.status !== "VERIFICATION_STATUS_VERIFIED") return { status: "not_found" };
+  return { status: "found", source: "gateway", pharmacy };
+}
+
+function asPharmacyDetails(body: Record<string, unknown> | null): PharmacyDetails | undefined {
+  if (typeof body?.pharmacyId !== "string" || typeof body.name !== "string" || !body.name) return undefined;
+  const out: PharmacyDetails = { pharmacyId: body.pharmacyId, name: body.name };
+  for (const key of ["address", "dzongkhag", "phone"] as const) {
+    const value = body[key];
+    if (typeof value === "string" && value) out[key] = value;
+  }
+  const loc = body.location as Partial<GeoPoint> | undefined;
+  if (typeof loc?.latitude === "number" && typeof loc.longitude === "number") {
+    out.location = { latitude: loc.latitude, longitude: loc.longitude };
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
