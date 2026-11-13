@@ -315,8 +315,9 @@ func TestConsumerWaitingDuplicateHandlesEventWhenFirstHandlerFails(t *testing.T)
 	go func() { secondDone <- newConsumer().handleDelivery(context.Background(), delivery) }()
 
 	select {
-	case <-secondDone:
-		t.Fatal("second copy finished while the first still held the claim")
+	case err := <-secondDone:
+		close(releaseFirst)
+		t.Fatalf("second copy finished while the first still held the claim (err: %v)", err)
 	case <-time.After(20 * time.Millisecond):
 	}
 
