@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -59,6 +60,7 @@ type Pharmacy struct {
 	OwnerID       string
 	Name          string
 	LicenseNumber string
+	Dzongkhag     string
 	Location      GeoPoint
 	Hours         []OpeningHours
 	Status        Status
@@ -67,7 +69,7 @@ type Pharmacy struct {
 	VerifiedAt    *time.Time
 }
 
-func NewPharmacy(id, ownerID, name, licenseNumber string, location GeoPoint, hours []OpeningHours, now time.Time) (Pharmacy, error) {
+func NewPharmacy(id, ownerID, name, licenseNumber, dzongkhag string, location GeoPoint, hours []OpeningHours, now time.Time) (Pharmacy, error) {
 	switch {
 	case id == "":
 		return Pharmacy{}, ErrMissingPharmacyID
@@ -86,7 +88,7 @@ func NewPharmacy(id, ownerID, name, licenseNumber string, location GeoPoint, hou
 		}
 	}
 	return Pharmacy{
-		ID: id, OwnerID: ownerID, Name: name, LicenseNumber: licenseNumber,
+		ID: id, OwnerID: ownerID, Name: name, LicenseNumber: licenseNumber, Dzongkhag: strings.TrimSpace(dzongkhag),
 		Location: location, Hours: append([]OpeningHours(nil), hours...),
 		Status: StatusPending, CreatedAt: now,
 	}, nil

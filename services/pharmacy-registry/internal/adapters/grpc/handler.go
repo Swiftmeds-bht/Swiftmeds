@@ -29,7 +29,8 @@ func (h *Handler) RegisterPharmacy(ctx context.Context, req *registryv1.Register
 		point = domain.GeoPoint{Latitude: loc.GetLatitude(), Longitude: loc.GetLongitude()}
 	}
 	p, err := h.svc.Register(ctx, app.RegisterInput{
-		OwnerID: req.GetOwnerUserId(), Name: req.GetName(), LicenseNumber: req.GetLicenseNumber(), Location: point,
+		OwnerID: req.GetOwnerUserId(), Name: req.GetName(), LicenseNumber: req.GetLicenseNumber(),
+		Dzongkhag: req.GetDzongkhag(), Location: point,
 	})
 	if err != nil {
 		return nil, toStatus(err)
@@ -88,8 +89,9 @@ func (h *Handler) SetVerificationStatus(ctx context.Context, req *registryv1.Set
 
 func toProto(p domain.Pharmacy) *registryv1.Pharmacy {
 	return &registryv1.Pharmacy{PharmacyId: p.ID, OwnerUserId: p.OwnerID, Name: p.Name, LicenseNumber: p.LicenseNumber,
-		Location: &commonv1.GeoPoint{Latitude: p.Location.Latitude, Longitude: p.Location.Longitude},
-		Status:   statusFromProto(p.Status), StatusReason: p.StatusReason, CreatedAt: timestamppb.New(p.CreatedAt),
+		Dzongkhag: p.Dzongkhag,
+		Location:  &commonv1.GeoPoint{Latitude: p.Location.Latitude, Longitude: p.Location.Longitude},
+		Status:    statusFromProto(p.Status), StatusReason: p.StatusReason, CreatedAt: timestamppb.New(p.CreatedAt),
 		VerifiedAt: timestampOrNil(p.VerifiedAt)}
 }
 

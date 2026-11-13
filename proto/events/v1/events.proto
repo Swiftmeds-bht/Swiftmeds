@@ -93,3 +93,16 @@ message FeedbackSubmitted {
   bool was_in_stock = 6;
   int32 rating = 7;
 }
+
+// Routing key: search.recorded
+// Producer: search. Consumer: analytics.
+// Search publishes one event per matched product for each completed search.
+message SearchRecorded {
+  EventMetadata metadata = 1;
+  string search_id = 2;
+  string product_id = 3;
+  string product_name = 4;
+  string dzongkhag = 5;
+  // True when at least one nearby offer had available stock.
+  bool has_stock = 6;
+}

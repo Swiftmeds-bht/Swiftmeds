@@ -36,6 +36,7 @@ func TestVerificationTransitions(t *testing.T) {
 func TestNewPharmacyStartsPending(t *testing.T) {
 	now := time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
 	p, err := NewPharmacy("ph-1", "owner-1", "Paro Pharmacy", "LIC-1",
+		"  Paro  ",
 		GeoPoint{Latitude: 27.43, Longitude: 89.41},
 		[]OpeningHours{{Day: 1, OpensAt: "09:00", ClosesAt: "17:00"}}, now)
 	if err != nil {
@@ -44,17 +45,20 @@ func TestNewPharmacyStartsPending(t *testing.T) {
 	if p.Status != StatusPending {
 		t.Fatalf("status = %s, want PENDING", p.Status)
 	}
+	if p.Dzongkhag != "Paro" {
+		t.Fatalf("dzongkhag = %q, want %q", p.Dzongkhag, "Paro")
+	}
 	if p.VerifiedAt != nil {
 		t.Fatal("new pharmacy has verified_at")
 	}
 }
 
 func TestNewPharmacyRejectsInvalidInput(t *testing.T) {
-	_, err := NewPharmacy("", "owner-1", "Name", "LIC-1", GeoPoint{}, nil, time.Now())
+	_, err := NewPharmacy("", "owner-1", "Name", "LIC-1", "", GeoPoint{}, nil, time.Now())
 	if !errors.Is(err, ErrMissingPharmacyID) {
 		t.Fatalf("err = %v, want %v", err, ErrMissingPharmacyID)
 	}
-	_, err = NewPharmacy("ph-1", "owner-1", "Name", "LIC-1", GeoPoint{Latitude: 91}, nil, time.Now())
+	_, err = NewPharmacy("ph-1", "owner-1", "Name", "LIC-1", "", GeoPoint{Latitude: 91}, nil, time.Now())
 	if !errors.Is(err, ErrInvalidLocation) {
 		t.Fatalf("err = %v, want %v", err, ErrInvalidLocation)
 	}

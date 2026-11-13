@@ -632,6 +632,94 @@ func (x *FeedbackSubmitted) GetRating() int32 {
 	return 0
 }
 
+// Routing key: search.recorded
+// Producer: search. Consumer: analytics.
+// Search publishes one event per matched product for each completed search.
+type SearchRecorded struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	SearchId    string                 `protobuf:"bytes,2,opt,name=search_id,json=searchId,proto3" json:"search_id,omitempty"`
+	ProductId   string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ProductName string                 `protobuf:"bytes,4,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
+	Dzongkhag   string                 `protobuf:"bytes,5,opt,name=dzongkhag,proto3" json:"dzongkhag,omitempty"`
+	// True when at least one nearby offer had available stock.
+	HasStock      bool `protobuf:"varint,6,opt,name=has_stock,json=hasStock,proto3" json:"has_stock,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchRecorded) Reset() {
+	*x = SearchRecorded{}
+	mi := &file_events_v1_events_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchRecorded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchRecorded) ProtoMessage() {}
+
+func (x *SearchRecorded) ProtoReflect() protoreflect.Message {
+	mi := &file_events_v1_events_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchRecorded.ProtoReflect.Descriptor instead.
+func (*SearchRecorded) Descriptor() ([]byte, []int) {
+	return file_events_v1_events_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SearchRecorded) GetMetadata() *EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *SearchRecorded) GetSearchId() string {
+	if x != nil {
+		return x.SearchId
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetProductName() string {
+	if x != nil {
+		return x.ProductName
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetDzongkhag() string {
+	if x != nil {
+		return x.Dzongkhag
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetHasStock() bool {
+	if x != nil {
+		return x.HasStock
+	}
+	return false
+}
+
 var File_events_v1_events_proto protoreflect.FileDescriptor
 
 const file_events_v1_events_proto_rawDesc = "" +
@@ -703,7 +791,15 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"product_id\x18\x05 \x01(\tR\tproductId\x12 \n" +
 	"\fwas_in_stock\x18\x06 \x01(\bR\n" +
 	"wasInStock\x12\x16\n" +
-	"\x06rating\x18\a \x01(\x05R\x06ratingBDZBgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/events/v1;eventsv1b\x06proto3"
+	"\x06rating\x18\a \x01(\x05R\x06rating\"\xe9\x01\n" +
+	"\x0eSearchRecorded\x12=\n" +
+	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x1b\n" +
+	"\tsearch_id\x18\x02 \x01(\tR\bsearchId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x03 \x01(\tR\tproductId\x12!\n" +
+	"\fproduct_name\x18\x04 \x01(\tR\vproductName\x12\x1c\n" +
+	"\tdzongkhag\x18\x05 \x01(\tR\tdzongkhag\x12\x1b\n" +
+	"\thas_stock\x18\x06 \x01(\bR\bhasStockBDZBgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/events/v1;eventsv1b\x06proto3"
 
 var (
 	file_events_v1_events_proto_rawDescOnce sync.Once
@@ -717,7 +813,7 @@ func file_events_v1_events_proto_rawDescGZIP() []byte {
 	return file_events_v1_events_proto_rawDescData
 }
 
-var file_events_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_events_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_events_v1_events_proto_goTypes = []any{
 	(*EventMetadata)(nil),         // 0: swiftmed.events.v1.EventMetadata
 	(*HoldRequested)(nil),         // 1: swiftmed.events.v1.HoldRequested
@@ -726,23 +822,25 @@ var file_events_v1_events_proto_goTypes = []any{
 	(*HoldConfirmed)(nil),         // 4: swiftmed.events.v1.HoldConfirmed
 	(*StockIncreased)(nil),        // 5: swiftmed.events.v1.StockIncreased
 	(*FeedbackSubmitted)(nil),     // 6: swiftmed.events.v1.FeedbackSubmitted
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*SearchRecorded)(nil),        // 7: swiftmed.events.v1.SearchRecorded
+	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
 }
 var file_events_v1_events_proto_depIdxs = []int32{
-	7, // 0: swiftmed.events.v1.EventMetadata.occurred_at:type_name -> google.protobuf.Timestamp
-	0, // 1: swiftmed.events.v1.HoldRequested.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	7, // 2: swiftmed.events.v1.HoldRequested.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 3: swiftmed.events.v1.StockReserved.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 4: swiftmed.events.v1.StockUnavailable.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 5: swiftmed.events.v1.HoldConfirmed.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	7, // 6: swiftmed.events.v1.HoldConfirmed.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 7: swiftmed.events.v1.StockIncreased.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 8: swiftmed.events.v1.FeedbackSubmitted.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	8,  // 0: swiftmed.events.v1.EventMetadata.occurred_at:type_name -> google.protobuf.Timestamp
+	0,  // 1: swiftmed.events.v1.HoldRequested.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	8,  // 2: swiftmed.events.v1.HoldRequested.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: swiftmed.events.v1.StockReserved.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 4: swiftmed.events.v1.StockUnavailable.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 5: swiftmed.events.v1.HoldConfirmed.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	8,  // 6: swiftmed.events.v1.HoldConfirmed.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: swiftmed.events.v1.StockIncreased.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 8: swiftmed.events.v1.FeedbackSubmitted.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 9: swiftmed.events.v1.SearchRecorded.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_events_v1_events_proto_init() }
@@ -756,7 +854,7 @@ func file_events_v1_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_events_v1_events_proto_rawDesc), len(file_events_v1_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

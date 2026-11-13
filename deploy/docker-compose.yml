@@ -347,9 +347,11 @@ services:
       SEARCH_UPSTREAM: traefik:50051
       SEARCH_CALL_TIMEOUT: ${SEARCH_CALL_TIMEOUT:-800ms}
       SEARCH_REQUEST_TIMEOUT: ${SEARCH_REQUEST_TIMEOUT:-2s}
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       - traefik
+      - rabbitmq
     labels:
       - traefik.enable=true
       - traefik.http.routers.search.rule=Host(`search`)
@@ -383,6 +385,31 @@ services:
       - traefik.http.routers.watchlist.entrypoints=grpc
       - traefik.http.services.watchlist.loadbalancer.server.port=${WATCHLIST_GRPC_PORT:-50064}
       - traefik.http.services.watchlist.loadbalancer.server.scheme=h2c
+
+  analytics:
+    build:
+      context: ..
+      dockerfile: services/analytics/Dockerfile
+    restart: unless-stopped
+    environment:
+      ANALYTICS_GRPC_PORT: ${ANALYTICS_GRPC_PORT:-50068}
+      ANALYTICS_DATABASE_URL: ${ANALYTICS_DATABASE_URL:?set ANALYTICS_DATABASE_URL in .env}
+      ANALYTICS_UPSTREAM: traefik:50051
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.analytics.rule=Host(`analytics`)
+      - traefik.http.routers.analytics.entrypoints=grpc
+      - traefik.http.services.analytics.loadbalancer.server.port=${ANALYTICS_GRPC_PORT:-50068}
+      - traefik.http.services.analytics.loadbalancer.server.scheme=h2c
 
   feedback:
     build:

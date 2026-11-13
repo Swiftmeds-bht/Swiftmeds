@@ -29,13 +29,17 @@ func TestRegisterVerifyAndVerifiedOnlyList(t *testing.T) {
 	ctx := context.Background()
 	registered, err := h.RegisterPharmacy(ctx, &registryv1.RegisterPharmacyRequest{
 		OwnerUserId: "owner-1", Name: "Paro Pharmacy", LicenseNumber: "LIC-1",
-		Location: &commonv1.GeoPoint{Latitude: 27.43, Longitude: 89.41},
+		Dzongkhag: "  Paro  ",
+		Location:  &commonv1.GeoPoint{Latitude: 27.43, Longitude: 89.41},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if registered.GetPharmacy().GetStatus() != registryv1.VerificationStatus_VERIFICATION_STATUS_PENDING {
 		t.Fatalf("new pharmacy status = %v, want pending", registered.GetPharmacy().GetStatus())
+	}
+	if registered.GetPharmacy().GetDzongkhag() != "Paro" {
+		t.Fatalf("dzongkhag = %q, want %q", registered.GetPharmacy().GetDzongkhag(), "Paro")
 	}
 	if _, err := h.SetVerificationStatus(ctx, &registryv1.SetVerificationStatusRequest{
 		PharmacyId: registered.GetPharmacy().GetPharmacyId(),

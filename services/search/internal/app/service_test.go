@@ -174,6 +174,22 @@ type fakeSubstitution struct {
 	subs map[string][]domain.Product
 }
 
+type fakeSearchEvents struct {
+	err   error
+	calls []struct {
+		searchID, dzongkhag string
+		result              domain.ProductResult
+	}
+}
+
+func (f *fakeSearchEvents) SearchRecorded(_ context.Context, searchID, dzongkhag string, result domain.ProductResult) error {
+	f.calls = append(f.calls, struct {
+		searchID, dzongkhag string
+		result              domain.ProductResult
+	}{searchID, dzongkhag, result})
+	return f.err
+}
+
 func (f *fakeSubstitution) Substitutes(ctx context.Context, id string, _ int) ([]domain.Product, error) {
 	if err := f.wait(ctx); err != nil {
 		return nil, err
@@ -213,6 +229,7 @@ type world struct {
 	registry *fakeRegistry
 	ranking  *fakeRanking
 	subs     *fakeSubstitution
+	events   *fakeSearchEvents
 }
 
 func newWorld() *world {
@@ -238,6 +255,7 @@ func newWorld() *world {
 		}},
 		ranking: &fakeRanking{},
 		subs:    &fakeSubstitution{subs: map[string][]domain.Product{brufen.ID: {profen, brufen}}},
+		events:  &fakeSearchEvents{},
 	}
 }
 
@@ -248,16 +266,52 @@ func (w *world) service(opts Options) *Service {
 	return NewService(Deps{
 		Catalog: w.catalog, Geo: w.geo, Inventory: w.inv, Freshness: w.fresh, Pricing: w.pricing,
 		Trust: w.trust, Registry: w.registry, Ranking: w.ranking, Substitution: w.subs,
+		Events: w.events,
 	}, opts)
 }
 
 func query(t *testing.T, text string) domain.Query {
 	t.Helper()
-	q, err := domain.NewQuery(text, domain.Point{Lat: 27.4728, Lng: 89.639}, 5000, 0)
+	q, err := domain.NewQuery(text, "", domain.Point{Lat: 27.4728, Lng: 89.639}, 5000, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	return q
+}
+
+func TestSearchPublishesOneEventPerMatchedProduct(t *testing.T) {
+	w := newWorld()
+	svc := w.service(Options{})
+	q := query(t, "napa")
+	q.Dzongkhag = "Paro"
+
+	res, err := svc.Search(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(w.events.calls) != len(res.Results) {
+		t.Fatalf("published %d events for %d matched products", len(w.events.calls), len(res.Results))
+	}
+	if len(w.events.calls) != 1 || w.events.calls[0].searchID != res.SearchID ||
+		w.events.calls[0].dzongkhag != "Paro" || w.events.calls[0].result.ID != napa.ID ||
+		len(w.events.calls[0].result.Offers) == 0 {
+		t.Fatalf("events = %+v", w.events.calls)
+	}
+}
+
+func TestSearchPublishErrorDegradesWithoutLosingResults(t *testing.T) {
+	w := newWorld()
+	w.events.err = errors.New("broker unavailable")
+	svc := w.service(Options{})
+
+	res, err := svc.Search(context.Background(), query(t, "napa"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Results) != 1 || !reflect.DeepEqual(res.Degraded, []string{DepSearchEvents}) {
+		t.Fatalf("result = %+v", res)
+	}
 }
 
 func pharmacies(offers []domain.Offer) []string {

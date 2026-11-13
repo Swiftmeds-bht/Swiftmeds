@@ -12,15 +12,17 @@ import (
 type RouterOption func(*routes)
 
 type routes struct {
-	freshness  ports.DecayApplier
-	expiry     ports.HoldExpirySweeper
-	auth       ports.Authenticator
-	search     ports.Searcher
-	geo        ports.NearbyPharmacyFinder
-	substitute ports.SubstituteFinder
-	holds      ports.HoldsClient
-	watchlist  ports.WatchlistClient
-	feedback   ports.FeedbackClient
+	freshness        ports.DecayApplier
+	expiry           ports.HoldExpirySweeper
+	auth             ports.Authenticator
+	search           ports.Searcher
+	geo              ports.NearbyPharmacyFinder
+	substitute       ports.SubstituteFinder
+	holds            ports.HoldsClient
+	watchlist        ports.WatchlistClient
+	feedback         ports.FeedbackClient
+	pharmacyRegistry ports.PharmacyRegistryClient
+	analytics        ports.AnalyticsClient
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
@@ -54,6 +56,14 @@ func WithSubstitution(finder ports.SubstituteFinder) RouterOption {
 
 func WithHolds(client ports.HoldsClient) RouterOption {
 	return func(r *routes) { r.holds = client }
+}
+
+func WithPharmacyRegistry(client ports.PharmacyRegistryClient) RouterOption {
+	return func(r *routes) { r.pharmacyRegistry = client }
+}
+
+func WithAnalytics(client ports.AnalyticsClient) RouterOption {
+	return func(r *routes) { r.analytics = client }
 }
 
 func WithWatchlist(client ports.WatchlistClient) RouterOption {
@@ -106,6 +116,12 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		mux.Handle("POST /api/v1/holds/{holdId}/feedback", feedbackHandler(wired.feedback, logger))
 	}
 	mux.Handle("/api/v1/", http.NotFoundHandler())
+
+	if wired.pharmacyRegistry != nil && wired.analytics != nil {
+		mux.Handle(
+			"GET /api/v1/pharmacies/me/analytics/unmet-demand",
+			unmetDemandHandler(wired.analytics, wired.pharmacyRegistry, logger))
+	}
 
 	// The first middleware is the outermost. Recover sits inside Logging so a
 	// panic is logged as a 500 request, and outside CORS and the handlers.
