@@ -19,6 +19,7 @@ use (
 	./services/search
 	./services/stock-sync
 	./services/substitution
+	./services/trust
 	./services/user-profile
 	./services/watchlist
 )

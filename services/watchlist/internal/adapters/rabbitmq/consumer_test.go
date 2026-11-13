@@ -115,10 +115,18 @@ func (c *fakeChannel) ConsumeWithContext(context.Context, string, string, bool, 
 	return make(chan amqp.Delivery), nil
 }
 
+// noDedup claims every event, so every delivery reaches the handler.
 type noDedup struct{}
 
-func (noDedup) IsProcessed(context.Context, string) (bool, error) { return false, nil }
-func (noDedup) MarkProcessed(context.Context, string) error       { return nil }
+func (noDedup) Claim(context.Context, string) (messaging.Claim, bool, error) {
+	return noClaim{}, true, nil
+}
+
+// noClaim is the claim noDedup hands out; it records nothing.
+type noClaim struct{}
+
+func (noClaim) Commit(context.Context) error  { return nil }
+func (noClaim) Release(context.Context) error { return nil }
 
 func TestNewConsumerBindsStockIncreased(t *testing.T) {
 	ch := &fakeChannel{}

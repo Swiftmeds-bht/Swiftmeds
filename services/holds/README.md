@@ -78,7 +78,8 @@ stock would stay "reserved" for ever.)
 **Idempotent consumers.** Two layers:
 
 1. `pkg/messaging` records each processed `event_id` in Postgres (`swiftmed_processed_events`) and
-   acknowledges a repeat without running the handler. A failing event is retried 3 times, then
+   acknowledges a repeat without running the handler. The check and the record are one atomic
+   claim, so two copies delivered at once cannot both run it. A failing event is retried 3 times, then
    dead-lettered (`holds.stock-events.dlq`).
 2. The handlers are safe on their own, because the same answer can come back under a new `event_id`.
    Every row of the table above is a no-op or a repeat of something already done.
@@ -151,7 +152,16 @@ go test -cover ./...
 # Repository contract tests against Postgres (use a throwaway database; it empties the holds table):
 HOLDS_TEST_DATABASE_URL=postgres://swiftmed:change-me@localhost:5432/holds_test?sslmode=disable \
   go test -tags integration ./internal/adapters/postgres/
+
+# Mutation testing (SCRUM-113), settings in .gremlins.yaml; or `make mutation` from the repo root:
+GOWORK=off gremlins unleash ./internal/domain
+GOWORK=off gremlins unleash ./internal/app
 ```
+
+Mutation scores (Gremlins v0.5.0, every mutator): domain 95.2% efficacy (20 killed, 1 equivalent
+mutant lived, 13 in tagless `switch` cases that Go's coverage profile cannot see), app 98.3% (57 killed,
+1 equivalent lived, 1 constant not coverable). Details:
+[docs/test-plan.md §7.3](../../docs/test-plan.md).
 
 ### End-to-end saga test
 

@@ -1,29 +1,66 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { ArrowLeftIcon, InfoIcon, MapPinIcon, SearchIcon, StoreIcon } from "@/components/Icons";
-import { getPharmacy } from "@/lib/api";
+import { lookupPharmacy } from "@/lib/api";
 
 type Params = Promise<{ id: string }>;
 
+export const dynamic = "force-dynamic";
+
+// One gateway call per request, shared by the metadata and the page.
+const lookup = cache((id: string) => lookupPharmacy(id));
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const pharmacy = getPharmacy((await params).id);
-  return { title: pharmacy?.name ?? "Pharmacy" };
+  const result = await lookup((await params).id);
+  return { title: result.status === "found" ? result.pharmacy.name : "Pharmacy" };
 }
 
-// Placeholder: opening hours and the stock list come in later sprints.
+// Opening hours and the stock list come in later sprints.
 export default async function PharmacyPage({ params }: { params: Params }) {
-  const pharmacy = getPharmacy((await params).id);
-  if (!pharmacy) notFound();
+  const result = await lookup((await params).id);
+  if (result.status === "not_found") notFound();
 
-  const mapUrl = `https://www.openstreetmap.org/?mlat=${pharmacy.location.latitude}&mlon=${pharmacy.location.longitude}#map=17/${pharmacy.location.latitude}/${pharmacy.location.longitude}`;
+  if (result.status === "unavailable") {
+    console.error(`pharmacy details unavailable (${result.kind})`);
+    return (
+      <div className="page narrow pharmacy-page">
+        <Link href="/" className="back-link">
+          <ArrowLeftIcon size={16} /> New search
+        </Link>
+        <div className="problem" role="alert">
+          <h1>Pharmacy details are not available right now</h1>
+          <p>
+            We could not load this pharmacy&apos;s details. Its address and distance are shown with your search results, and you
+            can still reserve from there.
+          </p>
+          <Link href="/" className="button">
+            <SearchIcon size={16} /> Find a medicine
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { pharmacy, source } = result;
+  const loc = pharmacy.location;
+  const mapUrl = loc
+    ? `https://www.openstreetmap.org/?mlat=${loc.latitude}&mlon=${loc.longitude}#map=17/${loc.latitude}/${loc.longitude}`
+    : undefined;
 
   return (
     <div className="page narrow pharmacy-page">
       <Link href="/" className="back-link">
         <ArrowLeftIcon size={16} /> New search
       </Link>
+      {source === "demo" && (
+        <p className="notice" role="note">
+          <InfoIcon />
+          <span>Showing a demo pharmacy, not live data.</span>
+        </p>
+      )}
       <article className="panel detail-card">
         <div className="detail-head">
           <span className="detail-icon">
@@ -31,24 +68,38 @@ export default async function PharmacyPage({ params }: { params: Params }) {
           </span>
           <div>
             <h1>{pharmacy.name}</h1>
-            <p className="muted">Pharmacy in {pharmacy.dzongkhag}</p>
+            {pharmacy.dzongkhag && <p className="muted">Pharmacy in {pharmacy.dzongkhag}</p>}
           </div>
         </div>
         <dl className="details">
-          <div>
-            <dt>Address</dt>
-            <dd>{pharmacy.address}</dd>
-          </div>
-          <div>
-            <dt>Dzongkhag</dt>
-            <dd>{pharmacy.dzongkhag}</dd>
-          </div>
+          {pharmacy.address && (
+            <div>
+              <dt>Address</dt>
+              <dd>{pharmacy.address}</dd>
+            </div>
+          )}
+          {pharmacy.dzongkhag && (
+            <div>
+              <dt>Dzongkhag</dt>
+              <dd>{pharmacy.dzongkhag}</dd>
+            </div>
+          )}
+          {pharmacy.phone && (
+            <div>
+              <dt>Phone</dt>
+              <dd>
+                <a href={`tel:${pharmacy.phone.replace(/[^\d+]/g, "")}`}>{pharmacy.phone}</a>
+              </dd>
+            </div>
+          )}
         </dl>
         <div className="detail-actions">
-          <a href={mapUrl} rel="noopener noreferrer" target="_blank" className="button">
-            <MapPinIcon size={16} /> Open in map<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-          <Link href="/" className="button button-outline">
+          {mapUrl && (
+            <a href={mapUrl} rel="noopener noreferrer" target="_blank" className="button">
+              <MapPinIcon size={16} /> Open in map<span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
+          <Link href="/" className={mapUrl ? "button button-outline" : "button"}>
             <SearchIcon size={16} /> Find a medicine
           </Link>
         </div>

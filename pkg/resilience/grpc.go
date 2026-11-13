@@ -3,7 +3,6 @@ package resilience
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"google.golang.org/grpc"
@@ -16,8 +15,8 @@ type Config struct {
 	Breaker BreakerConfig
 	Retry   RetryConfig
 	// RetryableMethod decides whether a method may be retried after a
-	// retryable failure. Zero uses a conservative name-based policy that
-	// excludes mutating RPCs such as CreateHold.
+	// retryable failure. Zero allows only the read-only RPCs listed in
+	// methods.go; writes such as CreateHold and unknown methods are called once.
 	RetryableMethod func(method string) bool
 	// Timeout is the limit for each attempt, not for the whole call. Default 3s.
 	Timeout time.Duration
@@ -36,6 +35,7 @@ type Config struct {
 // By default only codes.Unavailable is retried. Other codes, including
 // DeadlineExceeded, are not, because the server may already have done the work
 // and a retry could do it twice. Change Config.Retry.Retryable for calls that are safe to repeat.
+// Only read-only methods are retried at all (see methods.go and Config.RetryableMethod).
 //
 // Create one interceptor per connection so each downstream service gets its own breaker.
 func UnaryClientInterceptor(cfg Config) grpc.UnaryClientInterceptor {
@@ -78,22 +78,6 @@ func UnaryClientInterceptor(cfg Config) grpc.UnaryClientInterceptor {
 // isRetryable allows a retry only for codes.Unavailable.
 func isRetryable(err error) bool {
 	return status.Code(err) == codes.Unavailable
-}
-
-// isIdempotentMethod keeps retries away from RPCs that commonly mutate state.
-// Unknown methods remain retryable so read/query RPCs do not need a central
-// registry in this shared package.
-func isIdempotentMethod(method string) bool {
-	name := method
-	if slash := strings.LastIndexByte(name, '/'); slash >= 0 {
-		name = name[slash+1:]
-	}
-	for _, prefix := range []string{"Create", "Update", "Delete", "Cancel", "Commit", "Reserve", "Release", "Consume", "Set", "Add"} {
-		if strings.HasPrefix(name, prefix) {
-			return false
-		}
-	}
-	return true
 }
 
 // isServerFault counts only problems on the server side or the network.

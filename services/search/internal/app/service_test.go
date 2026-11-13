@@ -356,6 +356,37 @@ func TestSearchHappyPath(t *testing.T) {
 	}
 }
 
+// Ranking gets each pharmacy's score from the Trust service, not the neutral
+// placeholder (SCRUM-73). Neutral is only for a pharmacy Trust did not return.
+func TestRankingUsesTheTrustServiceScores(t *testing.T) {
+	w := newWorld()
+	w.trust.scores = map[string]float64{"ph-near": 0.0, "ph-far": 1.0} // the boundaries
+	res, err := w.service(Options{}).Search(context.Background(), query(t, "napa"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contains(res.Degraded, DepTrust) {
+		t.Fatalf("degraded = %v, want trust answered", res.Degraded)
+	}
+	got := map[string]float64{}
+	for _, c := range w.ranking.got {
+		got[c.PharmacyID] = c.Trust
+	}
+	if want := map[string]float64{"ph-near": 0.0, "ph-far": 1.0}; !reflect.DeepEqual(got, want) {
+		t.Errorf("trust given to Ranking = %v, want %v", got, want)
+	}
+
+	w.trust.scores = map[string]float64{"ph-far": 0.9} // ph-near missing from the answer
+	if _, err := w.service(Options{}).Search(context.Background(), query(t, "napa")); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range w.ranking.got {
+		if c.PharmacyID == "ph-near" && c.Trust != NeutralTrust {
+			t.Errorf("ph-near trust = %v, want neutral %v when Trust returns no score", c.Trust, NeutralTrust)
+		}
+	}
+}
+
 func TestSearchNoProductMatches(t *testing.T) {
 	w := newWorld()
 	res, err := w.service(Options{}).Search(context.Background(), query(t, "nonexistium"))

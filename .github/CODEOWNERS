@@ -13,6 +13,22 @@
 # Contracts (frozen after Sprint 1; changes need the architecture lead)
 /proto/                         @PemaLoselMaurer
 
+# Shared code, tooling and docs: architecture lead.
+# More specific rules below (docs/test-plan.md, each service) override these.
+/pkg/                           @PemaLoselMaurer
+/scripts/                       @PemaLoselMaurer
+/docs/                          @PemaLoselMaurer
+/docs/api/                      @PemaLoselMaurer
+/services/                      @PemaLoselMaurer
+
+# Deployment (Compose, Traefik, RabbitMQ, Postgres init, seed): Yeshey
+/deploy/                        @Zhennue
+
+# Web apps
+/web/                           @PemaLoselMaurer
+/web/patient-app/               @PemaLoselMaurer
+/web/pharmacy-dashboard/        @JigmeZ
+
 # Identity and platform: Yeshey
 /services/gateway/              @Zhennue
 /services/auth/                 @Zhennue
@@ -40,6 +56,7 @@
 /services/feedback/             @nimas854
 /services/trust/                @nimas854
 /services/freshness/            @nimas854
+/workers/                       @nimas854
 /workers/hold-expiry/           @nimas854
 /workers/freshness-decay/       @nimas854
 

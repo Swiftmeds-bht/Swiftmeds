@@ -10,7 +10,7 @@ have it in stock. Owner: Pema. Responsive: works on phones and desktops.
 | `/` | Search form: medicine name (with suggestions), location, radius |
 | `/results?q=…&place=…&radius=…` | Matching medicines with in-stock pharmacies (best match first and highlighted: distance, price, stock, and freshness as 1 to 3 bars with words), and same-molecule alternatives when nothing is in stock. The search sits in one compact bar; the town and radius fold into a "Near …, within … · Change" line (a native `<details>`, so it works without JavaScript) |
 | `/results?q=…&lat=…&lng=…&radius=…` | The same, searched from the patient's device location |
-| `/pharmacy/[id]` | Pharmacy detail (placeholder: address, dzongkhag, map link and a link back to search; opening hours and stock list come later) |
+| `/pharmacy/[id]` | Pharmacy detail: name, address, dzongkhag, phone, map link and a link back to search (opening hours and stock list come later). Live from the gateway with `GATEWAY_URL`, demo data (labelled) without it; see [Data](#data) |
 | `/reserve?product=…&pharmacy=…` | Confirm a reservation: medicine, pharmacy, price, how many units (1 to 5, no more than in stock), and the total to pay at the counter, which updates with the number of units. Opened from Reserve on a result |
 | `/holds/[id]` | One hold: "Checking stock" (refreshes every 2 s), then the pickup code on a ticket with a countdown, or why it was not held, expired or cancelled. When a hold has just turned active (status changed in the last 15 s), the code's digits rise into place once; reloads do not replay it, and reduced motion turns it off |
 | `/holds` | My holds: current (with Cancel) and past |
@@ -43,7 +43,7 @@ search is a shareable URL. With JavaScript it also shows suggestions, offers
 | Empty: no match | "No medicines match …" with how to fix the search |
 | Empty: nobody has it | "No pharmacy nearby has … in stock." plus substitutes when the gateway sends them |
 | Error | A clear message and a Try again link (`SearchProblem`): cannot reach the search, too slow, not working, not available yet, or the search was not accepted |
-| Some details missing | A note when the gateway reports optional services as down (`x-search-degraded` header) |
+| Some details missing | A note when the gateway reports optional services as down (`x-search-degraded` header). **Not shown yet:** the gateway does not forward that header from the Search service until SCRUM-124 lands. The app already reads it (`lib/api.ts`), and `npm run dev:gateway` with the search `degraded` shows the note |
 
 ## Reserving and collecting (SCRUM-60)
 
@@ -59,16 +59,45 @@ and confirms. The hold page follows the hold through its states
 | Expired | When it ran out, and a link to search again. The page turns expired by itself when the countdown ends |
 | Cancelled, collected | A short final message |
 
-**Session.** Signing in stores the access token in an httpOnly, SameSite=Lax cookie
-(`lib/session.ts`, `lib/auth.ts`), so page scripts cannot read it. All gateway
-calls with the token happen on the server (`app/actions.ts`, server components).
-When the gateway rejects the token, the page sends the patient to sign in again
-(`/session-ended` clears the cookie) and back afterwards. The `next` address after
-signing in must be a path on this site, so a crafted link cannot send a patient
-elsewhere. Refresh tokens are not used yet: the patient signs in again when the
-access token expires (`JWT_TTL`, 15 minutes by default).
+**Session.** Signing in stores the access token, its expiry and the refresh token
+in an httpOnly, SameSite=Lax cookie (`lib/session.ts`, `lib/auth.ts`), so page
+scripts cannot read them. All gateway calls with the token happen on the server
+(`app/actions.ts`, server components). The `next` address after signing in must
+be a path on this site, so a crafted link cannot send a patient elsewhere.
 
-**Gateway routes** (`lib/holds.ts`): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
+**Staying signed in (SCRUM-131).** The access token lasts 15 minutes (`JWT_TTL`).
+The app swaps the refresh token for a new pair (`POST /api/v1/auth/refresh`,
+`lib/refresh.ts`) so the patient is not signed out:
+
+- **Before it expires**: `proxy.ts` (Next.js 16 Proxy, formerly middleware) runs
+  before every page, route handler and server action that carries the cookie. Within
+  60 s of expiry, or after it, it refreshes, puts the new cookie on the forwarded
+  request (so the page rendering that request already uses the new token) and on the
+  response. It has to happen there: server components cannot set cookies.
+- **After a 401**: server actions refresh once and retry the call
+  (`withFreshToken`). A second 401 signs the patient out; there is no loop.
+- **Refused refresh** (400/401, or any 4xx): the cookie is removed and pages that need
+  a session send the patient to sign in. **Gateway down or 5xx**: nothing changes, and
+  the next request tries again.
+- **Concurrent requests**: refresh tokens work once, and a browser often sends
+  several requests with the same cookie (a page, the alert stream, prefetches).
+  `refreshOnce` shares one gateway call between them and gives requests that arrive
+  up to 30 s later with the old cookie the same new tokens. This lives in the
+  server's memory, so with several app instances use sticky sessions (or move it to
+  a shared store).
+- The cookie lasts 7 days when there is a refresh token (the gateway's own limit is
+  `JWT_REFRESH_TTL`, 30 days). Signing out also revokes the refresh token
+  (`POST /api/v1/auth/logout`, best effort).
+- A server-component page that still gets a 401 sends the patient to sign in again
+  (`/session-ended` clears the cookie) and back afterwards.
+
+The gateway does not serve the auth routes yet (SCRUM-115), so this is covered by
+unit tests with a mocked gateway (`lib/refresh.test.ts`, `lib/session-proxy.test.ts`)
+and can only be tried live once SCRUM-115 lands. Until then a refresh is refused and
+the patient signs in again after 15 minutes, as before.
+
+**Gateway routes** (`lib/holds.ts`, `lib/refresh.ts`): `POST /api/v1/auth/register`, `POST /api/v1/auth/login`,
+`POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`,
 `POST /api/v1/holds`, `GET /api/v1/holds/{id}`, `GET /api/v1/holds`,
 `POST /api/v1/holds/{id}/cancel`. Most are still "planned" in the API spec; until
 they exist, a gateway answering 404 shows "This is not available yet".
@@ -115,9 +144,18 @@ and wait.
 |---|---|
 | `GET /api/v1/search?q=…&lat=…&lng=…&radius_m=…` | Results (`SearchMedicine`) |
 | `GET /api/v1/search/autocomplete?prefix=…&limit=…` | Suggestions (`Autocomplete`) |
+| `GET /api/v1/pharmacies/{pharmacyId}` | The pharmacy page (`lookupPharmacy`; public in the spec) |
 
 JSON follows `proto/search/v1/search.proto` in protobuf JSON form (camelCase;
 int64 values such as money arrive as strings).
+
+**Pharmacy page.** In gateway mode it reads `GET /api/v1/pharmacies/{pharmacyId}`
+and never falls back to demo data. Only verified pharmacies are shown; an unknown or
+unverified one is "Page not found". The route is still "planned": the gateway does
+not mount it yet and its auth middleware treats `/api/v1/pharmacies/…` as
+pharmacy-staff only, so today the page says "Pharmacy details are not available
+right now" (a plain-text 404, 401, 403 or 501 all mean this). `GET
+/api/v1/pharmacies/nearby` cannot stand in: it returns only IDs and distances.
 
 - With `GATEWAY_URL` set, a failing gateway is shown as an error. The app never
   replaces a failed search with demo stock.

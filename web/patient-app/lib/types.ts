@@ -109,6 +109,11 @@ export interface Session {
   accessToken: string;
   /** ISO time the access token stops working, when the gateway says. */
   expiresAt?: string;
+  /**
+   * Exchanged for a new token pair shortly before `expiresAt` (lib/refresh.ts).
+   * Server-side only, like the access token. Absent in demo mode.
+   */
+  refreshToken?: string;
 }
 
 export interface PharmacySummary {
@@ -117,4 +122,14 @@ export interface PharmacySummary {
   address: string;
   dzongkhag: string;
   location: GeoPoint;
+}
+
+/** What the pharmacy page shows (openapi.yaml Pharmacy, public fields only). */
+export interface PharmacyDetails {
+  pharmacyId: string;
+  name: string;
+  address?: string;
+  dzongkhag?: string;
+  phone?: string;
+  location?: GeoPoint;
 }
