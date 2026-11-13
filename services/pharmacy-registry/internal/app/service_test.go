@@ -20,13 +20,17 @@ func TestRegistrationAndVerifiedOnlyList(t *testing.T) {
 
 	created, err := svc.Register(context.Background(), RegisterInput{
 		OwnerID: "owner-1", Name: "Paro Pharmacy", LicenseNumber: "LIC-1",
-		Location: domain.GeoPoint{Latitude: 27.43, Longitude: 89.41},
+		Dzongkhag: "Paro",
+		Location:  domain.GeoPoint{Latitude: 27.43, Longitude: 89.41},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if created.Status != domain.StatusPending {
 		t.Fatalf("status = %s, want PENDING", created.Status)
+	}
+	if created.Dzongkhag != "Paro" {
+		t.Fatalf("dzongkhag = %q, want %q", created.Dzongkhag, "Paro")
 	}
 
 	verified, err := svc.SetVerificationStatus(context.Background(), "ph-1", domain.StatusVerified, "")

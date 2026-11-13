@@ -1,0 +1,2 @@
+ALTER TABLE pharmacies
+    ADD COLUMN IF NOT EXISTS dzongkhag TEXT NOT NULL DEFAULT '';

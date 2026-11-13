@@ -6,6 +6,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/Swiftmeds-bht/Swiftmeds/services/search/internal/domain"
 )
 
@@ -77,6 +79,16 @@ type Ranked struct {
 // Ranking orders candidates, best first.
 type Ranking interface {
 	Rank(ctx context.Context, candidates []RankCandidate) ([]Ranked, error)
+}
+
+// SearchEvents publishes analytics events for completed searches.
+type SearchEvents interface {
+	SearchRecorded(ctx context.Context, searchID, dzongkhag string, result domain.ProductResult) error
+}
+
+// EventPublisher is the narrow interface implemented by messaging.Publisher.
+type EventPublisher interface {
+	Publish(ctx context.Context, routingKey string, event proto.Message) error
 }
 
 // Substitution returns products with the same molecule, strength and form.

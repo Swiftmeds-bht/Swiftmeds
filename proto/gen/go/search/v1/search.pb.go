@@ -241,7 +241,9 @@ type SearchMedicineRequest struct {
 	// 500–50000. Defaults to 5000 when 0.
 	RadiusM int32 `protobuf:"varint,3,opt,name=radius_m,json=radiusM,proto3" json:"radius_m,omitempty"`
 	// Max offers per product. Defaults to 10 when 0.
-	MaxOffers     int32 `protobuf:"varint,4,opt,name=max_offers,json=maxOffers,proto3" json:"max_offers,omitempty"`
+	MaxOffers int32 `protobuf:"varint,4,opt,name=max_offers,json=maxOffers,proto3" json:"max_offers,omitempty"`
+	// Optional Bhutan dzongkhag for analytics attribution; empty means unknown.
+	Dzongkhag     string `protobuf:"bytes,5,opt,name=dzongkhag,proto3" json:"dzongkhag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -302,6 +304,13 @@ func (x *SearchMedicineRequest) GetMaxOffers() int32 {
 		return x.MaxOffers
 	}
 	return 0
+}
+
+func (x *SearchMedicineRequest) GetDzongkhag() string {
+	if x != nil {
+		return x.Dzongkhag
+	}
+	return ""
 }
 
 type SearchMedicineResponse struct {
@@ -544,13 +553,14 @@ const file_search_v1_search_proto_rawDesc = "" +
 	"brand_name\x18\x02 \x01(\tR\tbrandName\x12!\n" +
 	"\fgeneric_name\x18\x03 \x01(\tR\vgenericName\x12\x1a\n" +
 	"\bstrength\x18\x04 \x01(\tR\bstrength\x129\n" +
-	"\x06offers\x18\x05 \x03(\v2!.swiftmed.search.v1.PharmacyOfferR\x06offers\"\xa1\x01\n" +
+	"\x06offers\x18\x05 \x03(\v2!.swiftmed.search.v1.PharmacyOfferR\x06offers\"\xbf\x01\n" +
 	"\x15SearchMedicineRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x128\n" +
 	"\blocation\x18\x02 \x01(\v2\x1c.swiftmed.common.v1.GeoPointR\blocation\x12\x19\n" +
 	"\bradius_m\x18\x03 \x01(\x05R\aradiusM\x12\x1d\n" +
 	"\n" +
-	"max_offers\x18\x04 \x01(\x05R\tmaxOffers\"\xb7\x01\n" +
+	"max_offers\x18\x04 \x01(\x05R\tmaxOffers\x12\x1c\n" +
+	"\tdzongkhag\x18\x05 \x01(\tR\tdzongkhag\"\xb7\x01\n" +
 	"\x16SearchMedicineResponse\x12\x1b\n" +
 	"\tsearch_id\x18\x01 \x01(\tR\bsearchId\x12;\n" +
 	"\aresults\x18\x02 \x03(\v2!.swiftmed.search.v1.ProductResultR\aresults\x12C\n" +

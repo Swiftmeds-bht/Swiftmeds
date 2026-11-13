@@ -52,6 +52,8 @@ message SearchMedicineRequest {
   int32 radius_m = 3;
   // Max offers per product. Defaults to 10 when 0.
   int32 max_offers = 4;
+  // Optional Bhutan dzongkhag for analytics attribution; empty means unknown.
+  string dzongkhag = 5;
 }
 
 message SearchMedicineResponse {

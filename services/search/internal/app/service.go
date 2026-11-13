@@ -45,6 +45,7 @@ const (
 	DepRegistry     = "pharmacy-registry"
 	DepRanking      = "ranking"
 	DepSubstitution = "substitution"
+	DepSearchEvents = "search-events"
 )
 
 type Deps struct {
@@ -57,6 +58,7 @@ type Deps struct {
 	Registry     ports.Registry
 	Ranking      ports.Ranking
 	Substitution ports.Substitution
+	Events       ports.SearchEvents
 }
 
 type Options struct {
@@ -192,6 +194,18 @@ func (s *Service) search(ctx context.Context, q domain.Query) (domain.Result, er
 	}
 
 	res.Degraded = deg.list()
+	if s.deps.Events != nil {
+		for _, result := range res.Results {
+			if err := s.deps.Events.SearchRecorded(ctx, res.SearchID, q.Dzongkhag, result); err != nil {
+				s.opts.Logger.ErrorContext(ctx, "search event publish failed",
+					slog.String("search_id", res.SearchID),
+					slog.String("product_id", result.ID),
+					slog.String("error", err.Error()))
+				deg.add(DepSearchEvents)
+			}
+		}
+		res.Degraded = deg.list()
+	}
 	if len(res.Degraded) > 0 {
 		s.opts.Logger.WarnContext(ctx, "search answered with partial data",
 			slog.String("search_id", res.SearchID), slog.Any("degraded", res.Degraded))

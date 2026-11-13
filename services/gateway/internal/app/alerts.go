@@ -82,7 +82,7 @@ func alertsHandler(client ports.WatchlistClient, logger *slog.Logger, heartbeat 
 		for {
 			select {
 			case <-ctx.Done():
-				<-ended
+				waitForAlertReceiver(ended, logger, httpx.RequestIDFromContext(r.Context()))
 				return
 			case a := <-alerts:
 				data, err := protojson.Marshal(a)
@@ -92,7 +92,7 @@ func alertsHandler(client ports.WatchlistClient, logger *slog.Logger, heartbeat 
 				}
 				if !writeEvent(w, rc, fmt.Sprintf("id: %s\nevent: alert\ndata: %s\n\n", a.GetSubscriptionId(), data)) {
 					cancel()
-					<-ended
+					waitForAlertReceiver(ended, logger, httpx.RequestIDFromContext(r.Context()))
 					return
 				}
 			case err := <-ended:
@@ -105,12 +105,28 @@ func alertsHandler(client ports.WatchlistClient, logger *slog.Logger, heartbeat 
 			case <-ticker.C:
 				if !writeEvent(w, rc, ": ping\n\n") {
 					cancel()
-					<-ended
+					waitForAlertReceiver(ended, logger, httpx.RequestIDFromContext(r.Context()))
 					return
 				}
 			}
 		}
 	}
+}
+
+func waitForAlertReceiver(ended <-chan error, logger *slog.Logger, requestID string) {
+	err := <-ended
+	if err == nil ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		status.Code(err) == codes.Canceled {
+		return
+	}
+
+	logger.Error("alert stream failed during shutdown",
+		"request_id", requestID,
+		"error", err.Error(),
+	)
 }
 
 // writeEvent writes and flushes one chunk; false means the client is gone.

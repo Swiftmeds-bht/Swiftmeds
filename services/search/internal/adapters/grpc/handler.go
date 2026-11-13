@@ -38,7 +38,7 @@ func (h *Handler) SearchMedicine(ctx context.Context, req *searchv1.SearchMedici
 		return nil, status.Error(codes.InvalidArgument, "location is required")
 	}
 	center := domain.Point{Lat: req.GetLocation().GetLatitude(), Lng: req.GetLocation().GetLongitude()}
-	q, err := domain.NewQuery(req.GetQuery(), center, req.GetRadiusM(), req.GetMaxOffers())
+	q, err := domain.NewQuery(req.GetQuery(), req.GetDzongkhag(), center, req.GetRadiusM(), req.GetMaxOffers())
 	if err != nil {
 		return nil, toStatus(err)
 	}

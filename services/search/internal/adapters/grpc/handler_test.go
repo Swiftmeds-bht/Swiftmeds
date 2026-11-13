@@ -54,7 +54,9 @@ func startSearch(t *testing.T, up *upstreamtest.Upstream) searchv1.SearchService
 func TestSearchMedicineEndToEndOverGRPC(t *testing.T) {
 	c := startSearch(t, &upstreamtest.Upstream{})
 	var header metadata.MD
-	resp, err := c.SearchMedicine(context.Background(), &searchv1.SearchMedicineRequest{Query: "napa", Location: thimphu}, grpc.Header(&header))
+	resp, err := c.SearchMedicine(context.Background(), &searchv1.SearchMedicineRequest{
+		Query: "napa", Location: thimphu, Dzongkhag: "  Thimphu  ",
+	}, grpc.Header(&header))
 	if err != nil {
 		t.Fatal(err)
 	}
