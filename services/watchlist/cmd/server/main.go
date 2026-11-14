@@ -110,14 +110,24 @@ func run() error {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}
 	defer func() { _ = rabbitConn.Close() }()
+	publisherChannel, err := rabbitConn.Channel()
+	if err != nil {
+		return fmt.Errorf("RabbitMQ publisher channel: %w", err)
+	}
+	defer func() { _ = publisherChannel.Close() }()
 	consumerChannel, err := rabbitConn.Channel()
 	if err != nil {
 		return fmt.Errorf("RabbitMQ consumer channel: %w", err)
 	}
 	defer func() { _ = consumerChannel.Close() }()
+	messagePublisher, err := messaging.NewPublisher(publisherChannel)
+	if err != nil {
+		return fmt.Errorf("event publisher: %w", err)
+	}
+	alertPublisher := rabbitmqadapter.NewPublisher(messagePublisher)
 
 	// Outbound adapters -> use cases -> inbound adapters.
-	svc := app.NewService(postgres.NewRepository(db), clients.NewGeo(geoConn), time.Now, app.NewID)
+	svc := app.NewService(postgres.NewRepository(db), clients.NewGeo(geoConn), time.Now, app.NewID, alertPublisher)
 
 	deduper, err := messaging.NewPostgresDeduper(sqlDB)
 	if err != nil {

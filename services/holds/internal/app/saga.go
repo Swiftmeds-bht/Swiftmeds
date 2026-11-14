@@ -90,6 +90,9 @@ func (s *Service) HandleStockUnavailable(ctx context.Context, holdID string) (Ou
 		}
 		return OutcomeRejected, nil
 	case domain.Rejected:
+		if err := s.events.HoldRejected(ctx, h); err != nil {
+			return "", fmt.Errorf("publish hold.rejected: %w", err)
+		}
 		return OutcomeAlreadyRejected, nil
 	default:
 		return OutcomeIgnored, nil
@@ -107,3 +110,5 @@ type noEvents struct{}
 
 func (noEvents) HoldRequested(context.Context, domain.Hold) error { return nil }
 func (noEvents) HoldConfirmed(context.Context, domain.Hold) error { return nil }
+func (noEvents) HoldExpired(context.Context, domain.Hold) error   { return nil }
+func (noEvents) HoldRejected(context.Context, domain.Hold) error  { return nil }

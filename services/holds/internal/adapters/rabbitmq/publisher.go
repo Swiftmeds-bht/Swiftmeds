@@ -22,6 +22,8 @@ import (
 const (
 	RoutingKeyHoldRequested    = "hold.requested"
 	RoutingKeyHoldConfirmed    = "hold.confirmed"
+	RoutingKeyHoldExpired      = "hold.expired"
+	RoutingKeyHoldRejected     = "hold.rejected"
 	RoutingKeyStockReserved    = "stock.reserved"
 	RoutingKeyStockUnavailable = "stock.unavailable"
 )
@@ -73,6 +75,27 @@ func (p *Publisher) HoldConfirmed(ctx context.Context, h domain.Hold) error {
 		Quantity:   int32(h.Quantity),
 		PickupCode: h.PickupCode,
 		ExpiresAt:  timestamppb.New(h.ExpiresAt),
+	})
+}
+
+func (p *Publisher) HoldExpired(ctx context.Context, h domain.Hold) error {
+	if h.Status != domain.Expired {
+		return fmt.Errorf("hold %s is %s, only an EXPIRED hold can be published", h.ID, h.Status)
+	}
+	return p.publisher.Publish(ctx, RoutingKeyHoldExpired, &eventsv1.HoldExpired{
+		Metadata: metadata(RoutingKeyHoldExpired, h.ID, h.StatusChangedAt),
+		HoldId:   h.ID, UserId: h.UserID, PharmacyId: h.PharmacyID, ProductId: h.ProductID,
+	})
+}
+
+func (p *Publisher) HoldRejected(ctx context.Context, h domain.Hold) error {
+	if h.Status != domain.Rejected {
+		return fmt.Errorf("hold %s is %s, only a REJECTED hold can be published", h.ID, h.Status)
+	}
+	return p.publisher.Publish(ctx, RoutingKeyHoldRejected, &eventsv1.HoldRejected{
+		Metadata: metadata(RoutingKeyHoldRejected, h.ID, h.StatusChangedAt),
+		HoldId:   h.ID, UserId: h.UserID, PharmacyId: h.PharmacyID, ProductId: h.ProductID,
+		Reason: h.StatusReason,
 	})
 }
 

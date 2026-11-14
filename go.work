@@ -20,5 +20,6 @@ use (
 	./services/substitution
 	./services/trust
 	./services/user-profile
+	./services/notification
 	./services/watchlist
 )

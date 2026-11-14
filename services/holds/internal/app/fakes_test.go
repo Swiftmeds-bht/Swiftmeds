@@ -55,8 +55,12 @@ func (f *fakeInventory) count(op string) int {
 type fakeEvents struct {
 	requested    []domain.Hold
 	confirmed    []domain.Hold
+	expired      []domain.Hold
+	rejected     []domain.Hold
 	errRequested error
 	errConfirmed error
+	errExpired   error
+	errRejected  error
 }
 
 func (f *fakeEvents) HoldRequested(_ context.Context, h domain.Hold) error {
@@ -67,6 +71,16 @@ func (f *fakeEvents) HoldRequested(_ context.Context, h domain.Hold) error {
 func (f *fakeEvents) HoldConfirmed(_ context.Context, h domain.Hold) error {
 	f.confirmed = append(f.confirmed, h)
 	return f.errConfirmed
+}
+
+func (f *fakeEvents) HoldExpired(_ context.Context, h domain.Hold) error {
+	f.expired = append(f.expired, h)
+	return f.errExpired
+}
+
+func (f *fakeEvents) HoldRejected(_ context.Context, h domain.Hold) error {
+	f.rejected = append(f.rejected, h)
+	return f.errRejected
 }
 
 // sagaService is a Service on an in-memory repository with a fake Inventory and fake events.

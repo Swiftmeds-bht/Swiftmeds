@@ -37,3 +37,8 @@ type SubscriptionRepository interface {
 type PharmacyLocator interface {
 	WithinRadius(ctx context.Context, pharmacyID string, center domain.Point, radiusM int32) (bool, error)
 }
+
+// AlertEvents publishes newly created watchlist alerts for downstream services.
+type AlertEvents interface {
+	AlertCreated(context.Context, domain.Alert) error
+}

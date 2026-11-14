@@ -136,32 +136,12 @@ func TestSagaErrorsAreReturnedSoTheEventIsRetried(t *testing.T) {
 }
 
 func TestNewStockConsumerNeedsAHandler(t *testing.T) {
-	if _, err := NewStockConsumer(&fakeChannel{}, newMemoryDeduper(), nil, nil); err == nil {
+	if _, err := NewStockConsumer(&fakeChannel{}, messaging.NewMemoryDeduper(), nil, nil); err == nil {
 		t.Error("err = nil, want an error")
 	}
 }
 
 // ---- the real consumer, deduplication and Holds' own logic together ----------------------------
-
-type memoryDeduper struct {
-	mu   sync.Mutex
-	seen map[string]bool
-}
-
-func newMemoryDeduper() *memoryDeduper { return &memoryDeduper{seen: map[string]bool{}} }
-
-func (d *memoryDeduper) IsProcessed(_ context.Context, id string) (bool, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.seen[id], nil
-}
-
-func (d *memoryDeduper) MarkProcessed(_ context.Context, id string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.seen[id] = true
-	return nil
-}
 
 // ack records how each delivery was settled.
 type ack struct {
@@ -223,7 +203,7 @@ type sagaRig struct {
 	svc      *app.Service
 	channel  *fakeChannel
 	acks     *ack
-	deduper  *memoryDeduper
+	deduper  *messaging.MemoryDeduper
 	confirmd *recordingEvents
 }
 
@@ -234,6 +214,8 @@ func (r *recordingEvents) HoldConfirmed(_ context.Context, h domain.Hold) error 
 	r.confirmed = append(r.confirmed, h)
 	return nil
 }
+func (r *recordingEvents) HoldExpired(context.Context, domain.Hold) error  { return nil }
+func (r *recordingEvents) HoldRejected(context.Context, domain.Hold) error { return nil }
 
 func newSagaRig(t *testing.T) *sagaRig {
 	t.Helper()
@@ -248,7 +230,7 @@ func newSagaRig(t *testing.T) *sagaRig {
 		svc:      svc,
 		channel:  &fakeChannel{deliveries: make(chan amqp.Delivery, 10)},
 		acks:     &ack{},
-		deduper:  newMemoryDeduper(),
+		deduper:  messaging.NewMemoryDeduper(),
 		confirmd: events,
 	}
 }

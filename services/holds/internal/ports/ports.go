@@ -51,4 +51,8 @@ type Events interface {
 	// HoldConfirmed says the hold is ACTIVE, with its pickup code and expiry
 	// time (routing key hold.confirmed).
 	HoldConfirmed(ctx context.Context, h domain.Hold) error
+	// HoldExpired says an ACTIVE hold expired (routing key hold.expired).
+	HoldExpired(ctx context.Context, h domain.Hold) error
+	// HoldRejected says a PENDING hold could not be fulfilled (routing key hold.rejected).
+	HoldRejected(ctx context.Context, h domain.Hold) error
 }

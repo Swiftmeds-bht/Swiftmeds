@@ -163,15 +163,17 @@ func (c *Consumer) handleDelivery(ctx context.Context, delivery amqp.Delivery) e
 		return delivery.Nack(false, false)
 	}
 
-	processed, err := c.deduper.IsProcessed(ctx, delivery.MessageId)
+	// Claim checks and reserves the event ID in one step, so two consumers that
+	// receive the same message cannot both run the handler (SCRUM-132).
+	claim, claimed, err := c.deduper.Claim(ctx, delivery.MessageId)
 	if err != nil {
 		nackErr := delivery.Nack(false, true)
 		return errors.Join(
-			fmt.Errorf("check event %q deduplication: %w", delivery.MessageId, err),
+			fmt.Errorf("claim event %q for deduplication: %w", delivery.MessageId, err),
 			wrapNackError(nackErr),
 		)
 	}
-	if processed {
+	if !claimed {
 		return delivery.Ack(false)
 	}
 
@@ -186,33 +188,48 @@ func (c *Consumer) handleDelivery(ctx context.Context, delivery amqp.Delivery) e
 			select {
 			case <-ctx.Done():
 				timer.Stop()
+				// Shutting down: give the ID back so the requeued delivery is handled.
+				releaseErr := releaseClaim(ctx, claim, delivery.MessageId)
 				nackErr := delivery.Nack(false, true)
-				return errors.Join(ctx.Err(), wrapNackError(nackErr))
+				return errors.Join(ctx.Err(), releaseErr, wrapNackError(nackErr))
 			case <-timer.C:
 			}
 		}
 	}
 
 	if handlerErr != nil {
+		// The event was not handled, so it is not recorded: if it is replayed
+		// from the dead-letter queue, it is handled then.
+		releaseErr := releaseClaim(ctx, claim, delivery.MessageId)
 		if err := delivery.Nack(false, false); err != nil {
-			return fmt.Errorf("dead-letter event %q: %w", delivery.MessageId, err)
+			return errors.Join(fmt.Errorf("dead-letter event %q: %w", delivery.MessageId, err), releaseErr)
 		}
 		slog.ErrorContext(ctx, "event handler failed; delivery dead-lettered",
 			"message_id", delivery.MessageId,
 			"attempts", c.config.MaxAttempts,
 			"error", handlerErr,
 		)
+		if releaseErr != nil {
+			slog.ErrorContext(ctx, "release event claim", "message_id", delivery.MessageId, "error", releaseErr)
+		}
 		return nil
 	}
 
-	if err := c.deduper.MarkProcessed(ctx, delivery.MessageId); err != nil {
+	if err := claim.Commit(context.WithoutCancel(ctx)); err != nil {
+		// The handler ran but the record was not saved. Requeue: the event is
+		// handled again (at least once), which handlers must tolerate anyway.
 		nackErr := delivery.Nack(false, true)
-		return errors.Join(
-			fmt.Errorf("mark event %q processed: %w", delivery.MessageId, err),
-			wrapNackError(nackErr),
-		)
+		return errors.Join(err, wrapNackError(nackErr))
 	}
 	return delivery.Ack(false)
+}
+
+// releaseClaim gives a claim back. It must run even when ctx is already cancelled.
+func releaseClaim(ctx context.Context, claim Claim, eventID string) error {
+	if err := claim.Release(context.WithoutCancel(ctx)); err != nil {
+		return fmt.Errorf("release event %q: %w", eventID, err)
+	}
+	return nil
 }
 
 func wrapNackError(err error) error {

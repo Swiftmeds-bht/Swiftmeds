@@ -75,25 +75,6 @@ func (*inMemoryAcknowledger) Reject(uint64, bool) error {
 	return nil
 }
 
-type inMemoryEventDeduper struct {
-	processed map[string]bool
-}
-
-func (d *inMemoryEventDeduper) IsProcessed(
-	_ context.Context,
-	eventID string,
-) (bool, error) {
-	return d.processed[eventID], nil
-}
-
-func (d *inMemoryEventDeduper) MarkProcessed(
-	_ context.Context,
-	eventID string,
-) error {
-	d.processed[eventID] = true
-	return nil
-}
-
 func TestDuplicateHoldRequestedDeliveryReservesOnce(t *testing.T) {
 	stock, err := domain.NewStock(
 		"pharmacy-1",
@@ -146,7 +127,7 @@ func TestDuplicateHoldRequestedDeliveryReservesOnce(t *testing.T) {
 	}
 
 	broker := &inMemoryRabbitChannel{deliveries: deliveries}
-	deduper := &inMemoryEventDeduper{processed: make(map[string]bool)}
+	deduper := messaging.NewMemoryDeduper()
 
 	consumer, err := NewHoldRequestedConsumer(broker, deduper, service)
 	if err != nil {
@@ -165,7 +146,7 @@ func TestDuplicateHoldRequestedDeliveryReservesOnce(t *testing.T) {
 	if len(acker.nacked) != 0 {
 		t.Errorf("nacked %d deliveries; want 0", len(acker.nacked))
 	}
-	if !deduper.processed["event-1"] {
+	if !deduper.IsProcessed("event-1") {
 		t.Error("event ID was not marked processed")
 	}
 	if broker.consumerQueue != "inventory.hold-requested" {
