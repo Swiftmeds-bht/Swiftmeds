@@ -15,6 +15,7 @@ type routes struct {
 	freshness        ports.DecayApplier
 	expiry           ports.HoldExpirySweeper
 	auth             ports.Authenticator
+	authRoutes       ports.AuthRoutes
 	search           ports.Searcher
 	geo              ports.NearbyPharmacyFinder
 	substitute       ports.SubstituteFinder
@@ -40,7 +41,11 @@ func WithExpiry(sweeper ports.HoldExpirySweeper) RouterOption {
 
 // WithAuth adds the Auth service client used by protected API routes.
 func WithAuth(authenticator ports.Authenticator) RouterOption {
-	return func(r *routes) { r.auth = authenticator }
+	return func(r *routes) { r.auth = authenticator; r.authRoutes, _ = authenticator.(ports.AuthRoutes) }
+}
+
+func WithAuthRoutes(client ports.AuthRoutes) RouterOption {
+	return func(r *routes) { r.authRoutes = client }
 }
 
 func WithSearch(searcher ports.Searcher) RouterOption {
@@ -97,6 +102,12 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.search != nil {
 		mux.Handle("GET /api/v1/search", searchHandler(wired.search, logger))
+	}
+	if wired.authRoutes != nil {
+		mux.Handle("POST /api/v1/auth/register", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/login", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/refresh", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/logout", authHandler(wired.authRoutes, logger))
 	}
 	if wired.geo != nil {
 		mux.Handle("GET /api/v1/pharmacies/nearby", nearbyHandler(wired.geo, logger))

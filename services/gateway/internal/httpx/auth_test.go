@@ -53,7 +53,7 @@ func TestAuthAllowsPublicRoutesWithoutToken(t *testing.T) {
 	called := false
 	handler := Auth(auth, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
 
-	for _, path := range []string{"/api/v1/search", "/api/v1/nearby/pharmacies", "/api/v1/auth/login"} {
+	for _, path := range []string{"/api/v1/search", "/api/v1/nearby/pharmacies", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh"} {
 		called = false
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))

@@ -225,7 +225,7 @@ paths:
       operationId: login
       summary: Sign in with email and password
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Login
       x-roles: []
       requestBody:
@@ -258,7 +258,7 @@ paths:
       summary: Exchange a refresh token for a new token pair
       description: The old refresh token stops working as soon as the new pair is issued.
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/RefreshToken
       x-roles: []
       requestBody:
@@ -290,8 +290,9 @@ paths:
       operationId: logout
       summary: Revoke a refresh token
       description: Safe to call more than once with the same token.
-      security: []
-      x-status: planned
+      security:
+        - bearerAuth: []
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Logout
       x-roles: []
       requestBody:

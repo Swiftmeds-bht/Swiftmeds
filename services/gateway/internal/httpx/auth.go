@@ -104,7 +104,7 @@ func isPublicRoute(path string) bool {
 		routeMatches(path, "/api/v1/nearby") ||
 		routeMatches(path, "/api/v1/medicines") ||
 		routeMatches(path, "/api/v1/login") ||
-		routeMatches(path, "/api/v1/auth/login")
+		path == "/api/v1/auth/register" || path == "/api/v1/auth/login" || path == "/api/v1/auth/refresh"
 }
 
 func roleForRoute(path string) authv1.Role {
