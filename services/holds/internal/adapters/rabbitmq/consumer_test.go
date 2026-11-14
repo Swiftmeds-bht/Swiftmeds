@@ -214,6 +214,8 @@ func (r *recordingEvents) HoldConfirmed(_ context.Context, h domain.Hold) error 
 	r.confirmed = append(r.confirmed, h)
 	return nil
 }
+func (r *recordingEvents) HoldExpired(context.Context, domain.Hold) error  { return nil }
+func (r *recordingEvents) HoldRejected(context.Context, domain.Hold) error { return nil }
 
 func newSagaRig(t *testing.T) *sagaRig {
 	t.Helper()

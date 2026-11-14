@@ -74,7 +74,7 @@ func WithInventory(inv ports.Inventory) Option {
 	return func(s *Service) { s.inventory = inv }
 }
 
-// WithEvents sets the publisher for hold.requested and hold.confirmed. Without
+// WithEvents sets the publisher for hold lifecycle events. Without
 // it no events are sent (unit tests of the hold rules); the server always sets it.
 func WithEvents(events ports.Events) Option {
 	return func(s *Service) { s.events = events }
@@ -223,9 +223,16 @@ func (s *Service) ReserveHold(ctx context.Context, id string) (domain.Hold, erro
 // RejectHold is the stock.unavailable event: PENDING -> REJECTED. Nothing was
 // reserved, so there is nothing to give back to Inventory.
 func (s *Service) RejectHold(ctx context.Context, id, reason string) (domain.Hold, error) {
-	return s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
+	rejected, err := s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
 		return h.Reject(s.now(), reason)
 	}, nil)
+	if err != nil {
+		return domain.Hold{}, err
+	}
+	if err := s.events.HoldRejected(ctx, rejected); err != nil {
+		return rejected, fmt.Errorf("publish hold.rejected: %w", err)
+	}
+	return rejected, nil
 }
 
 // CancelHold lets the patient who made the hold cancel it. An ACTIVE hold has
@@ -275,6 +282,11 @@ func (s *Service) ExpireHold(ctx context.Context, id string) (domain.Hold, error
 		return domain.Hold{}, err
 	}
 	if h.Status != domain.Active {
+		if h.Status == domain.Expired {
+			if err := s.events.HoldExpired(ctx, h); err != nil {
+				return h, fmt.Errorf("publish hold.expired: %w", err)
+			}
+		}
 		return h, nil
 	}
 	now := s.now()
@@ -296,6 +308,9 @@ func (s *Service) ExpireHold(ctx context.Context, id string) (domain.Hold, error
 			return s.GetHold(ctx, id)
 		}
 		return domain.Hold{}, fmt.Errorf("expire hold: %w", err)
+	}
+	if err := s.events.HoldExpired(ctx, expired); err != nil {
+		return expired, fmt.Errorf("publish hold.expired: %w", err)
 	}
 	return expired, nil
 }

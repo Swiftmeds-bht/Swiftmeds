@@ -21,6 +21,7 @@ type routes struct {
 	holds            ports.HoldsClient
 	watchlist        ports.WatchlistClient
 	feedback         ports.FeedbackClient
+	notifications    ports.NotificationClient
 	pharmacyRegistry ports.PharmacyRegistryClient
 	analytics        ports.AnalyticsClient
 }
@@ -74,6 +75,10 @@ func WithFeedback(client ports.FeedbackClient) RouterOption {
 	return func(r *routes) { r.feedback = client }
 }
 
+func WithNotifications(client ports.NotificationClient) RouterOption {
+	return func(r *routes) { r.notifications = client }
+}
+
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
 	var wired routes
 	for _, opt := range opts {
@@ -114,6 +119,9 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.feedback != nil {
 		mux.Handle("POST /api/v1/holds/{holdId}/feedback", feedbackHandler(wired.feedback, logger))
+	}
+	if wired.notifications != nil {
+		mux.Handle("GET /api/v1/notifications", notificationsHandler(wired.notifications, logger))
 	}
 	mux.Handle("/api/v1/", http.NotFoundHandler())
 

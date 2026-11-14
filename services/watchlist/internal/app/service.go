@@ -14,17 +14,22 @@ import (
 
 // Service implements the Watchlist use cases.
 type Service struct {
-	repo  ports.SubscriptionRepository
-	geo   ports.PharmacyLocator
-	now   func() time.Time
-	newID func() string
-	hub   *hub
-	poll  time.Duration
+	repo   ports.SubscriptionRepository
+	geo    ports.PharmacyLocator
+	events ports.AlertEvents
+	now    func() time.Time
+	newID  func() string
+	hub    *hub
+	poll   time.Duration
 }
 
 // NewService wires the use cases. Pass time.Now and NewID in production, fixed ones in tests.
-func NewService(repo ports.SubscriptionRepository, geo ports.PharmacyLocator, now func() time.Time, newID func() string) *Service {
-	return &Service{repo: repo, geo: geo, now: now, newID: newID, hub: newHub(), poll: DefaultAlertPoll}
+func NewService(repo ports.SubscriptionRepository, geo ports.PharmacyLocator, now func() time.Time, newID func() string, events ...ports.AlertEvents) *Service {
+	s := &Service{repo: repo, geo: geo, now: now, newID: newID, hub: newHub(), poll: DefaultAlertPoll}
+	if len(events) > 0 {
+		s.events = events[0]
+	}
+	return s
 }
 
 // Subscribe asks to be told when productID is in stock near a point. Subscribing
@@ -106,6 +111,11 @@ func (s *Service) HandleStockIncreased(ctx context.Context, e domain.StockIncrea
 			return alerts, fmt.Errorf("save alert for subscription %s: %w", sub.ID, err)
 		}
 		if saved {
+			if s.events != nil {
+				if err := s.events.AlertCreated(ctx, a); err != nil {
+					return alerts, fmt.Errorf("publish alert %s: %w", a.ID, err)
+				}
+			}
 			alerts = append(alerts, a)
 			s.hub.notify(a.UserID) // wake the user's open alert streams
 		}

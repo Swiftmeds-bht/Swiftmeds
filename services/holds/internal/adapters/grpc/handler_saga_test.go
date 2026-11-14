@@ -32,6 +32,8 @@ type switchableEvents struct{ down bool }
 
 func (s *switchableEvents) HoldRequested(context.Context, domain.Hold) error { return s.result() }
 func (s *switchableEvents) HoldConfirmed(context.Context, domain.Hold) error { return s.result() }
+func (s *switchableEvents) HoldExpired(context.Context, domain.Hold) error   { return s.result() }
+func (s *switchableEvents) HoldRejected(context.Context, domain.Hold) error  { return s.result() }
 func (s *switchableEvents) result() error {
 	if s.down {
 		return errors.New("rabbitmq is down")

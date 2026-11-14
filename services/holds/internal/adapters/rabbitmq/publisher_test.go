@@ -108,6 +108,38 @@ func TestHoldConfirmedCarriesThePickupCodeAndExpiry(t *testing.T) {
 	}
 }
 
+func TestHoldExpiredAndRejectedPublishTheLifecycleEvents(t *testing.T) {
+	fake := &fakePublisher{}
+	p, _ := NewPublisher(fake)
+	active := activeHold(t)
+	expired, err := active.Expire(active.ExpiresAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := pendingHold(t).Reject(t0.Add(time.Minute), "stock unavailable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.HoldExpired(context.Background(), expired); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.HoldRejected(context.Background(), rejected); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.sent) != 2 || fake.sent[0].key != RoutingKeyHoldExpired || fake.sent[1].key != RoutingKeyHoldRejected {
+		t.Fatalf("published events = %+v, want expired then rejected", fake.sent)
+	}
+	expiredEvent := fake.sent[0].event.(*eventsv1.HoldExpired)
+	if expiredEvent.GetUserId() != expired.UserID || expiredEvent.GetMetadata().GetEventId() != EventID(RoutingKeyHoldExpired, expired.ID) {
+		t.Errorf("expired event = %+v, want correct user and deterministic event ID", expiredEvent)
+	}
+	rejectedEvent := fake.sent[1].event.(*eventsv1.HoldRejected)
+	if rejectedEvent.GetUserId() != rejected.UserID || rejectedEvent.GetReason() != rejected.StatusReason ||
+		rejectedEvent.GetMetadata().GetEventId() != EventID(RoutingKeyHoldRejected, rejected.ID) {
+		t.Errorf("rejected event = %+v, want correct user, reason, and deterministic event ID", rejectedEvent)
+	}
+}
+
 // Sending hold.confirmed a second time must produce exactly the same message,
 // so that a listener sees the same event ID and ignores it.
 func TestSendingHoldConfirmedAgainGivesIdenticalBytes(t *testing.T) {

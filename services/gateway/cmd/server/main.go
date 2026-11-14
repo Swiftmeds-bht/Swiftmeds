@@ -22,6 +22,7 @@ import (
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
+	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
@@ -101,6 +102,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("feedback client: %w", err)
 	}
+	notificationConn, err := conns.Connection(context.Background(), "notification")
+	if err != nil {
+		return fmt.Errorf("notification client: %w", err)
+	}
 	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
 	if err != nil {
 		return fmt.Errorf("pharmacy registry client: %w", err)
@@ -125,7 +130,7 @@ func run() error {
 			app.WithSubstitution(clients.NewSubstitutionClient(substitutionv1.NewSubstitutionServiceClient(substitutionConn))),
 			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
-			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
+			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
