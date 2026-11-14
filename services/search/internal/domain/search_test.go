@@ -48,7 +48,7 @@ func TestNewQuery(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			q, err := NewQuery(tc.text, tc.center, tc.radius, tc.maxOffers)
+			q, err := NewQuery(tc.text, "", tc.center, tc.radius, tc.maxOffers)
 			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tc.wantErr)
 			}
@@ -77,6 +77,7 @@ func TestNewSuggestQuery(t *testing.T) {
 		{"p", 0, ErrInvalidQuery, 0},
 		{strings.Repeat("p", 101), 0, ErrInvalidQuery, 0},
 	}
+
 	for _, tc := range cases {
 		q, err := NewSuggestQuery(tc.prefix, tc.limit)
 		if !errors.Is(err, tc.wantErr) {
@@ -86,6 +87,16 @@ func TestNewSuggestQuery(t *testing.T) {
 		if err == nil && (q.Limit != tc.wantLimit || q.Prefix != strings.TrimSpace(tc.prefix)) {
 			t.Errorf("NewSuggestQuery(%q, %d) = %+v", tc.prefix, tc.limit, q)
 		}
+	}
+}
+
+func TestNewQueryTrimsOptionalDzongkhag(t *testing.T) {
+	q, err := NewQuery("paracetamol", "  Paro  ", thimphu, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.Dzongkhag != "Paro" {
+		t.Fatalf("dzongkhag = %q, want %q", q.Dzongkhag, "Paro")
 	}
 }
 

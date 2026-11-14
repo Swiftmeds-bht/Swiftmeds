@@ -20,6 +20,7 @@ INSERT INTO pharmacies (
     owner_user_id,
     name,
     license_number,
+    dzongkhag,
     latitude,
     longitude,
     status,
@@ -31,6 +32,7 @@ SELECT
     owner_user_id,
     name,
     license_number,
+    dzongkhag,
     latitude,
     longitude,
     CASE status
@@ -44,6 +46,7 @@ ON CONFLICT (pharmacy_id) DO UPDATE SET
     owner_user_id = EXCLUDED.owner_user_id,
     name = EXCLUDED.name,
     license_number = EXCLUDED.license_number,
+    dzongkhag = EXCLUDED.dzongkhag,
     latitude = EXCLUDED.latitude,
     longitude = EXCLUDED.longitude,
     status = EXCLUDED.status,

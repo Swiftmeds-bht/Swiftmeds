@@ -12,16 +12,19 @@ import (
 	"syscall"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/messaging"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/resilience"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/search/internal/adapters/clients"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/search/internal/adapters/grpc"
+	rabbitmqadapter "github.com/Swiftmeds-bht/Swiftmeds/services/search/internal/adapters/rabbitmq"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/search/internal/app"
 )
 
@@ -47,11 +50,31 @@ func run() error {
 	upstream := cfg.String("SEARCH_UPSTREAM", "traefik:50051")
 	callTimeout := cfg.Duration("SEARCH_CALL_TIMEOUT", 800*time.Millisecond)
 	requestTimeout := cfg.Duration("SEARCH_REQUEST_TIMEOUT", 2*time.Second)
+	rabbitURL := cfg.Required("RABBITMQ_URL")
 	logLevel := cfg.String("LOG_LEVEL", "info")
 	if err := cfg.Err(); err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
 	log := logger.New(serviceName, logLevel)
+
+	rabbitConn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		return fmt.Errorf("RabbitMQ connection: %w", err)
+	}
+	defer func() { _ = rabbitConn.Close() }()
+	publisherChannel, err := rabbitConn.Channel()
+	if err != nil {
+		return fmt.Errorf("RabbitMQ publisher channel: %w", err)
+	}
+	defer func() { _ = publisherChannel.Close() }()
+	messagePublisher, err := messaging.NewPublisher(publisherChannel)
+	if err != nil {
+		return fmt.Errorf("event publisher: %w", err)
+	}
+	eventPublisher, err := rabbitmqadapter.NewPublisher(messagePublisher)
+	if err != nil {
+		return fmt.Errorf("search event publisher: %w", err)
+	}
 
 	// One connection per downstream service: Traefik routes by :authority, and
 	// each connection gets its own breaker and bulkhead. Retries are limited to
@@ -86,6 +109,7 @@ func run() error {
 		Registry:     clients.NewRegistry(conns["pharmacy-registry"]),
 		Ranking:      clients.NewRanking(conns["ranking"]),
 		Substitution: clients.NewSubstitution(conns["substitution"]),
+		Events:       eventPublisher,
 	}, app.Options{CallTimeout: callTimeout, RequestTimeout: requestTimeout, Logger: log})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

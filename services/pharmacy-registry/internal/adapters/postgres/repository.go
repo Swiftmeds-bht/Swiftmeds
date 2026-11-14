@@ -26,10 +26,10 @@ func (r *Repository) Create(ctx context.Context, p domain.Pharmacy) error {
 		return fmt.Errorf("encode hours: %w", err)
 	}
 	_, err = r.db.Exec(ctx, `INSERT INTO pharmacies
-		(pharmacy_id, owner_user_id, name, license_number, latitude, longitude, hours, status, status_reason, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		p.ID, p.OwnerID, p.Name, p.LicenseNumber, p.Location.Latitude, p.Location.Longitude,
-		hours, string(p.Status), p.StatusReason, p.CreatedAt)
+		(pharmacy_id, owner_user_id, name, license_number, dzongkhag, latitude, longitude, hours, status, status_reason, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		p.ID, p.OwnerID, p.Name, p.LicenseNumber, p.Dzongkhag, p.Location.Latitude,
+		p.Location.Longitude, hours, string(p.Status), p.StatusReason, p.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert pharmacy: %w", err)
 	}
@@ -89,7 +89,7 @@ func (r *Repository) SetStatus(ctx context.Context, id string, status domain.Sta
 	return next, nil
 }
 
-const pharmacySelect = `SELECT pharmacy_id, owner_user_id, name, license_number, latitude, longitude, hours, status, status_reason, created_at, verified_at FROM pharmacies`
+const pharmacySelect = `SELECT pharmacy_id, owner_user_id, name, license_number, dzongkhag, latitude, longitude, hours, status, status_reason, created_at, verified_at FROM pharmacies`
 
 type rowScanner interface{ Scan(...any) error }
 
@@ -112,7 +112,7 @@ func scanPharmacy(row rowScanner) (domain.Pharmacy, error) {
 func scanRow(row rowScanner, p *domain.Pharmacy) error {
 	var hours []byte
 	var status string
-	if err := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.LicenseNumber, &p.Location.Latitude,
+	if err := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.LicenseNumber, &p.Dzongkhag, &p.Location.Latitude,
 		&p.Location.Longitude, &hours, &status, &p.StatusReason, &p.CreatedAt, &p.VerifiedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrNotFound

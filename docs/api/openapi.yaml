@@ -978,6 +978,38 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/me/analytics/unmet-demand:
+    get:
+      tags: [Analytics]
+      operationId: getPharmacyUnmetDemand
+      summary: Get unavailable medicine demand for the pharmacy's area
+      description: |
+        Returns up to 10 medicines searched for but unavailable in the
+        authenticated pharmacy's dzongkhag during the previous 7 days.
+        The dzongkhag is resolved from Pharmacy Registry using the pharmacy
+        ID in the authenticated identity.
+      x-status: implemented
+      x-grpc: swiftmed.analytics.v1.AnalyticsService/GetUnmetDemand
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      responses:
+        "200":
+          description: Unmet-demand report for the pharmacy's area.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnmetDemandResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The pharmacy has no dzongkhag configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
   /api/v1/holds:
     post:
       tags: [Holds]
@@ -2314,6 +2346,7 @@ components:
           format: int32
           minimum: 1
           maximum: 5
+
     HoldList:
       type: object
       properties:

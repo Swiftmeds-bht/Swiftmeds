@@ -15,6 +15,7 @@ import (
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	analyticsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/analytics/v1"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	expiryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1"
 	feedbackv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1"
@@ -22,6 +23,7 @@ import (
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
+	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
@@ -103,11 +105,22 @@ func run() error {
 	notificationConn, err := conns.Connection(context.Background(), "notification")
 	if err != nil {
 		return fmt.Errorf("notification client: %w", err)
+	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
+	if err != nil {
+		return fmt.Errorf("pharmacy registry client: %w", err)
+	}
+
+	analyticsConn, err := conns.Connection(context.Background(), "analytics")
+	if err != nil {
+		return fmt.Errorf("analytics client: %w", err)
 	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
 		Handler: app.NewRouter(cfg, log,
+			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
+			app.WithPharmacyRegistry(clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn))),
+			app.WithAnalytics(clients.NewAnalyticsClient(analyticsv1.NewAnalyticsServiceClient(analyticsConn))),
 			app.WithFreshness(freshness),
 			app.WithExpiry(expiry),
 			app.WithAuth(auth),

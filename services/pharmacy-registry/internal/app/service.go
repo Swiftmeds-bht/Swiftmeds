@@ -17,6 +17,7 @@ type RegisterInput struct {
 	OwnerID       string
 	Name          string
 	LicenseNumber string
+	Dzongkhag     string
 	Location      domain.GeoPoint
 	Hours         []domain.OpeningHours
 }
@@ -32,7 +33,7 @@ func NewService(repo ports.PharmacyRepository, now func() time.Time, newID func(
 }
 
 func (s *Service) Register(ctx context.Context, in RegisterInput) (domain.Pharmacy, error) {
-	p, err := domain.NewPharmacy(s.newID(), in.OwnerID, in.Name, in.LicenseNumber, in.Location, in.Hours, s.now())
+	p, err := domain.NewPharmacy(s.newID(), in.OwnerID, in.Name, in.LicenseNumber, in.Dzongkhag, in.Location, in.Hours, s.now())
 	if err != nil {
 		return domain.Pharmacy{}, err
 	}

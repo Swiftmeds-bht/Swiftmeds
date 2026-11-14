@@ -4,6 +4,7 @@ use (
 	./pkg
 	./proto/gen/go
 	./services/auth
+	./services/analytics
 	./services/catalog
 	./services/expiry
 	./services/feedback
