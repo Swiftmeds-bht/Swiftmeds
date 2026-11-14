@@ -5,7 +5,6 @@ import { loginAction } from "@/app/actions";
 import { AuthForm } from "@/components/AuthForm";
 import { InfoIcon } from "@/components/Icons";
 import { getSession } from "@/lib/auth";
-import { DEMO_ACCOUNT } from "@/lib/demo-holds";
 import { holdsBackend } from "@/lib/holds";
 import { safeNext } from "@/lib/session";
 
@@ -33,10 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Search
       {demo && (
         <p className="notice" role="note">
           <InfoIcon />
-          <span>
-            Demo mode: try <strong>{DEMO_ACCOUNT.email}</strong> with password <strong>{DEMO_ACCOUNT.password}</strong>, or create
-            an account. Accounts are kept only until the app restarts.
-          </span>
+          <span>Demo mode: create an account to try the app. Accounts are kept only until the app restarts.</span>
         </p>
       )}
       <div className="panel auth-card">
