@@ -65,3 +65,53 @@ func TestAuthRoutesLoginAndRegisterErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthRoutesRegisterRefreshAndLogout(t *testing.T) {
+	tests := []struct {
+		name, path, body string
+		want             int
+		contains         string
+	}{
+		{"register patient", "/api/v1/auth/register", `{"email":"new@example.com","password":"password"}`, http.StatusCreated, `"userId":"u1"`},
+		{"register pharmacy staff", "/api/v1/auth/register", `{"email":"staff@example.com","password":"password","role":"ROLE_PHARMACY_STAFF"}`, http.StatusCreated, `"userId":"u1"`},
+		{"refresh", "/api/v1/auth/refresh", `{"refreshToken":"refresh"}`, http.StatusOK, `"accessToken":"next"`},
+		{"logout", "/api/v1/auth/logout", `{"refreshToken":"refresh"}`, http.StatusNoContent, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeAuthRoutes{}
+			h := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, slog.Default(), WithAuth(fake))
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			if tc.path == "/api/v1/auth/logout" {
+				req.Header.Set("Authorization", "Bearer access")
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			if tc.contains != "" && !strings.Contains(rec.Body.String(), tc.contains) {
+				t.Fatalf("body=%s missing %q", rec.Body.String(), tc.contains)
+			}
+		})
+	}
+}
+
+func TestAuthRoutesRejectInvalidBodies(t *testing.T) {
+	tests := []struct{ path, body string }{
+		{"/api/v1/auth/register", `{"email":"","password":"password"}`},
+		{"/api/v1/auth/register", `{"email":"a@example.com","password":"password","role":"ROLE_ADMIN"}`},
+		{"/api/v1/auth/login", `{"email":"a@example.com"}`},
+		{"/api/v1/auth/refresh", `{}`},
+		{"/api/v1/auth/logout", `{}`},
+		{"/api/v1/auth/login", `not-json`},
+	}
+	for _, tc := range tests {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+		authHandler(&fakeAuthRoutes{}, slog.Default())(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s body %q: status=%d, want 400", tc.path, tc.body, rec.Code)
+		}
+	}
+}
