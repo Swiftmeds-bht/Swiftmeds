@@ -105,6 +105,7 @@ func run() error {
 	notificationConn, err := conns.Connection(context.Background(), "notification")
 	if err != nil {
 		return fmt.Errorf("notification client: %w", err)
+	}
 	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
 	if err != nil {
 		return fmt.Errorf("pharmacy registry client: %w", err)
@@ -129,7 +130,6 @@ func run() error {
 			app.WithSubstitution(clients.NewSubstitutionClient(substitutionv1.NewSubstitutionServiceClient(substitutionConn))),
 			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
-			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
 			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,

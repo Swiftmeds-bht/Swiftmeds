@@ -1,0 +1,14 @@
+./cursor.go
+./saga.go
+./service.go
+./compensation_test.go
+./create_events_test.go
+./create_test.go
+./cursor_test.go
+./defaults_test.go
+./fakes_test.go
+./helpers_test.go
+./ids_test.go
+./lifecycle_test.go
+./list_test.go
+./saga_test.go

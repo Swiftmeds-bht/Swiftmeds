@@ -12,16 +12,6 @@ import (
 type RouterOption func(*routes)
 
 type routes struct {
-	freshness     ports.DecayApplier
-	expiry        ports.HoldExpirySweeper
-	auth          ports.Authenticator
-	search        ports.Searcher
-	geo           ports.NearbyPharmacyFinder
-	substitute    ports.SubstituteFinder
-	holds         ports.HoldsClient
-	watchlist     ports.WatchlistClient
-	feedback      ports.FeedbackClient
-	notifications ports.NotificationClient
 	freshness        ports.DecayApplier
 	expiry           ports.HoldExpirySweeper
 	auth             ports.Authenticator
@@ -31,6 +21,7 @@ type routes struct {
 	holds            ports.HoldsClient
 	watchlist        ports.WatchlistClient
 	feedback         ports.FeedbackClient
+	notifications    ports.NotificationClient
 	pharmacyRegistry ports.PharmacyRegistryClient
 	analytics        ports.AnalyticsClient
 }
