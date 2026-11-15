@@ -11,9 +11,17 @@ These CSV files are development fixtures for SwiftMeds:
 
 These are demo records. Pharmacy contact and license fields, demo brand labels, and stock quantities do not represent real registrations, contact details, or current inventory. Use only for development and testing.
 
-Run `make seed` from the repository root after copying `.env.example` to `.env`.
-The target starts the Catalog, Pharmacy Registry, Geo, Inventory, and Pricing
-services, waits for their migrations, and imports the fixtures transactionally.
+`make up` loads them automatically once every service is healthy; `make seed`
+loads them again. Both run the one-shot `seed` container from
+`deploy/docker-compose.yml`, which runs `seed.sh`. Compose starts it only after
+Auth, Catalog, Pharmacy Registry, Geo, Inventory and Pricing are healthy (each
+applies its migrations first), and each file is imported transactionally.
+
+- `auth.sql`: demo accounts, all with the password `swiftmeds-demo`. One patient
+  (`patient@demo.swiftmeds.test`) and one pharmacist per pharmacy, signed in as
+  the license number (`demo-tim-001@demo.swiftmeds.test`) and linked to that
+  pharmacy, so it can collect holds there. The pharmacist's user ID is the
+  pharmacy's `owner_user_id`.
 Catalog medicines are already loaded by
 `services/catalog/migrations/002_seed_medicines.up.sql`; `make seed` does not
 import them a second time.

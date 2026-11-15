@@ -31,7 +31,17 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/services/analytics/migrations"
 )
 
+const (
+	portEnv     = "ANALYTICS_GRPC_PORT"
+	defaultPort = 50059
+)
+
 func main() {
+	// The image is distroless (no shell or curl), so Docker's HEALTHCHECK runs
+	// "/server healthcheck", which asks this server's gRPC health service.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -40,7 +50,7 @@ func main() {
 
 func run() error {
 	cfg := config.New()
-	port := cfg.Int("ANALYTICS_GRPC_PORT", 50068)
+	port := cfg.Int(portEnv, defaultPort)
 	dbURL := cfg.Required("ANALYTICS_DATABASE_URL")
 	rabbitURL := cfg.Required("RABBITMQ_URL")
 	upstream := cfg.String("ANALYTICS_UPSTREAM", "traefik:50051")
@@ -117,4 +127,15 @@ func run() error {
 		}
 	}
 	return nil
+}
+
+func healthcheck() int {
+	port := config.New().Int(portEnv, defaultPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := grpcx.CheckHealth(ctx, fmt.Sprintf("localhost:%d", port)); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
 }
