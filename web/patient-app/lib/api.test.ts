@@ -60,6 +60,37 @@ describe("searchMedicines", () => {
     expect(String(fetchFn.mock.calls[0][0])).toContain("/api/v1/search?q=x");
   });
 
+  it("fills in the defaults protobuf JSON leaves out", async () => {
+    // As the real gateway answers (seen live, SCRUM-117): a product nobody nearby
+    // stocks has no `offers`, and zero numbers (0 m away, freshness 0) are absent.
+    const body = {
+      searchId: "s-1",
+      results: [
+        { productId: "p-1", brandName: "Demo Paracetamol 500", genericName: "Paracetamol", strength: "500mg" },
+        {
+          productId: "p-2",
+          brandName: "Demo Paracetamol Syrup",
+          genericName: "Paracetamol",
+          strength: "250mg/5ml",
+          offers: [{ pharmacyId: "ph-1", pharmacyName: "Thimphu 01", quantityAvailable: 1, priceChhertum: "1102", trustScore: 0.5, rankScore: 0.65 }],
+        },
+      ],
+    };
+    const fetchFn = vi.fn().mockResolvedValue(json(body));
+    const res = await searchMedicines(params("para"), { gatewayUrl: "http://gw", fetchFn });
+
+    expect(res.data.results[0].offers).toEqual([]);
+    expect(res.data.results[1].offers[0]).toMatchObject({
+      pharmacyId: "ph-1",
+      address: "",
+      distanceM: 0,
+      freshnessScore: 0,
+      priceChhertum: "1102",
+      rankScore: 0.65,
+    });
+    expect(res.data.substitutes).toEqual([]);
+  });
+
   it("copes with an empty JSON answer", async () => {
     const fetchFn = vi.fn().mockResolvedValue(json(null));
     const res = await searchMedicines(params("x"), { gatewayUrl: "http://gw", fetchFn });

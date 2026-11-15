@@ -118,8 +118,40 @@ export async function searchMedicines(params: SearchParams, options: ApiOptions 
     .filter(Boolean);
   return {
     source: "gateway",
-    data: { searchId: data.searchId ?? "", results: data.results ?? [], substitutes: data.substitutes ?? [] },
+    data: {
+      searchId: data.searchId ?? "",
+      results: (data.results ?? []).map(normalizeProduct),
+      substitutes: (data.substitutes ?? []).map(normalizeProduct),
+    },
     degraded,
+  };
+}
+
+// Protobuf JSON leaves out fields that hold their default value: an empty list,
+// 0 or "". A product nobody nearby stocks arrives without `offers`, and a
+// pharmacy 0 m away without `distanceM`. Fill the defaults back in so the
+// screens can rely on the types in lib/types.ts.
+function normalizeProduct(p: Partial<ProductResult>): ProductResult {
+  return {
+    productId: p.productId ?? "",
+    brandName: p.brandName ?? "",
+    genericName: p.genericName ?? "",
+    strength: p.strength ?? "",
+    offers: (p.offers ?? []).map(normalizeOffer),
+  };
+}
+
+function normalizeOffer(o: Partial<PharmacyOffer>): PharmacyOffer {
+  return {
+    ...o,
+    pharmacyId: o.pharmacyId ?? "",
+    pharmacyName: o.pharmacyName ?? "",
+    address: o.address ?? "",
+    distanceM: o.distanceM ?? 0,
+    quantityAvailable: o.quantityAvailable ?? 0,
+    freshnessScore: o.freshnessScore ?? 0,
+    trustScore: o.trustScore ?? 0,
+    rankScore: o.rankScore ?? 0,
   };
 }
 
