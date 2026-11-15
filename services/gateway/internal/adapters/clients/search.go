@@ -10,6 +10,7 @@ import (
 )
 
 var _ ports.Searcher = (*SearchClient)(nil)
+var _ ports.Suggester = (*SearchClient)(nil)
 var _ ports.NearbyPharmacyFinder = (*GeoClient)(nil)
 var _ ports.SubstituteFinder = (*SubstitutionClient)(nil)
 
@@ -21,6 +22,10 @@ func NewSearchClient(client searchv1.SearchServiceClient) *SearchClient {
 
 func (c *SearchClient) SearchMedicine(ctx context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
 	return c.client.SearchMedicine(ctx, req)
+}
+
+func (c *SearchClient) Autocomplete(ctx context.Context, req *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error) {
+	return c.client.Autocomplete(ctx, req)
 }
 
 type GeoClient struct{ client geov1.GeoServiceClient }

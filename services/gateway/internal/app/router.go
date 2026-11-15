@@ -17,6 +17,7 @@ type routes struct {
 	auth             ports.Authenticator
 	authRoutes       ports.AuthRoutes
 	search           ports.Searcher
+	suggester        ports.Suggester
 	geo              ports.NearbyPharmacyFinder
 	substitute       ports.SubstituteFinder
 	holds            ports.HoldsClient
@@ -48,8 +49,10 @@ func WithAuthRoutes(client ports.AuthRoutes) RouterOption {
 	return func(r *routes) { r.authRoutes = client }
 }
 
+// WithSearch adds the search route, and the autocomplete route when the client
+// also offers suggestions (the Search service client does).
 func WithSearch(searcher ports.Searcher) RouterOption {
-	return func(r *routes) { r.search = searcher }
+	return func(r *routes) { r.search = searcher; r.suggester, _ = searcher.(ports.Suggester) }
 }
 
 func WithGeo(finder ports.NearbyPharmacyFinder) RouterOption {
@@ -102,6 +105,9 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.search != nil {
 		mux.Handle("GET /api/v1/search", searchHandler(wired.search, logger))
+	}
+	if wired.suggester != nil {
+		mux.Handle("GET /api/v1/search/autocomplete", autocompleteHandler(wired.suggester, logger))
 	}
 	if wired.authRoutes != nil {
 		mux.Handle("POST /api/v1/auth/register", authHandler(wired.authRoutes, logger))
