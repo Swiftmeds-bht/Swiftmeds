@@ -9,11 +9,12 @@
 // (gateway down) changes nothing, and the next request tries again.
 import { NextResponse, type NextRequest } from "next/server";
 
+import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { refreshOnce, type RefreshOptions } from "./refresh";
 import { SESSION_COOKIE, encodeSession, needsRefresh, parseSession, sessionCookieOptions } from "./session";
 
 export async function refreshInProxy(request: NextRequest, options: Partial<RefreshOptions> = {}): Promise<NextResponse> {
-  const gatewayUrl = options.gatewayUrl ?? process.env.GATEWAY_URL ?? "";
+  const gatewayUrl = options.gatewayUrl ?? configuredGatewayUrl();
   const now = options.now ?? Date.now;
   const session = parseSession(request.cookies.get(SESSION_COOKIE)?.value);
   if (!gatewayUrl || !session || !needsRefresh(session, now())) return NextResponse.next();

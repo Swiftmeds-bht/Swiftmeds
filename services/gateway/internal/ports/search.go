@@ -12,6 +12,11 @@ type Searcher interface {
 	SearchMedicine(context.Context, *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error)
 }
 
+// Suggester offers medicine names while the patient types (Search Autocomplete).
+type Suggester interface {
+	Autocomplete(context.Context, *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error)
+}
+
 type NearbyPharmacyFinder interface {
 	FindNearbyPharmacies(context.Context, *geov1.FindNearbyPharmaciesRequest) (*geov1.FindNearbyPharmaciesResponse, error)
 }

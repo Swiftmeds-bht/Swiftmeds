@@ -10,7 +10,7 @@ have it in stock. Owner: Pema. Responsive: works on phones and desktops.
 | `/` | Search form: medicine name (with suggestions), location, radius |
 | `/results?q=…&place=…&radius=…` | Matching medicines with in-stock pharmacies (best match first and highlighted: distance, price, stock, and freshness as 1 to 3 bars with words), and same-molecule alternatives when nothing is in stock. The search sits in one compact bar; the town and radius fold into a "Near …, within … · Change" line (a native `<details>`, so it works without JavaScript) |
 | `/results?q=…&lat=…&lng=…&radius=…` | The same, searched from the patient's device location |
-| `/pharmacy/[id]` | Pharmacy detail: name, address, dzongkhag, phone, map link and a link back to search (opening hours and stock list come later). Live from the gateway with `GATEWAY_URL`, demo data (labelled) without it; see [Data](#data) |
+| `/pharmacy/[id]` | Pharmacy detail: name, address, dzongkhag, phone, map link and a link back to search (opening hours and stock list come later). Live from the gateway, demo data (labelled) with `USE_DEMO_DATA=true`; see [Data](#data) |
 | `/reserve?product=…&pharmacy=…` | Confirm a reservation: medicine, pharmacy, price, how many units (1 to 5, no more than in stock), and the total to pay at the counter, which updates with the number of units. Opened from Reserve on a result |
 | `/holds/[id]` | One hold: "Checking stock" (refreshes every 2 s), then the pickup code on a ticket with a countdown, or why it was not held, expired or cancelled. When a hold has just turned active (status changed in the last 15 s), the code's digits rise into place once; reloads do not replay it, and reduced motion turns it off |
 | `/holds` | My holds: current (with Cancel) and past |
@@ -102,7 +102,7 @@ the patient signs in again after 15 minutes, as before.
 `POST /api/v1/holds/{id}/cancel`. Most are still "planned" in the API spec; until
 they exist, a gateway answering 404 shows "This is not available yet".
 
-**Demo mode** (no `GATEWAY_URL`, `lib/demo-holds.ts`): accounts and holds live in
+**Demo mode** (`USE_DEMO_DATA=true`, `lib/demo-holds.ts`): accounts and holds live in
 the server's memory and are lost on restart. Sign in as `patient@demo.bt` /
 `swiftmed-demo`, or create an account. A hold is pending for 2 seconds, then active
 for 30 minutes. It is rejected when more units are asked for than are left, or when
@@ -138,7 +138,17 @@ and wait.
 
 ## Data
 
-`lib/api.ts` calls the gateway at `GATEWAY_URL`:
+The app reads live data from the gateway by default. `lib/data-source.ts` is the
+one place that decides:
+
+| Setting | Data |
+|---|---|
+| nothing set | the gateway at `http://localhost:8080` |
+| `GATEWAY_URL=http://gateway:8080` | the gateway at that address (Docker Compose sets this) |
+| `USE_DEMO_DATA=true` | built-in demo data (`lib/mock-data.ts`, `lib/demo-holds.ts`), labelled on every screen |
+
+Both are read by the server on each request, so one Docker image works anywhere.
+`lib/api.ts` calls these gateway routes:
 
 | Route | Used for |
 |---|---|
@@ -157,10 +167,15 @@ pharmacy-staff only, so today the page says "Pharmacy details are not available
 right now" (a plain-text 404, 401, 403 or 501 all mean this). `GET
 /api/v1/pharmacies/nearby` cannot stand in: it returns only IDs and distances.
 
-- With `GATEWAY_URL` set, a failing gateway is shown as an error. The app never
-  replaces a failed search with demo stock.
-- With `GATEWAY_URL` empty, the app uses demo data from `lib/mock-data.ts` (built
+- In gateway mode a failing or unreachable gateway is shown as an error. The app
+  never replaces a failed search with demo stock.
+- With `USE_DEMO_DATA=true` the app uses demo data from `lib/mock-data.ts` (built
   from `deploy/seed/`), and the results page says "Showing demo data".
+- One exception in gateway mode: a hold carries only IDs and the gateway has no
+  product or pharmacy name route yet, so the holds pages take names from the
+  seed list in `lib/mock-data.ts` (`holdNames` in `lib/hold-format.ts`). For a
+  seeded ID these are the same names as in the database; any other ID shows
+  "Medicine" and "Pharmacy". No demo stock or demo holds are shown.
 
 ## Run
 
@@ -168,16 +183,18 @@ Requires Node.js 20+.
 
 ```bash
 npm ci
-npm run dev                                   # http://localhost:3000 (demo data)
-GATEWAY_URL=http://localhost:8080 npm run dev # use the gateway
+npm run dev             # http://localhost:3000, live data from the gateway on :8080 (`make up`)
+npm run dev:demo        # the same on demo data, no gateway needed
+npm run dev -- -p 3071  # another port, if 3000 is taken
 ```
 
-To try every state with real network calls before the gateway has the search
-routes, run the stand-in gateway in another terminal:
+With the whole stack, `make up` at the repository root also runs this app in
+Docker (see the root README). To try every error state with real network calls
+but without the stack, run the stand-in gateway in another terminal:
 
 ```bash
-npm run dev:gateway                           # http://localhost:8080
-GATEWAY_URL=http://localhost:8080 npm run dev
+npm run dev:gateway     # stand-in gateway on http://localhost:8080
+npm run dev
 ```
 
 Then search for `napa` (normal), `slow` (loading), `error` (503), `gone` (404),

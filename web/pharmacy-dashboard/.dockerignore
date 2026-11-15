@@ -1,0 +1,9 @@
+# The image is built from this folder; npm ci and next build run inside it.
+node_modules
+.next
+coverage
+.env
+.env.*
+npm-debug.log*
+Dockerfile
+.dockerignore

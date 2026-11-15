@@ -528,7 +528,7 @@ paths:
       operationId: autocomplete
       summary: Suggest medicine names while the patient types
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.search.v1.SearchService/Autocomplete
       x-roles: []
       parameters:
@@ -542,10 +542,11 @@ paths:
             maxLength: 100
         - name: limit
           in: query
-          description: Most suggestions to return.
+          description: Most suggestions to return, 1 to 20.
           schema:
             type: integer
             minimum: 1
+            maximum: 20
             default: 8
       responses:
         "200":

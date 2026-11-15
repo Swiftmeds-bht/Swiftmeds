@@ -85,7 +85,8 @@ function ProductCard({ product, watch }: { product: ProductResult; watch?: Watch
                   <p className="offer-meta">
                     <MapPinIcon size={15} />
                     <span>
-                      <span className="offer-distance">{formatDistance(o.distanceM)}</span> away · {o.address}
+                      <span className="offer-distance">{formatDistance(o.distanceM)}</span> away
+                      {o.address && <> · {o.address}</>}
                     </span>
                   </p>
                   <Freshness score={o.freshnessScore} />

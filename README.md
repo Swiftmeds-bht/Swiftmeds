@@ -26,7 +26,7 @@ Tutors: Mr. Pema Namgay and Mr. Nima
 - **RabbitMQ** carries events. The reservation saga (Holds and Inventory) runs on choreographed events.
 - **Traefik** handles service discovery and round-robin load balancing.
 - **Cloudflare Workers** run scheduled jobs: expiring reservations and decaying stock freshness.
-- **Next.js** powers the patient web app (`web/patient-app`). The pharmacy dashboard (`web/pharmacy-dashboard`) is not built yet (SCRUM-58, SCRUM-70).
+- **Next.js** powers the patient web app (`web/patient-app`) and the pharmacy dashboard (`web/pharmacy-dashboard`, SCRUM-58, SCRUM-70). `make up` runs both in Docker.
 
 Diagrams (system context, containers, events, the reservation saga) are in
 [docs/architecture](docs/architecture/README.md), and the reasons behind the main
@@ -37,7 +37,7 @@ proto/      gRPC and event contracts (generated code goes in proto/gen/go)
 pkg/        shared Go code: resilience, messaging, grpcx, auth, logger, config
 services/   one folder per microservice
 workers/    Cloudflare Workers (TypeScript)
-web/        patient-app (pharmacy-dashboard is a placeholder for now)
+web/        patient-app and pharmacy-dashboard (Next.js, each with its own Dockerfile)
 deploy/     Docker Compose, Traefik, RabbitMQ, Postgres init, demo seed data
 scripts/    proto generation, coverage gate, integration and mutation test runners
 tests/      integration (reservation saga), load (k6); e2e and features are placeholders
@@ -78,24 +78,32 @@ Pricing uses deterministic synthetic values from `deploy/seed/prices.demo.csv`;
 these are not real prices. The import is transactional and safe to repeat
 without truncating tables or removing active reservations.
 
-The gateway listens on `http://localhost:8080`; its health check is available at
-`http://localhost:8080/healthz`. The Traefik dashboard is available at
-`http://localhost:8081/dashboard/`, and the RabbitMQ management UI is available at
-`http://localhost:15672`. Run `make help` to list all targets.
+| What | Address |
+|---|---|
+| Patient app | `http://localhost:3000` (`PATIENT_APP_HTTP_PORT`) |
+| Pharmacy dashboard | `http://localhost:3001` (`DASHBOARD_HTTP_PORT`) |
+| API gateway | `http://localhost:8080`, health check at `/healthz` |
+| Traefik dashboard | `http://localhost:8081/dashboard/` |
+| RabbitMQ management UI | `http://localhost:15672` |
+
+If a port is already taken on your machine, change it in `.env` (for example
+`PATIENT_APP_HTTP_PORT=3071`). Traefik serves the two web apps on their own
+entrypoints; they call the gateway inside the Docker network
+(`GATEWAY_URL=http://gateway:8080`), so the browser never calls the gateway
+directly. Both show live data from the seeded database. The patient app only
+uses its built-in demo data with `USE_DEMO_DATA=true`. Run `make help` to list
+all targets.
 
 Gateway API routes use `Authorization: Bearer <access-token>`. The public routes
-are `GET /api/v1/search`, `GET /api/v1/pharmacies/nearby` and
-`GET /api/v1/medicines/{id}/alternatives`. The holds, watchlist and feedback
-routes validate the token through Auth; pharmacy and admin routes additionally
-require their respective roles. Missing or invalid credentials return `401`,
-insufficient roles return `403`, and an unavailable Auth service returns `503`.
-The two `/api/v1/internal/...` routes called by the Cloudflare Workers check the
-`X-Worker-Secret` header (`WORKER_SHARED_SECRET` in `.env`) instead of a token.
-
-The gateway has **no login or register routes yet** (SCRUM-115).
-`POST /api/v1/auth/login` is described in `docs/api/openapi.yaml`, but the gateway
-answers `404` until SCRUM-115 is merged, so you cannot get an access token
-through the gateway today.
+are `GET /api/v1/search`, `GET /api/v1/search/autocomplete`,
+`GET /api/v1/pharmacies/nearby`, `GET /api/v1/medicines/{id}/alternatives`, and
+`POST /api/v1/auth/register`, `/login` and `/refresh`. The holds, watchlist and
+feedback routes validate the token through Auth; pharmacy and admin routes
+additionally require their respective roles. Missing or invalid credentials
+return `401`, insufficient roles return `403`, and an unavailable Auth service
+returns `503`. The two `/api/v1/internal/...` routes called by the Cloudflare
+Workers check the `X-Worker-Secret` header (`WORKER_SHARED_SECRET` in `.env`)
+instead of a token.
 
 On Windows PowerShell, if `make` is not installed, use Docker Compose directly
 from the repository root. Pass `--env-file .env` as `make` does: Compose

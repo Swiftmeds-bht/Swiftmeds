@@ -1,7 +1,9 @@
-// API client for the patient app. It calls the REST gateway at GATEWAY_URL.
-// With no GATEWAY_URL it serves clearly labelled demo data. When a gateway is
-// configured but fails, it throws a SearchError: it never shows demo stock in
-// place of a real search, because a patient could act on stock that is not there.
+// API client for the patient app. It calls the REST gateway at GATEWAY_URL
+// (default http://localhost:8080). Only with USE_DEMO_DATA=true does it serve
+// clearly labelled demo data (lib/data-source.ts). When the gateway fails, it
+// throws a SearchError: it never shows demo stock in place of a real search,
+// because a patient could act on stock that is not there.
+import { gatewayUrl } from "./data-source";
 import { MOCK_PHARMACIES, MOCK_PRODUCTS, MOCK_STOCK } from "./mock-data";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "./rules";
 import type {
@@ -32,7 +34,7 @@ export interface ApiOptions {
 }
 
 const defaultOptions = (): ApiOptions => ({
-  gatewayUrl: process.env.GATEWAY_URL ?? "",
+  gatewayUrl: gatewayUrl(),
   fetchFn: globalThis.fetch,
   timeoutMs: 5000,
 });
@@ -116,8 +118,40 @@ export async function searchMedicines(params: SearchParams, options: ApiOptions 
     .filter(Boolean);
   return {
     source: "gateway",
-    data: { searchId: data.searchId ?? "", results: data.results ?? [], substitutes: data.substitutes ?? [] },
+    data: {
+      searchId: data.searchId ?? "",
+      results: (data.results ?? []).map(normalizeProduct),
+      substitutes: (data.substitutes ?? []).map(normalizeProduct),
+    },
     degraded,
+  };
+}
+
+// Protobuf JSON leaves out fields that hold their default value: an empty list,
+// 0 or "". A product nobody nearby stocks arrives without `offers`, and a
+// pharmacy 0 m away without `distanceM`. Fill the defaults back in so the
+// screens can rely on the types in lib/types.ts.
+function normalizeProduct(p: Partial<ProductResult>): ProductResult {
+  return {
+    productId: p.productId ?? "",
+    brandName: p.brandName ?? "",
+    genericName: p.genericName ?? "",
+    strength: p.strength ?? "",
+    offers: (p.offers ?? []).map(normalizeOffer),
+  };
+}
+
+function normalizeOffer(o: Partial<PharmacyOffer>): PharmacyOffer {
+  return {
+    ...o,
+    pharmacyId: o.pharmacyId ?? "",
+    pharmacyName: o.pharmacyName ?? "",
+    address: o.address ?? "",
+    distanceM: o.distanceM ?? 0,
+    quantityAvailable: o.quantityAvailable ?? 0,
+    freshnessScore: o.freshnessScore ?? 0,
+    trustScore: o.trustScore ?? 0,
+    rankScore: o.rankScore ?? 0,
   };
 }
 

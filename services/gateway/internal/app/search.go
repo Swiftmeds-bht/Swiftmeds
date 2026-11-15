@@ -42,6 +42,36 @@ func searchHandler(client ports.Searcher, logger *slog.Logger) http.HandlerFunc 
 	}
 }
 
+// Suggestion limits, the same as Search's (services/search/internal/domain).
+const (
+	defaultSuggestions = 8
+	maxSuggestions     = 20
+)
+
+// autocompleteHandler serves GET /api/v1/search/autocomplete?prefix=&limit=.
+func autocompleteHandler(client ports.Suggester, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		prefix := strings.TrimSpace(r.URL.Query().Get("prefix"))
+		if n := len([]rune(prefix)); n < 2 || n > 100 {
+			writeError(w, http.StatusBadRequest, "prefix must be 2 to 100 characters")
+			return
+		}
+		limit, err := queryInt(r, "limit", defaultSuggestions)
+		if err != nil || limit < 1 || limit > maxSuggestions {
+			writeError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), downstreamTimeout)
+		defer cancel()
+		resp, callErr := client.Autocomplete(ctx, &searchv1.AutocompleteRequest{Prefix: prefix, Limit: int32(limit)})
+		if callErr != nil {
+			writeDownstreamError(w, logger, r, callErr)
+			return
+		}
+		writeProtoJSON(w, resp)
+	}
+}
+
 func nearbyHandler(client ports.NearbyPharmacyFinder, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		lat, lng, radius, err := parseLocation(r)

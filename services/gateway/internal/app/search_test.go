@@ -26,6 +26,19 @@ func (f *fakeSearcher) SearchMedicine(_ context.Context, req *searchv1.SearchMed
 	return f.response, f.err
 }
 
+// fakeSearchService answers both search and autocomplete, as the Search client does.
+type fakeSearchService struct {
+	fakeSearcher
+	suggestions *searchv1.AutocompleteResponse
+	suggestErr  error
+	suggestReq  *searchv1.AutocompleteRequest
+}
+
+func (f *fakeSearchService) Autocomplete(_ context.Context, req *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error) {
+	f.suggestReq = req
+	return f.suggestions, f.suggestErr
+}
+
 type fakeGeo struct {
 	response *geov1.FindNearbyPharmaciesResponse
 	err      error
@@ -134,6 +147,79 @@ func TestOtherRoutesMapGRPCErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAutocompleteRoute(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
+	napa := &searchv1.AutocompleteResponse{Suggestions: []*searchv1.Suggestion{
+		{ProductId: "p-1", DisplayName: "Napa 500mg (Paracetamol)"},
+	}}
+
+	t.Run("public, mapped and shaped like the spec", func(t *testing.T) {
+		fake := &fakeSearchService{suggestions: napa}
+		// No WithAuth and no bearer token: the route must still answer.
+		router := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, logger, WithSearch(fake))
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=%20na%20&limit=5", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		want := `{"suggestions":[{"productId":"p-1","displayName":"Napa 500mg (Paracetamol)"}]}`
+		if rec.Code != http.StatusOK || strings.ReplaceAll(rec.Body.String(), " ", "") != strings.ReplaceAll(want, " ", "") {
+			t.Fatalf("got %d %s, want 200 %s", rec.Code, rec.Body.String(), want)
+		}
+		if fake.suggestReq.GetPrefix() != "na" || fake.suggestReq.GetLimit() != 5 {
+			t.Fatalf("request was not mapped: %v", fake.suggestReq)
+		}
+	})
+
+	t.Run("default limit", func(t *testing.T) {
+		fake := &fakeSearchService{suggestions: &searchv1.AutocompleteResponse{}}
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK || fake.suggestReq.GetLimit() != defaultSuggestions {
+			t.Fatalf("got %d, limit %d", rec.Code, fake.suggestReq.GetLimit())
+		}
+	})
+
+	for name, query := range map[string]string{
+		"no prefix":        "",
+		"short prefix":     "prefix=n",
+		"blank prefix":     "prefix=%20%20%20",
+		"long prefix":      "prefix=" + strings.Repeat("n", 101),
+		"zero limit":       "prefix=na&limit=0",
+		"limit over max":   "prefix=na&limit=21",
+		"non-number limit": "prefix=na&limit=many",
+	} {
+		t.Run("400/"+name, func(t *testing.T) {
+			fake := &fakeSearchService{suggestions: napa}
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?"+query, nil)
+			rec := httptest.NewRecorder()
+			autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest || fake.suggestReq != nil {
+				t.Fatalf("got %d (called: %v), want 400 without a Search call", rec.Code, fake.suggestReq != nil)
+			}
+		})
+	}
+
+	t.Run("downstream error hides detail", func(t *testing.T) {
+		fake := &fakeSearchService{suggestErr: status.Error(codes.Unavailable, "catalog down: dial tcp")}
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || strings.Contains(rec.Body.String(), "dial tcp") {
+			t.Fatalf("got %d %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("absent when the client cannot suggest", func(t *testing.T) {
+		router := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, logger, WithSearch(&fakeSearcher{}))
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("got %d, want 404", rec.Code)
+		}
+	})
 }
 
 func TestSearchValidation(t *testing.T) {
