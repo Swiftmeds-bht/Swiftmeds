@@ -1,8 +1,8 @@
 // A tiny stand-in for the gateway's search routes, so the patient app can be tried
-// with real network calls before the real routes exist. Development only.
+// with real network calls without the whole stack. Development only.
 //
-//   npm run dev:gateway                            # listens on http://localhost:8080
-//   GATEWAY_URL=http://localhost:8080 npm run dev  # in another terminal
+//   npm run dev:gateway   # listens on http://localhost:8080
+//   npm run dev           # in another terminal (uses http://localhost:8080 by default)
 //
 // What you type in the search box decides what happens:
 //   "slow"     answers after 2.5 s (shows the loading state)

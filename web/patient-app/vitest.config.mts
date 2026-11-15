@@ -8,5 +8,8 @@ export default defineConfig({
     environment: "jsdom",
     include: ["**/*.test.{ts,tsx}"],
     exclude: ["node_modules/**", ".next/**"],
+    // Tests never need a running gateway: the default backends are the demo ones.
+    // Gateway tests pass a gateway URL or set the env themselves.
+    env: { USE_DEMO_DATA: "true" },
   },
 });

@@ -1,7 +1,8 @@
 // Back-in-stock watchlist for the patient app (SCRUM-71). Like lib/holds.ts:
-// with GATEWAY_URL it calls the gateway (docs/api/openapi.yaml, Watchlist), and
-// without it an in-memory demo answers. Server-side only: the access token
-// never reaches the browser; the browser reads alerts from /api/alerts.
+// it calls the gateway (docs/api/openapi.yaml, Watchlist), and only with
+// USE_DEMO_DATA=true does an in-memory demo answer. Server-side only: the access
+// token never reaches the browser; the browser reads alerts from /api/alerts.
+import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { demoBackend } from "./demo-holds";
 import { errorForStatus } from "./holds";
 import { HoldError } from "./holds-core";
@@ -34,7 +35,7 @@ export interface WatchlistBackend {
   alerts(session: Session, signal: AbortSignal): AsyncGenerator<StockAlert>;
 }
 
-export function watchlistBackend(gatewayUrl = process.env.GATEWAY_URL ?? ""): WatchlistBackend {
+export function watchlistBackend(gatewayUrl = configuredGatewayUrl()): WatchlistBackend {
   return gatewayUrl ? gatewayWatchlist({ gatewayUrl }) : demoWatchlist();
 }
 

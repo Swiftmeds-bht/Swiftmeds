@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "./route";
 
-beforeEach(() => vi.stubEnv("GATEWAY_URL", "")); // demo mode: no network
+beforeEach(() => vi.stubEnv("USE_DEMO_DATA", "true")); // demo mode: no network
 afterEach(() => vi.unstubAllEnvs());
 
 const ask = (prefix?: string) =>

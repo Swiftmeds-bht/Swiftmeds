@@ -1,7 +1,9 @@
-// API client for the patient app. It calls the REST gateway at GATEWAY_URL.
-// With no GATEWAY_URL it serves clearly labelled demo data. When a gateway is
-// configured but fails, it throws a SearchError: it never shows demo stock in
-// place of a real search, because a patient could act on stock that is not there.
+// API client for the patient app. It calls the REST gateway at GATEWAY_URL
+// (default http://localhost:8080). Only with USE_DEMO_DATA=true does it serve
+// clearly labelled demo data (lib/data-source.ts). When the gateway fails, it
+// throws a SearchError: it never shows demo stock in place of a real search,
+// because a patient could act on stock that is not there.
+import { gatewayUrl } from "./data-source";
 import { MOCK_PHARMACIES, MOCK_PRODUCTS, MOCK_STOCK } from "./mock-data";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "./rules";
 import type {
@@ -32,7 +34,7 @@ export interface ApiOptions {
 }
 
 const defaultOptions = (): ApiOptions => ({
-  gatewayUrl: process.env.GATEWAY_URL ?? "",
+  gatewayUrl: gatewayUrl(),
   fetchFn: globalThis.fetch,
   timeoutMs: 5000,
 });

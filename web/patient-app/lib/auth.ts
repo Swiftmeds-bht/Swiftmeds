@@ -4,6 +4,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { retryAfterRefresh, revokeRefreshToken } from "./refresh";
 import { SESSION_COOKIE, decodeSession, encodeSession, parseSession, sessionCookieOptions } from "./session";
 import type { Session } from "./types";
@@ -24,7 +25,7 @@ export async function saveSession(session: Session): Promise<void> {
 }
 
 /** Signs out: forgets the cookie and, with a gateway, revokes the refresh token (best effort). */
-export async function clearSession(gatewayUrl = process.env.GATEWAY_URL ?? ""): Promise<void> {
+export async function clearSession(gatewayUrl = configuredGatewayUrl()): Promise<void> {
   const jar = await cookies();
   const refreshToken = parseSession(jar.get(SESSION_COOKIE)?.value)?.refreshToken;
   jar.delete(SESSION_COOKIE);
@@ -39,5 +40,5 @@ export async function clearSession(gatewayUrl = process.env.GATEWAY_URL ?? ""): 
  * caller signs the patient out.
  */
 export function withFreshToken<T>(session: Session, run: (session: Session) => Promise<T>): Promise<T> {
-  return retryAfterRefresh(session, run, { gatewayUrl: process.env.GATEWAY_URL ?? "", save: saveSession });
+  return retryAfterRefresh(session, run, { gatewayUrl: configuredGatewayUrl(), save: saveSession });
 }

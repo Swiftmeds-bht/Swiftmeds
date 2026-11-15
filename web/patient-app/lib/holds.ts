@@ -1,7 +1,8 @@
-// Accounts and holds for the patient app. With GATEWAY_URL set, every call goes
-// to the REST gateway (docs/api/openapi.yaml). Without it, a clearly labelled
-// in-memory demo answers instead (lib/demo-holds.ts). Server-side only: the
-// access token never reaches the browser.
+// Accounts and holds for the patient app. By default every call goes to the
+// REST gateway (docs/api/openapi.yaml). Only with USE_DEMO_DATA=true does a
+// clearly labelled in-memory demo answer instead (lib/demo-holds.ts).
+// Server-side only: the access token never reaches the browser.
+import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { demoBackend } from "./demo-holds";
 import { HoldError, type HoldsBackend } from "./holds-core";
 import { tokenFields } from "./refresh";
@@ -9,8 +10,8 @@ import type { Hold } from "./types";
 
 export { HoldError, MAX_HOLD_QUANTITY, type HoldErrorKind, type HoldsBackend } from "./holds-core";
 
-/** The backend for this server: the gateway when GATEWAY_URL is set, else the demo. */
-export function holdsBackend(gatewayUrl = process.env.GATEWAY_URL ?? ""): HoldsBackend {
+/** The backend for this server: the gateway, or the demo with USE_DEMO_DATA=true. */
+export function holdsBackend(gatewayUrl = configuredGatewayUrl()): HoldsBackend {
   return gatewayUrl ? gatewayBackend({ gatewayUrl }) : demoBackend();
 }
 
