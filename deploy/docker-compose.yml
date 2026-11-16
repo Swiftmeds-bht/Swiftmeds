@@ -14,6 +14,7 @@ services:
       TRAEFIK_GRPC_TARGET: ${TRAEFIK_GRPC_TARGET:-traefik:50051}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
       traefik:
         condition: service_healthy
@@ -73,7 +74,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - ./seed:/opt/swiftmed/seed:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
       interval: 5s
@@ -216,38 +216,39 @@ services:
       - traefik.http.services.pharmacy-registry.loadbalancer.server.scheme=h2c
 
   holds:
-       build:
-         context: ..
-         dockerfile: services/holds/Dockerfile
-       restart: unless-stopped
-       healthcheck:
-         test: ["CMD", "/server", "healthcheck"]
-         interval: 10s
-         timeout: 3s
-         start_period: 5s
-         retries: 3
-       environment:
-         HOLDS_GRPC_PORT: ${HOLDS_GRPC_PORT:-50065}
-         HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
-         HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
-         HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
-         # Reservation saga: hold.requested and hold.confirmed go out, and stock.reserved and
-         # stock.unavailable come in, over RabbitMQ. Cancel, expire and collect call Inventory
-         # through Traefik, which routes by :authority (the service name).
-         RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
-         HOLDS_UPSTREAM: ${HOLDS_UPSTREAM:-traefik:50051}
-         LOG_LEVEL: ${LOG_LEVEL:-info}
-       depends_on:
-         postgres:
-           condition: service_healthy
-         rabbitmq:
-           condition: service_healthy
-       labels:
-         - traefik.enable=true
-         - traefik.http.routers.holds.rule=Host(`holds`)
-         - traefik.http.routers.holds.entrypoints=grpc
-         - traefik.http.services.holds.loadbalancer.server.port=${HOLDS_GRPC_PORT:-50065}
-         - traefik.http.services.holds.loadbalancer.server.scheme=h2c
+    build:
+      context: ..
+      dockerfile: services/holds/Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    environment:
+      HOLDS_GRPC_PORT: ${HOLDS_GRPC_PORT:-50065}
+      HOLDS_DATABASE_URL: ${HOLDS_DATABASE_URL:?set HOLDS_DATABASE_URL in .env}
+      HOLDS_MAX_ACTIVE_PER_USER: ${HOLDS_MAX_ACTIVE_PER_USER:-3}
+      HOLDS_HOLD_DURATION: ${HOLDS_HOLD_DURATION:-2h}
+      # Reservation saga: hold.requested and hold.confirmed go out, and stock.reserved and
+      # stock.unavailable come in, over RabbitMQ. Cancel, expire and collect call Inventory
+      # through Traefik, which routes by :authority (the service name).
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      HOLDS_UPSTREAM: ${HOLDS_UPSTREAM:-traefik:50051}
+      HOLDS_CALL_TIMEOUT: ${HOLDS_CALL_TIMEOUT:-3s}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.holds.rule=Host(`holds`)
+      - traefik.http.routers.holds.entrypoints=grpc
+      - traefik.http.services.holds.loadbalancer.server.port=${HOLDS_GRPC_PORT:-50065}
+      - traefik.http.services.holds.loadbalancer.server.scheme=h2c
 
   stock-sync:
     build:
@@ -277,6 +278,7 @@ services:
       - traefik.http.routers.stock-sync.entrypoints=grpc
       - traefik.http.services.stock-sync.loadbalancer.server.port=${STOCK_SYNC_GRPC_PORT:-50057}
       - traefik.http.services.stock-sync.loadbalancer.server.scheme=h2c
+
   catalog:
     build:
       context: ..
@@ -301,6 +303,7 @@ services:
       - traefik.http.routers.catalog.entrypoints=grpc
       - traefik.http.services.catalog.loadbalancer.server.port=${CATALOG_GRPC_PORT:-50055}
       - traefik.http.services.catalog.loadbalancer.server.scheme=h2c
+
   substitution:
     build:
       context: ..
@@ -326,6 +329,7 @@ services:
       - traefik.http.routers.substitution.entrypoints=grpc
       - traefik.http.services.substitution.loadbalancer.server.port=${SUBSTITUTION_GRPC_PORT:-50058}
       - traefik.http.services.substitution.loadbalancer.server.scheme=h2c
+
   user-profile:
     build:
       context: ..
@@ -411,6 +415,7 @@ services:
       - traefik.http.routers.expiry.entrypoints=grpc
       - traefik.http.services.expiry.loadbalancer.server.port=${EXPIRY_GRPC_PORT:-50066}
       - traefik.http.services.expiry.loadbalancer.server.scheme=h2c
+
   geo:
     build:
       context: ..
@@ -455,6 +460,11 @@ services:
       RANKING_WEIGHT_TRUST: ${RANKING_WEIGHT_TRUST:-}
       RANKING_WEIGHT_PRICE: ${RANKING_WEIGHT_PRICE:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+    # Ranking owns no data and calls no other service; it is only reached
+    # through Traefik, so it starts once Traefik is up.
+    depends_on:
+      traefik:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.ranking.rule=Host(`ranking`)
@@ -531,8 +541,14 @@ services:
       context: ..
       dockerfile: services/analytics/Dockerfile
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
     environment:
-      ANALYTICS_GRPC_PORT: ${ANALYTICS_GRPC_PORT:-50068}
+      ANALYTICS_GRPC_PORT: ${ANALYTICS_GRPC_PORT:-50059}
       ANALYTICS_DATABASE_URL: ${ANALYTICS_DATABASE_URL:?set ANALYTICS_DATABASE_URL in .env}
       ANALYTICS_UPSTREAM: traefik:50051
       RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
@@ -543,7 +559,7 @@ services:
       rabbitmq:
         condition: service_healthy
       traefik:
-        condition: service_started
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.http.routers.analytics.rule=Host(`analytics`)
@@ -641,6 +657,68 @@ services:
       - traefik.http.routers.freshness.entrypoints=grpc
       - traefik.http.services.freshness.loadbalancer.server.port=${FRESHNESS_GRPC_PORT:-50069}
       - traefik.http.services.freshness.loadbalancer.server.scheme=h2c
+
+  notification:
+    build:
+      context: ..
+      dockerfile: services/notification/Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    environment:
+      NOTIFICATION_GRPC_PORT: ${NOTIFICATION_GRPC_PORT:-50054}
+      NOTIFICATION_DATABASE_URL: ${NOTIFICATION_DATABASE_URL:?set NOTIFICATION_DATABASE_URL in .env}
+      # Consumes hold.confirmed, hold.expired, hold.rejected and watchlist.alert;
+      # the gateway reads the results for GET /api/v1/notifications.
+      RABBITMQ_URL: ${RABBITMQ_URL:?set RABBITMQ_URL in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.notification.rule=Host(`notification`)
+      - traefik.http.routers.notification.entrypoints=grpc
+      - traefik.http.services.notification.loadbalancer.server.port=${NOTIFICATION_GRPC_PORT:-50054}
+      - traefik.http.services.notification.loadbalancer.server.scheme=h2c
+
+  # --- Demo data (SCRUM-66) ---------------------------------------------------
+  # One-shot job, not a service: `make up` runs it after every service above is
+  # healthy (`docker compose --profile seed run --rm seed`). It is behind a
+  # profile so `docker compose up --wait` never waits on a container that exits.
+  # Each service has applied its migrations before it reports healthy, so the
+  # tables exist when this runs. Re-running it is safe: every script upserts.
+  seed:
+    image: postgres:16-alpine
+    profiles: ["seed"]
+    restart: "no"
+    entrypoint: ["sh", "/opt/swiftmed/seed/seed.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-swiftmed}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - ./seed:/opt/swiftmed/seed:ro
+    depends_on:
+      auth:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      pharmacy-registry:
+        condition: service_healthy
+      geo:
+        condition: service_healthy
+      inventory:
+        condition: service_healthy
+      pricing:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   rabbitmq_data:

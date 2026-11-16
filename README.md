@@ -64,19 +64,32 @@ docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test 
 ```bash
 cp .env.example .env    # then change the secrets
 make proto              # generate gRPC code
-make up                 # build and start every service in deploy/docker-compose.yml, Postgres, RabbitMQ and Traefik
-make seed               # load repeatable demo medicines, pharmacies, stock and synthetic prices
+make up                 # build and start all 20 services, Postgres, RabbitMQ and Traefik, wait until all are healthy, then seed demo data
+make smoke              # search -> reserve -> collect through the gateway, to check the stack works
+make seed               # load the demo data again (safe to repeat)
 make down               # stop everything
 ```
 
-`make seed` starts the services whose migrations own the demo data, waits for
-those migrations, and imports the pharmacy, Geo, Inventory, and Pricing
-fixtures. Catalog medicines are loaded by the Catalog migration and are not
-imported again. Pharmacy CSV phone, address, and dzongkhag values are fixture
+`make up` waits until every container reports healthy (up to `UP_TIMEOUT`
+seconds, 900 by default; a first build on a clean machine compiles all 20
+images). It then runs the one-shot `seed` container (`deploy/seed/seed.sh`),
+which imports the pharmacy, Geo, Inventory, and Pricing fixtures and creates
+the demo accounts. Catalog medicines are loaded by the Catalog migration and
+are not imported again. Pharmacy CSV phone, address, and dzongkhag values are fixture
 metadata because the current Pharmacy Registry schema does not store them.
 Pricing uses deterministic synthetic values from `deploy/seed/prices.demo.csv`;
 these are not real prices. The import is transactional and safe to repeat
 without truncating tables or removing active reservations.
+
+Demo accounts (development only; the password for all of them is `swiftmeds-demo`):
+
+| Account | Sign in as |
+|---|---|
+| Patient | `patient@demo.swiftmeds.test` |
+| Pharmacist of each seeded pharmacy | its license number, for example `demo-tim-001@demo.swiftmeds.test` for Demo Pharmacy Thimphu 01 |
+
+A pharmacist registered through the API is not linked to any pharmacy, so it
+cannot collect holds; use a seeded pharmacist for that.
 
 | What | Address |
 |---|---|
@@ -111,8 +124,13 @@ otherwise looks for `.env` in `deploy/` (the folder of the Compose file) and
 fails with `required variable ... is missing a value`.
 
 ```powershell
-docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+# make up
+docker compose -f deploy/docker-compose.yml --env-file .env up -d --build --wait --wait-timeout 900
+docker compose -f deploy/docker-compose.yml --env-file .env --profile seed run --rm seed
 docker compose -f deploy/docker-compose.yml --env-file .env ps
+# make smoke
+powershell -ExecutionPolicy Bypass -File scripts/smoke-test.ps1
+# make down
 docker compose -f deploy/docker-compose.yml --env-file .env down
 ```
 
