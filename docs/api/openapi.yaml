@@ -755,7 +755,7 @@ paths:
       operationId: listPharmacyStock
       summary: List all stock of a pharmacy
       description: The pharmacy dashboard's stock table.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.inventory.v1.InventoryService/ListPharmacyStock
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:
@@ -811,7 +811,7 @@ paths:
         Sending the same quantity again still counts as a confirmation and refreshes the
         stock's freshness. To remove a medicine from sale, set the quantity to 0.
         Raising the quantity tells the watchlist service, which may alert waiting patients.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.inventory.v1.InventoryService/SetStock
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
