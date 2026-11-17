@@ -37,8 +37,9 @@ GATEWAY_URL=http://localhost:8080
 ### Dev gateway
 
 `scripts/dev-gateway.mjs` answers the routes the dashboard uses, with in-memory data,
-until they exist on the real gateway (auth: SCRUM-115, holds: SCRUM-54; stock and
-stock-sync routes are in the OpenAPI spec but not yet in the gateway).
+so the dashboard can run without the rest of the stack. The real gateway now serves
+all of them: auth (SCRUM-115), holds (SCRUM-54), stock (SCRUM-58) and stock-sync
+(SCRUM-70). To use it instead, run the Compose stack and point `GATEWAY_URL` at it.
 
 | What | Value |
 |---|---|

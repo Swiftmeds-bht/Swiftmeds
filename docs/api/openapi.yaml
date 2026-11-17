@@ -891,7 +891,7 @@ paths:
         The file is UTF-8, at most 1 MB, with the header `product_id,quantity,price_chhertum`.
         `price_chhertum` is optional. Valid rows are applied and bad rows are reported in
         the job's `rowErrors`, so a job can finish as `SYNC_JOB_STATUS_PARTIAL`.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/UploadStockCsv
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
@@ -931,7 +931,7 @@ paths:
       tags: [Stock]
       operationId: listSyncJobs
       summary: List the CSV upload jobs of a pharmacy
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/ListSyncJobs
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:
@@ -959,7 +959,7 @@ paths:
       operationId: getSyncJob
       summary: Get one CSV upload job
       description: A job that belongs to a different pharmacy than the one in the path returns 404.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/GetSyncJob
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:

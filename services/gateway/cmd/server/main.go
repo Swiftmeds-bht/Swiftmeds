@@ -26,6 +26,7 @@ import (
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
+	stocksyncv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/stock-sync/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
@@ -120,6 +121,12 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("inventory client: %w", err)
 	}
+	// An upload is parsed and applied before Stock Sync answers, so it gets a
+	// longer per-call limit than the default.
+	stockSyncConn, err := conns.ConnectionWithTimeout(context.Background(), "stock-sync", app.StockSyncCallTimeout)
+	if err != nil {
+		return fmt.Errorf("stock sync client: %w", err)
+	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
@@ -137,6 +144,7 @@ func run() error {
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
 			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
 			app.WithInventory(clients.NewInventoryClient(inventoryv1.NewInventoryServiceClient(inventoryConn))),
+			app.WithStockSync(clients.NewStockSyncClient(stocksyncv1.NewStockSyncServiceClient(stockSyncConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
