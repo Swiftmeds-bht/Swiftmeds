@@ -22,6 +22,7 @@ import (
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
+	inventoryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/inventory/v1"
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
@@ -115,6 +116,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("analytics client: %w", err)
 	}
+	inventoryConn, err := conns.Connection(context.Background(), "inventory")
+	if err != nil {
+		return fmt.Errorf("inventory client: %w", err)
+	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
@@ -131,6 +136,7 @@ func run() error {
 			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
 			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
+			app.WithInventory(clients.NewInventoryClient(inventoryv1.NewInventoryServiceClient(inventoryConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
