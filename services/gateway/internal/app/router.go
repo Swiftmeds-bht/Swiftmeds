@@ -27,6 +27,7 @@ type routes struct {
 	pharmacyRegistry ports.PharmacyRegistryClient
 	analytics        ports.AnalyticsClient
 	inventory        ports.InventoryClient
+	stockSync        ports.StockSyncClient
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
@@ -80,6 +81,12 @@ func WithAnalytics(client ports.AnalyticsClient) RouterOption {
 // (SCRUM-58).
 func WithInventory(client ports.InventoryClient) RouterOption {
 	return func(r *routes) { r.inventory = client }
+}
+
+// WithStockSync adds the pharmacy dashboard's CSV upload and import report
+// routes (SCRUM-70).
+func WithStockSync(client ports.StockSyncClient) RouterOption {
+	return func(r *routes) { r.stockSync = client }
 }
 
 func WithWatchlist(client ports.WatchlistClient) RouterOption {
@@ -138,6 +145,11 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	if wired.inventory != nil {
 		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock", stockHandler(wired.inventory, logger))
 		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/stock/{productId}", stockHandler(wired.inventory, logger))
+	}
+	if wired.stockSync != nil {
+		mux.Handle("POST /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs", stockSyncHandler(wired.stockSync, logger))
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs", stockSyncHandler(wired.stockSync, logger))
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs/{jobId}", stockSyncHandler(wired.stockSync, logger))
 	}
 	if wired.watchlist != nil {
 		mux.Handle("POST /api/v1/watchlist", watchlistHandler(wired.watchlist, logger))
