@@ -83,7 +83,9 @@ scenario here. They are checked at their own test level instead:
   trust score and event deliveries are not visible in any UI. Drive those through
   the gateway API (`POST /api/v1/holds/{holdId}/feedback`) and check the result
   through the API or the service under test.
-- Expiry scenarios should not wait 2 hours. Run the sweep with an `asOf` time in
-  the future (`POST /api/v1/internal/expiry/sweep`), as TC-011 describes.
+- Expiry scenarios should not wait 2 hours, but a sweep with an `asOf` time in the
+  future does not work either: Holds refuses to expire a hold before its own
+  `expires_at`. The Cypress specs start the stack with short holds instead (see
+  [tests/e2e/README.md](../e2e/README.md)).
 - Pharmacy names, products and prices are made-up test data. Never use real
   patient data (SRS-NFR-06).

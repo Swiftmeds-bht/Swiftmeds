@@ -192,6 +192,47 @@ jobs:
       - name: Run Go integration tests
         run: ./scripts/integration-tests.sh
 
+  compose-integration:
+    name: Compose gateway integration suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GATEWAY_URL: http://127.0.0.1:8080
+      RABBITMQ_URL: amqp://swiftmed:change-me@127.0.0.1:5672/
+      WORKER_SHARED_SECRET: change-me-worker-secret
+      HOLDS_HOLD_DURATION: 5s
+      EXPIRY_HOLD_DURATION: 5s
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Start full Compose stack and seed demo data
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env up -d --build --wait --wait-timeout 900
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env --profile seed run --rm seed
+
+      - name: Run gateway cross-service suite
+        working-directory: tests/integration
+        run: GOWORK=off go test -tags integration -count=1 -v ./compose
+
+      - name: Print Compose logs on failure
+        if: failure()
+        run: docker compose -f deploy/docker-compose.yml --env-file .env logs --no-color
+
+      - name: Stop Compose stack
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml --env-file .env down -v
+
   web:
     name: Web app
     runs-on: ubuntu-latest

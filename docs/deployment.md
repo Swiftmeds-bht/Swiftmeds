@@ -12,8 +12,18 @@ and run the same commands).
 | Patient app | http://localhost:9000 |
 | Pharmacy dashboard | http://localhost:9001 |
 | API gateway | http://localhost:9080 (`/healthz`) |
-| Public URL (Cloudflare Tunnel) | SCRUM-75 |
-| Demo accounts (password `swiftmeds-demo`) | `patient@demo.swiftmeds.test`, `demo-tim-001@demo.swiftmeds.test` (pharmacist of Demo Pharmacy Thimphu 01) |
+| Public HTTPS URLs | Cloudflare quick tunnels, see [Public access](#public-access); `deploy/k8s/overlays/prod/tunnel-urls.sh` prints them |
+
+**Demo accounts** (seeded by the seed job, password `swiftmeds-demo` for all):
+
+| Account | Role | Use it for |
+|---|---|---|
+| `patient@demo.swiftmeds.test` | patient | search, reserve, holds, watchlist |
+| `demo-tim-001@demo.swiftmeds.test` | pharmacist of Demo Pharmacy Thimphu 01 | the dashboard: stock, collecting holds, CSV upload |
+| `demo-<licence>@demo.swiftmeds.test` | pharmacist of each other demo pharmacy (`deploy/seed/pharmacies.csv`) | the same, for that pharmacy |
+| `admin@demo.swiftmeds.test` | admin | admin routes (and the pharmacy routes) |
+
+All data is synthetic. New patients can also sign up in the app.
 
 ## Layout
 
@@ -194,6 +204,85 @@ kubectl -n swiftmed delete pod backup-shell
 `ERROR: current user cannot be dropped` is expected: the dump also re-creates the
 user it is restored with. Into a new cluster, deploy first (so Postgres and the
 backups volume exist), copy the file in with `kubectl cp`, then follow the same steps.
+
+## Public access
+
+The prod overlay runs three **Cloudflare quick tunnels** (`overlays/prod/tunnel.yaml`,
+cloudflared 2026.10.7): one each for the patient app, the pharmacy dashboard and
+the API gateway, because the apps live at `/` and cannot share one hostname by
+path. Quick tunnels need no Cloudflare account and no domain, and open no port
+on the laptop: cloudflared connects out to Cloudflare, which serves HTTPS on
+`https://<random-words>.trycloudflare.com` and forwards to Traefik's public
+entrypoints. Postgres, RabbitMQ, the gRPC port and Traefik's dashboard stay
+unreachable (NetworkPolicies), and the gateway's worker routes need the shared secret.
+
+```bash
+deploy/k8s/overlays/prod/tunnel-urls.sh        # prints the three URLs
+```
+
+A URL stays the same while the `public-tunnel` pod runs and **changes when it
+restarts** (a laptop restart, a node drain). After that, print the new URLs and
+point the workers at the new API URL (below).
+
+**Cloudflare Workers.** Both workers (`workers/hold-expiry`, every minute, and
+`workers/freshness-decay`, hourly) call the gateway's internal routes with the
+shared secret. Deploy them to your Cloudflare account, pointed at the current
+API URL:
+
+1. Create an API token: dash.cloudflare.com -> My Profile -> API Tokens -> Create
+   Token -> template **Edit Cloudflare Workers** -> your account. Keep it secret.
+2. In WSL, from the repository:
+   ```bash
+   export CLOUDFLARE_API_TOKEN=<the token>
+   deploy/k8s/overlays/prod/tunnel-urls.sh --deploy-workers
+   ```
+   This deploys both workers with `GATEWAY_URL` set to the API tunnel and, the
+   first time, sets their `WORKER_SHARED_SECRET` from `.env` (the same value the
+   cluster uses). Use `--set-secret` to set it again after changing it.
+3. Check that they reach the cluster, in Traefik's access log (it sees every
+   request; `logs deploy/gateway` reads only one of the two gateway pods):
+   ```bash
+   kubectl -n swiftmed logs -l app.kubernetes.io/name=traefik --since=5m --tail=-1 \
+     | grep -oE '"RequestPath":"/api/v1/internal/[a-z/]+"|"DownstreamStatus":[0-9]+' | paste - -
+   ```
+   Expect one `/api/v1/internal/expiry/sweep` with status 200 a minute, and the
+   freshness call on the hour. 401 means the workers' secret differs from the cluster's
+   (`--set-secret`); 530 or 1033 means the API tunnel's URL has changed (run the script again).
+
+`wrangler` needs Node.js in WSL; the tools cache has one
+(`export PATH=$HOME/.cache/swiftmed-tools/node/bin:$PATH`), or install Node 20 or newer.
+
+`wrangler login` does not work from WSL here (its browser callback goes to a
+port inside WSL that Windows cannot reach), hence the token.
+
+**Limits of quick tunnels** (Cloudflare documents them as for testing):
+
+- **No Server-Sent Events.** The live back-in-stock toast (SCRUM-71) does not
+  arrive through the quick tunnel (tested: no heartbeat in 40 s, while the same
+  stream directly from the laptop sent one every 15 s). The alert is kept, and
+  the watchlist page shows it when the patient opens or refreshes it. Live
+  alerts work locally and through a named tunnel.
+- The URL changes on restart (see above), there is no uptime guarantee, and
+  Cloudflare limits a quick tunnel to 200 requests in flight, plenty for a demo.
+
+**Moving to a named tunnel** once the team has a domain on Cloudflare (fixed
+URLs, SSE works): `cloudflared tunnel login` (authorises the domain),
+`cloudflared tunnel create swiftmed`, add one public hostname per app in the
+dashboard (for example `swiftmed.<domain>` -> `http://traefik:3000`,
+`pharmacy.<domain>` -> `http://traefik:3001`, `api.<domain>` -> `http://traefik:8080`),
+store the tunnel token as a sealed secret, and run cloudflared with
+`tunnel run --token` instead of `--url`. Then deploy the workers once with the
+fixed API URL.
+
+Verified on 18 Nov 2026 through the public URLs, in a phone-sized browser: the
+demo patient signed in, searched, saw live stock, reserved 2 units and got a
+pickup code; the pharmacist signed in on the public dashboard and collected
+with that code; the patient's hold then showed "Collected". The admin account
+signed in over the public API (`ROLE_ADMIN`). From the internet, the gRPC port is
+unreachable and the worker route without its secret answers 401. Both workers
+were deployed with `tunnel-urls.sh --deploy-workers`; Cloudflare's cron then
+called `/api/v1/internal/expiry/sweep` through the tunnel every minute
+(16:15, 16:16, 16:17 UTC), each answered 200.
 
 ## Monitoring
 

@@ -45,4 +45,4 @@ load pricing_db           prices              pricing.sql
 load auth_db              users               auth.sql
 
 echo "seed: done. Demo data is synthetic and for development and testing only."
-echo "seed: sign in as patient@demo.swiftmeds.test or demo-tim-001@demo.swiftmeds.test (password: swiftmeds-demo)."
+echo "seed: sign in as patient@demo.swiftmeds.test, demo-tim-001@demo.swiftmeds.test (pharmacist) or admin@demo.swiftmeds.test (password: swiftmeds-demo)."
