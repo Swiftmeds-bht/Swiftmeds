@@ -362,6 +362,9 @@ efficacy) was brought to 100%:
 
 ### 7.4 Automation status at the end of Sprint 4
 
+UAT results and participant sign-off dispositions are recorded in
+[docs/uat.md](uat.md); any formal SRS changes require Product Owner approval.
+
 Sprint 4 built the reservation path: the Holds saga (SCRUM-61), Inventory's saga
 events (SCRUM-57), Expiry (SCRUM-62), Feedback (SCRUM-64), Watchlist (SCRUM-59), the
 gateway reservation routes (SCRUM-54) and the patient reserve screens (SCRUM-60).
