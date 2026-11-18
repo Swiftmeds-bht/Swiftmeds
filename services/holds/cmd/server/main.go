@@ -58,6 +58,8 @@ func run() error {
 	databaseURL := cfg.Required("HOLDS_DATABASE_URL")
 	maxActive := cfg.Int("HOLDS_MAX_ACTIVE_PER_USER", app.DefaultMaxActivePerUser)
 	holdDuration := cfg.Duration("HOLDS_HOLD_DURATION", app.DefaultHoldDuration)
+	pendingTimeout := cfg.Duration("HOLDS_PENDING_TIMEOUT", app.DefaultPendingTimeout)
+	sweepInterval := cfg.Duration("HOLDS_SWEEP_INTERVAL", time.Minute)
 	rabbitURL := cfg.Required("RABBITMQ_URL")
 	// Calls to Inventory go through Traefik, which routes by :authority (the service name).
 	upstream := cfg.String("HOLDS_UPSTREAM", "traefik:50051")
@@ -72,6 +74,10 @@ func run() error {
 	}
 	if holdDuration <= 0 {
 		return fmt.Errorf("config: HOLDS_HOLD_DURATION must be greater than zero, got %s", holdDuration)
+	}
+	if pendingTimeout <= 0 || sweepInterval <= 0 {
+		return fmt.Errorf("config: HOLDS_PENDING_TIMEOUT (%s) and HOLDS_SWEEP_INTERVAL (%s) must be greater than zero",
+			pendingTimeout, sweepInterval)
 	}
 
 	log := logger.New(serviceName, logLevel)
@@ -146,12 +152,16 @@ func run() error {
 
 	// Outbound adapters -> use cases -> inbound adapters.
 	repo := postgres.NewRepository(db)
-	svc := app.NewService(repo, app.Config{MaxActivePerUser: maxActive, HoldDuration: holdDuration}, time.Now,
+	svc := app.NewService(repo, app.Config{
+		MaxActivePerUser: maxActive, HoldDuration: holdDuration, PendingTimeout: pendingTimeout,
+	}, time.Now,
 		app.WithInventory(clients.NewInventory(inventoryConn)),
 		app.WithEvents(eventPublisher))
 	log.Info("holds settings",
 		slog.Int("max_active_per_user", maxActive),
 		slog.Duration("hold_duration", holdDuration),
+		slog.Duration("pending_timeout", pendingTimeout),
+		slog.Duration("sweep_interval", sweepInterval),
 		slog.String("upstream", upstream))
 
 	stockConsumer, err := rabbitmqadapter.NewStockConsumer(consumerChannel, deduper, svc, log)
@@ -169,7 +179,37 @@ func run() error {
 	runtimeErrors := make(chan error, 2)
 	go func() { runtimeErrors <- srv.Serve(ctx, fmt.Sprintf(":%d", port)) }()
 	go func() { runtimeErrors <- stockConsumer.Start(ctx) }()
+	go sweepPeriodically(ctx, svc, sweepInterval, log)
 	return waitForRuntime(ctx, stop, runtimeErrors)
+}
+
+// sweeper is the part of the service the periodic sweep needs.
+type sweeper interface {
+	SweepStaleHolds(ctx context.Context) (app.SweepResult, error)
+}
+
+// sweepPeriodically recovers holds the saga lost (app.SweepStaleHolds) every
+// interval until ctx is cancelled. A failed sweep is logged and tried again on
+// the next tick; it never stops the service.
+func sweepPeriodically(ctx context.Context, s sweeper, interval time.Duration, log *slog.Logger) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			res, err := s.SweepStaleHolds(ctx)
+			if err != nil {
+				log.Warn("stale hold sweep had failures", slog.Any("error", err),
+					slog.Int("rejected", res.Rejected), slog.Int("released", res.Released),
+					slog.Int("release_failed", res.ReleaseFailed), slog.Int("gave_up", res.GaveUp))
+			} else if res.Rejected+res.Released+res.GaveUp > 0 {
+				log.Info("stale holds recovered",
+					slog.Int("rejected", res.Rejected), slog.Int("released", res.Released))
+			}
+		}
+	}
 }
 
 // waitForRuntime waits for the gRPC server and the event consumer. If either one

@@ -4,6 +4,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/domain"
 )
@@ -29,11 +30,27 @@ type HoldRepository interface {
 	// List returns the holds that match the filter, newest first (by created_at,
 	// then by ID), starting after f.After and at most f.Limit of them.
 	List(ctx context.Context, f domain.ListFilter) ([]domain.Hold, error)
+	// RecordWrongPickupCode adds one to the hold's PickupAttempts in a single
+	// step and returns the new count, so wrong codes tried at the same moment
+	// are all counted. It returns domain.ErrNotFound if there is no such hold and
+	// domain.ErrConflict if the hold is no longer ACTIVE. Update never changes
+	// PickupAttempts; only this method does.
+	RecordWrongPickupCode(ctx context.Context, id string) (int, error)
+	// ListStalePending returns PENDING holds created before createdBefore,
+	// oldest first, at most limit of them.
+	ListStalePending(ctx context.Context, createdBefore time.Time, limit int) ([]domain.Hold, error)
+	// ListReleasePending returns holds whose StockReleasePending is set, the
+	// longest-waiting first, at most limit of them.
+	ListReleasePending(ctx context.Context, limit int) ([]domain.Hold, error)
 }
 
 // Inventory is the part of the Inventory service that Holds calls. Both calls
 // are safe to repeat for the same hold: Inventory keeps one reservation per hold ID.
 type Inventory interface {
+	// CheckStocked returns nil if Inventory has a stock row for the pharmacy and
+	// product, domain.ErrNotStocked if it has none (an unknown ID, or a medicine
+	// the pharmacy does not sell), and domain.ErrInventoryUnavailable otherwise.
+	CheckStocked(ctx context.Context, pharmacyID, productID string) error
 	// Release gives the hold's reserved units back to available stock
 	// (the hold was cancelled or expired). Any failure is domain.ErrInventoryUnavailable.
 	Release(ctx context.Context, holdID string) error

@@ -233,6 +233,50 @@ func TestSagaReserveAndCollect(t *testing.T) {
 	}
 }
 
+// SCRUM-125: after 5 wrong codes the hold is locked; the right code is refused
+// too, and the stock stays reserved for the hold until it expires or is cancelled.
+func TestCollectLocksAfterFiveWrongCodes(t *testing.T) {
+	s := newScenario(t, 10)
+	created := s.createHold(t, 1)
+	active := s.waitForStatus(t, created.GetHoldId(), holdsv1.HoldStatus_HOLD_STATUS_ACTIVE)
+
+	collect := func(code string) error {
+		_, err := s.holds.CollectHold(ctx(t), &holdsv1.CollectHoldRequest{
+			HoldId: created.GetHoldId(), PharmacyId: s.pharmacy, PickupCode: code,
+		})
+		return err
+	}
+	for range 5 {
+		wantCode(t, collect("ZZZZZZ"), codes.PermissionDenied)
+	}
+	wantCode(t, collect(active.GetPickupCode()), codes.ResourceExhausted)
+	if h := s.hold(t, created.GetHoldId()); h.GetStatus() != holdsv1.HoldStatus_HOLD_STATUS_ACTIVE {
+		t.Fatalf("a locked hold is %s, want it to stay ACTIVE", h.GetStatus())
+	}
+	if st := s.stock(t); st.GetQuantityOnHand() != 10 || st.GetQuantityReserved() != 1 {
+		t.Fatalf("stock = %v, want the unit still reserved", st)
+	}
+}
+
+// SCRUM-125: a pharmacy and product Inventory has no stock row for get a clear
+// NOT_FOUND at once, instead of a hold that is rejected a moment later.
+func TestCreateHoldForAnUnknownPharmacyOrProductIsNotFound(t *testing.T) {
+	s := newScenario(t, 10)
+	for name, req := range map[string]*holdsv1.CreateHoldRequest{
+		"unknown product":  {UserId: s.user, PharmacyId: s.pharmacy, ProductId: newUUID(t), Quantity: 1},
+		"unknown pharmacy": {UserId: s.user, PharmacyId: newUUID(t), ProductId: s.product, Quantity: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := s.holds.CreateHold(ctx(t), req)
+			wantCode(t, err, codes.NotFound)
+		})
+	}
+	res, err := s.holds.ListHolds(ctx(t), &holdsv1.ListHoldsRequest{UserId: s.user})
+	if err != nil || len(res.GetHolds()) != 0 {
+		t.Fatalf("holds stored = %d (%v), want none", len(res.GetHolds()), err)
+	}
+}
+
 // Not enough stock: Inventory answers stock.unavailable and the hold is REJECTED.
 func TestSagaStockUnavailable(t *testing.T) {
 	s := newScenario(t, 1)
