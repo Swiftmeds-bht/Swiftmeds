@@ -1,0 +1,46 @@
+# Voluntary disruptions (a node drain, a cluster upgrade) may take down only one
+# pod at a time of the paths that run two replicas, so each keeps serving.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: traefik
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: traefik}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gateway
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: gateway}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: search
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: search}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: holds
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: holds}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inventory
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: inventory}

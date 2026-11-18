@@ -1,0 +1,26 @@
+# Monitoring for the SwiftMed deployment (SCRUM-108): Prometheus and
+# kube-state-metrics for metrics, Loki and Grafana Alloy for central logs,
+# Grafana to look at both. Its own namespace and kustomization, applied after
+# the deployment:
+#   kubectl apply -k deploy/k8s/monitoring
+#   kubectl -n monitoring port-forward svc/grafana 3300:3000   -> http://localhost:3300
+# See docs/deployment.md, "Monitoring".
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+
+resources:
+  - namespace.yaml
+  - networkpolicies.yaml
+  - prometheus.yaml
+  - kube-state-metrics.yaml
+  - loki.yaml
+  - alloy.yaml
+  - grafana.yaml
+  # Encrypted admin password; made by make-grafana-secret.sh for this cluster.
+  - grafana-admin-sealed.yaml
+
+configMapGenerator:
+  - name: grafana-dashboards
+    files:
+      - dashboards/swiftmed-overview.json

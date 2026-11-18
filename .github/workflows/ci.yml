@@ -297,6 +297,36 @@ jobs:
           npm run typecheck
           npm test
 
+  k8s-manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSLO https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/CHECKSUMS \
+            | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
+          sudo install -m 755 kubeconform /usr/local/bin/kubeconform
+
+      # Every overlay must render and every object must match its schema, so a
+      # broken YAML file fails the PR. The local overlay reads a gitignored
+      # secrets.env; the example has the same keys.
+      - name: Build and validate base and overlays
+        run: |
+          cp deploy/k8s/base/secrets.env.example deploy/k8s/overlays/local/secrets.env
+          for dir in base overlays/local overlays/prod monitoring; do
+            echo "==> deploy/k8s/$dir"
+            kubectl kustomize "deploy/k8s/$dir" | kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          done
+
   saga-integration:
     name: Saga integration tests
     runs-on: ubuntu-latest

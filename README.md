@@ -157,6 +157,21 @@ docker stop deploy-search-2
 Do not add `-v` to the `down` command unless you intentionally want to delete the
 local PostgreSQL and RabbitMQ data volumes.
 
+### Deploy on Kubernetes
+
+Docker Compose is for development; the deployment runs on Kubernetes (k3s), on
+the team laptop through k3d ([ADR 0005](docs/adr/0005-docker-compose-main-stack-kubernetes-demo.md)).
+Manifests are in [`deploy/k8s/`](deploy/k8s): a shared `base` and two overlays.
+
+```bash
+kubectl apply -k deploy/k8s/overlays/prod   # the deployment: GHCR images v1.0.0, 2 replicas, sealed secret
+deploy/k8s/overlays/local/up.sh             # a development cluster from scratch: images built here, seeded
+```
+
+The runbook, with secrets, releases, rollbacks, scaling, backup and restore, and
+the measured self-healing, autoscaling and rolling-update demos, is
+[docs/deployment.md](docs/deployment.md).
+
 ### Tests
 
 ```bash

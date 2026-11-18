@@ -1,0 +1,53 @@
+# The deployment (SCRUM-108): versioned images from GHCR (pushed by CI on a
+# version tag), two replicas of the busy paths (from base), bigger volumes, and
+# the Secret as a SealedSecret that is safe to commit. Runs on the team laptop
+# (cluster.yaml); the same overlay works on any k3s or Kubernetes cluster.
+#   kubectl apply -k deploy/k8s/platform/sealed-secrets   # once per cluster
+#   kubectl apply -k deploy/k8s/overlays/prod
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: swiftmed
+
+resources:
+  - ../../base
+  # Encrypted; made by seal-secrets.sh for this cluster's controller.
+  - sealed-secrets.yaml
+  # Public HTTPS URLs through Cloudflare quick tunnels (SCRUM-75).
+  - tunnel.yaml
+
+patches:
+  - target: {kind: StatefulSet, name: postgres}
+    patch: |
+      - {op: replace, path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage, value: 10Gi}
+  - target: {kind: StatefulSet, name: rabbitmq}
+    patch: |
+      - {op: replace, path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage, value: 4Gi}
+  - target: {kind: PersistentVolumeClaim, name: postgres-backups}
+    patch: |
+      - {op: replace, path: /spec/resources/requests/storage, value: 20Gi}
+
+# The release. CI pushes these tags when a v* tag is pushed (release-images.yml).
+images:
+  - {name: ghcr.io/swiftmeds-bht/analytics, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/auth, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/catalog, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/expiry, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/feedback, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/freshness, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/gateway, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/geo, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/holds, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/inventory, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/notification, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-registry, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/pricing, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/ranking, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/search, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/stock-sync, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/substitution, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/trust, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/patient-app, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-dashboard, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/seed, newTag: v1.0.0}

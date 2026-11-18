@@ -1,0 +1,109 @@
+# pricing: gRPC service. Generated from deploy/docker-compose.yml (SCRUM-108), then reviewed.
+# Other services reach it through Traefik (traefik:50051) with :authority "pricing",
+# as in Compose; the Ingress below is that route.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pricing
+  labels:
+    app.kubernetes.io/name: pricing
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pricing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pricing
+        app.kubernetes.io/part-of: swiftmed
+        swiftmed/postgres-client: "true"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: wait-for-postgres
+          image: ghcr.io/swiftmeds-bht/seed
+          command: ["sh", "-c", "until pg_isready -h postgres -q; do echo waiting for postgres; sleep 2; done"]
+          resources: {requests: {cpu: 5m, memory: 8Mi}, limits: {cpu: 50m, memory: 32Mi}}
+          securityContext: {runAsUser: 70, runAsGroup: 70, allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+      containers:
+        - name: pricing
+          image: ghcr.io/swiftmeds-bht/pricing
+          ports:
+            - {name: grpc, containerPort: 50063}
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: LOG_LEVEL}
+            - name: PRICING_GRPC_PORT
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: PRICING_GRPC_PORT}
+            - name: PRICING_DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: swiftmed-secrets, key: PRICING_DATABASE_URL}
+          # The server reports SERVING on grpc.health.v1 only once migrations ran and it listens.
+          startupProbe:
+            grpc: {port: 50063}
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            grpc: {port: 50063}
+            periodSeconds: 5
+          livenessProbe:
+            grpc: {port: 50063}
+            periodSeconds: 10
+            failureThreshold: 3
+          # Keep serving a few seconds after a delete, until Traefik has dropped this
+          # pod from its endpoints; otherwise calls in that gap fail (zero-downtime
+          # updates and self-healing).
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pricing
+  labels:
+    app.kubernetes.io/name: pricing
+    app.kubernetes.io/part-of: swiftmed
+  annotations:
+    # The services speak plaintext HTTP/2 (gRPC without TLS).
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+spec:
+  selector:
+    app.kubernetes.io/name: pricing
+  ports:
+    - {name: grpc, port: 50063, targetPort: grpc}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pricing-grpc
+  labels:
+    app.kubernetes.io/name: pricing
+    app.kubernetes.io/part-of: swiftmed
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: grpc
+spec:
+  ingressClassName: swiftmed
+  rules:
+    - host: pricing
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pricing
+                port: {name: grpc}

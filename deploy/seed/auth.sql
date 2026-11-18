@@ -4,6 +4,8 @@
 -- These are development fixtures only. Never load this file into a real environment.
 --
 -- * One demo patient: patient@demo.swiftmeds.test
+-- * One demo admin: admin@demo.swiftmeds.test (SCRUM-75), for the admin-only
+--   routes; like a pharmacist, it can also use the pharmacy routes.
 -- * One demo pharmacist per pharmacy in pharmacies.csv, signed in as the
 --   pharmacy's license number, for example demo-tim-001@demo.swiftmeds.test.
 --   Registering through the API never links a pharmacist to a pharmacy, and the
@@ -36,6 +38,20 @@ VALUES (
     'patient@demo.swiftmeds.test',
     '$2a$10$PsbBqtED/0FLqhyzF/Cmkucj5CZlXm1AmF2clpxytXZ4/.JcDdL8K',
     'PATIENT',
+    NULL,
+    now()
+)
+ON CONFLICT (email) DO UPDATE
+SET password_hash = EXCLUDED.password_hash,
+    role = EXCLUDED.role,
+    pharmacy_id = EXCLUDED.pharmacy_id;
+
+INSERT INTO users (id, email, password_hash, role, pharmacy_id, created_at)
+VALUES (
+    '32000000-0000-4000-8000-000000000001',
+    'admin@demo.swiftmeds.test',
+    '$2a$10$PsbBqtED/0FLqhyzF/Cmkucj5CZlXm1AmF2clpxytXZ4/.JcDdL8K',
+    'ADMIN',
     NULL,
     now()
 )
