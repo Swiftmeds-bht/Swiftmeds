@@ -70,6 +70,17 @@ them to `ghcr.io/swiftmeds-bht` (workflow "Release images").
   Search, Holds and Inventory run 2 pods (the gateway and Search through their
   HPAs, minimum 2, up to 4 on CPU), each with a PodDisruptionBudget
   (`minAvailable: 1`). Postgres and RabbitMQ stay single (see ADR 0005).
+- **Traefik is active-active** (SCRUM-135). Both replicas serve at the same time:
+  each reads the Ingresses from the Kubernetes API and builds the same routes on
+  its own (Traefik keeps no state), and the `traefik` and `traefik-public` Services
+  spread connections over both. When one stops, its `preStop` pause and HTTP/2
+  GOAWAY move clients to the other. Updates start the new pod before stopping an
+  old one (`maxSurge: 1, maxUnavailable: 0`), the PodDisruptionBudget keeps one
+  through a node drain, and a preferred anti-affinity puts them on different
+  nodes when there are several. **Limit:** the laptop cluster has one node, so the
+  node (and the laptop) is still a single point of failure. Surviving a node
+  needs several nodes plus a load balancer in front of them (a cloud L4 load
+  balancer, or MetalLB / keepalived for a floating IP): future work.
 - **NetworkPolicies** (`base/networkpolicies.yaml`): everything is denied unless
   allowed. From outside, only Traefik's public ports (8080, 3000, 3001); inside,
   any pod may use Traefik's gRPC port; only Traefik reaches the services, the
@@ -346,19 +357,26 @@ whole time and counted the status codes.
 |---|---|---|
 | Self-healing | delete one search pod | replacement Ready in 17 s; **5,251 searches, all 200** |
 | No single point of failure | delete one of the two Traefik pods, twice | **8,401 and 8,412 searches, all 200** (before the `preStop` pause on Traefik: 8,328 failures in ~20 s) |
+| Traefik active-active under load (SCRUM-135) | k6 `search.js`, 100 users for 2 min (below); at 60 s delete one Traefik pod, 41 s later the other original one | **6,976 searches, 0 failed**, p95 14 ms, max 121 ms, all thresholds pass. Both replacement pods served (740 and 721 searches, 6,522 and 5,493 gRPC calls) |
 | Autoscaling | load on search; `kubectl -n swiftmed get hpa`, `describe hpa search` | gateway and search HPAs 1 -> **4 pods**, `SuccessfulRescale ... cpu ... above target` |
 | Rolling update + rollback | `kubectl -n swiftmed set env deployment/search LOG_LEVEL=debug`, `rollout undo` | **3,061 searches, all 200** |
 | Network policies | throw-away pods trying each connection (`nc -z`) | unlabelled pod -> Postgres, RabbitMQ, search, gateway: **blocked**; -> Traefik: allowed. Postgres client -> Postgres: allowed, -> RabbitMQ: blocked. Other namespace -> Postgres, Traefik gRPC: **blocked**; -> Traefik :8080: allowed |
 | Backup and restore | marker row, backup, drop it, restore as above | backup 1.5 MB; **marker row back**, all 22 accounts intact, search 200 |
 | End to end | Cypress journey specs (`tests/e2e`) against the cluster | **5 passing** (the expiry spec skips itself with 2-hour holds) |
 
-Load for the HPA demo with k6 (SCRUM-76's script), on the cluster's network:
+Load with k6 (`tests/load/search.js`), from the repository root. The script reads
+the seed medicines (`deploy/seed`), so mount the whole repository:
 
 ```bash
-docker run --rm --network k3d-swiftmed -v "$PWD/tests/load:/load" -w /load \
-  -e BASE_URL=http://k3d-swiftmed-serverlb:8080 grafana/k6 run search.js
-kubectl -n swiftmed get hpa -w          # in another terminal
+docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" -w /work/tests/load \
+  -e BASE_URL=http://localhost:9080 -e VUS=100 -e HOLD=2m grafana/k6:1.0.0 run search.js
+kubectl -n swiftmed get hpa -w          # HPA demo, in another terminal
+# Active-active demo, during the run: delete ONE Traefik pod (a label selector
+# alone would delete both at once).
+kubectl -n swiftmed delete "$(kubectl -n swiftmed get pods -l app.kubernetes.io/name=traefik -o name | head -n 1)" --wait=false
 ```
+
+The summary lands in `tests/load/results/search.md`.
 
 What the tests found, and fixed: a pod being deleted dropped calls in the instant
 before Traefik removed it (fixed with the `preStop` pause, also on Traefik itself);

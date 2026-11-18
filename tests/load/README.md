@@ -55,4 +55,5 @@ into the test summary report.
 | Date | Script | Environment | Result |
 |---|---|---|---|
 | _pending_ | `search.js` | Compose, 100 VUs | _run on the full stack_ |
+| 18 Nov 2026 | `search.js` | Kubernetes prod overlay (laptop, k3d), 100 VUs for 2 min; both Traefik pods deleted during the run (SCRUM-135) | **pass**: 6,976 requests, 0 failed, p95 14 ms, max 121 ms (`results/search.md`) |
 | _pending_ | `reservation-burst.js` | Compose, 50 patients | _blocked on SCRUM-115 and SCRUM-54_ |
