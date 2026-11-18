@@ -18,7 +18,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
@@ -92,7 +91,7 @@ func run() error {
 		return fmt.Errorf("messaging deduplication schema: %w", err)
 	}
 
-	rabbitConn, err := amqp.Dial(rabbitURL)
+	rabbitConn, err := messaging.Dial(context.Background(), rabbitURL, log)
 	if err != nil {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}
