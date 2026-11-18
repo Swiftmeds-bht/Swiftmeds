@@ -57,4 +57,5 @@ for worker in hold-expiry freshness-decay; do
       printf '%s' "$secret" | npx wrangler secret put WORKER_SHARED_SECRET
     fi )
 done
-echo "Both workers call $api. Check: kubectl -n $NS logs deploy/gateway | grep -E 'internal/(expiry|freshness)'"
+echo "Both workers call $api. In a minute, check (expect status 200):"
+echo "  kubectl -n $NS logs -l app.kubernetes.io/name=traefik --since=5m --tail=-1 | grep -c 'internal/expiry/sweep'"

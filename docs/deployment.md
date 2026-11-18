@@ -239,9 +239,18 @@ API URL:
    This deploys both workers with `GATEWAY_URL` set to the API tunnel and, the
    first time, sets their `WORKER_SHARED_SECRET` from `.env` (the same value the
    cluster uses). Use `--set-secret` to set it again after changing it.
-3. Check that they reach the cluster:
-   `kubectl -n swiftmed logs deploy/gateway --since=5m | grep internal/expiry`
-   (one sweep a minute; freshness decay on the hour).
+3. Check that they reach the cluster, in Traefik's access log (it sees every
+   request; `logs deploy/gateway` reads only one of the two gateway pods):
+   ```bash
+   kubectl -n swiftmed logs -l app.kubernetes.io/name=traefik --since=5m --tail=-1 \
+     | grep -oE '"RequestPath":"/api/v1/internal/[a-z/]+"|"DownstreamStatus":[0-9]+' | paste - -
+   ```
+   Expect one `/api/v1/internal/expiry/sweep` with status 200 a minute, and the
+   freshness call on the hour. 401 means the workers' secret differs from the cluster's
+   (`--set-secret`); 530 or 1033 means the API tunnel's URL has changed (run the script again).
+
+`wrangler` needs Node.js in WSL; the tools cache has one
+(`export PATH=$HOME/.cache/swiftmed-tools/node/bin:$PATH`), or install Node 20 or newer.
 
 `wrangler login` does not work from WSL here (its browser callback goes to a
 port inside WSL that Windows cannot reach), hence the token.
@@ -270,7 +279,10 @@ demo patient signed in, searched, saw live stock, reserved 2 units and got a
 pickup code; the pharmacist signed in on the public dashboard and collected
 with that code; the patient's hold then showed "Collected". The admin account
 signed in over the public API (`ROLE_ADMIN`). From the internet, the gRPC port is
-unreachable and the worker route without its secret answers 401.
+unreachable and the worker route without its secret answers 401. Both workers
+were deployed with `tunnel-urls.sh --deploy-workers`; Cloudflare's cron then
+called `/api/v1/internal/expiry/sweep` through the tunnel every minute
+(16:15, 16:16, 16:17 UTC), each answered 200.
 
 ## Monitoring
 
