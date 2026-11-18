@@ -19,6 +19,7 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/messaging"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/migrate"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/resilience"
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/grpc"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/noop"
@@ -75,7 +76,18 @@ func run() error {
 		return fmt.Errorf("messaging schema: %w", err)
 	}
 
-	rabbitConn, err := amqp.Dial(rabbitURL)
+	rabbitCtx, rabbitCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer rabbitCancel()
+	var rabbitConn *amqp.Connection
+	err = resilience.Retry(rabbitCtx, resilience.RetryConfig{
+		MaxAttempts: 60,
+		BaseDelay:   100 * time.Millisecond,
+		MaxDelay:    1 * time.Second,
+	}, func(context.Context) error {
+		var dialErr error
+		rabbitConn, dialErr = amqp.Dial(rabbitURL)
+		return dialErr
+	})
 	if err != nil {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}
