@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -57,7 +56,7 @@ func run() error {
 	}
 	log := logger.New(serviceName, logLevel)
 
-	rabbitConn, err := amqp.Dial(rabbitURL)
+	rabbitConn, err := messaging.Dial(context.Background(), rabbitURL, log)
 	if err != nil {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}
