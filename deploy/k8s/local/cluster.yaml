@@ -1,0 +1,30 @@
+# The team laptop's cluster (SCRUM-108): k3s in Docker, made with k3d.
+#   k3d cluster create --config deploy/k8s/local/cluster.yaml
+# The laptop opens the apps on these ports (the Compose stack keeps 3000/3001/8080):
+#   http://localhost:9000  patient app
+#   http://localhost:9001  pharmacy dashboard
+#   http://localhost:9080  API gateway
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: swiftmed
+servers: 1
+agents: 0
+image: rancher/k3s:v1.36.6-k3s1
+ports:
+  - port: 9080:8080
+    nodeFilters: [loadbalancer]
+  - port: 9000:3000
+    nodeFilters: [loadbalancer]
+  - port: 9001:3001
+    nodeFilters: [loadbalancer]
+options:
+  k3s:
+    extraArgs:
+      # SwiftMed runs its own Traefik (deploy/k8s/traefik.yaml), configured
+      # like the Compose one; k3s's bundled one would compete for the ports.
+      - arg: --disable=traefik
+        nodeFilters: [server:*]
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

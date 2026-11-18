@@ -1,0 +1,76 @@
+# SwiftMed on Kubernetes (SCRUM-108). Apply with:
+#   deploy/k8s/make-secrets.sh        # once: secrets.env from .env (gitignored)
+#   kubectl apply -k deploy/k8s
+# The runbook is docs/deployment.md. Docker Compose stays the local development
+# stack (ADR 0005); this is the deployment.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: swiftmed
+
+resources:
+  - namespace.yaml
+  - traefik.yaml
+  - postgres.yaml
+  - rabbitmq.yaml
+  - gateway.yaml
+  - web.yaml
+  - hpa.yaml
+  # gRPC services, one file each (Deployment, Service, Ingress route).
+  - services/analytics.yaml
+  - services/auth.yaml
+  - services/catalog.yaml
+  - services/expiry.yaml
+  - services/feedback.yaml
+  - services/freshness.yaml
+  - services/geo.yaml
+  - services/holds.yaml
+  - services/inventory.yaml
+  - services/notification.yaml
+  - services/pharmacy-registry.yaml
+  - services/pricing.yaml
+  - services/ranking.yaml
+  - services/search.yaml
+  - services/stock-sync.yaml
+  - services/substitution.yaml
+  - services/trust.yaml
+  - services/user-profile.yaml
+  - services/watchlist.yaml
+
+configMapGenerator:
+  # The name gets a content hash, so changing config.env rolls every pod that reads it.
+  - name: swiftmed-config
+    envs: [config.env]
+
+secretGenerator:
+  # A fixed name, so the seed Job (seed-job/) can find it. After changing
+  # secrets.env, run: kubectl -n swiftmed rollout restart deployment
+  - name: swiftmed-secrets
+    envs: [secrets.env]
+    options:
+      disableNameSuffixHash: true
+
+# Image tags in one place. A release changes newTag here (docs/deployment.md).
+images:
+  - {name: ghcr.io/swiftmeds-bht/analytics, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/auth, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/catalog, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/expiry, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/feedback, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/freshness, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/gateway, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/geo, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/holds, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/inventory, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/notification, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-registry, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/pricing, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/ranking, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/search, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/stock-sync, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/substitution, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/trust, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/patient-app, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-dashboard, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/seed, newTag: dev}

@@ -1,0 +1,33 @@
+# Loads the demo data into the cluster's Postgres (SCRUM-108/75), the same
+# deploy/seed/seed.sh as `make seed`. It waits for the services' migrations
+# itself, and it is safe to run again. A Job cannot be changed once created, so
+# re-run it with:
+#   kubectl -n swiftmed delete job seed --ignore-not-found && kubectl apply -k deploy/k8s/seed-job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed
+  labels:
+    app.kubernetes.io/name: seed
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seed
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: ghcr.io/swiftmeds-bht/seed
+          env:
+            - {name: PGHOST, value: postgres}
+            - name: PGUSER
+              valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_USER}}
+            - name: PGPASSWORD
+              valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_PASSWORD}}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
