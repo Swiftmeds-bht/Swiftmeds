@@ -21,7 +21,7 @@ var _ ports.HoldRepository = (*Repository)(nil)
 
 // holdColumns is the column list of every SELECT, in the order scanHold reads it.
 const holdColumns = `hold_id, user_id, pharmacy_id, product_id, quantity, status, pickup_code,
-	created_at, expires_at, status_changed_at, status_reason`
+	created_at, expires_at, status_changed_at, status_reason, pickup_attempts, stock_release_pending`
 
 // uniqueViolation is the Postgres error code for a unique index or key.
 const uniqueViolation = "23505"
@@ -60,9 +60,10 @@ func (r *Repository) Create(ctx context.Context, h domain.Hold, maxOpen int) err
 			}
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO holds (`+holdColumns+`)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 			h.ID, h.UserID, h.PharmacyID, h.ProductID, h.Quantity, string(h.Status), h.PickupCode,
-			h.CreatedAt, nullTime(h.ExpiresAt), h.StatusChangedAt, h.StatusReason)
+			h.CreatedAt, nullTime(h.ExpiresAt), h.StatusChangedAt, h.StatusReason,
+			h.PickupAttempts, h.StockReleasePending)
 		if err != nil {
 			if name, ok := violatedUnique(err); ok {
 				if name == activeCodeIndex {
@@ -91,12 +92,14 @@ func (r *Repository) Get(ctx context.Context, id string) (domain.Hold, error) {
 // Update changes the mutable columns, but only while the stored status is still
 // from. That one condition is what makes Collect and Expire safe when they
 // arrive at the same moment: the database lets exactly one UPDATE match.
+// pickup_attempts is left alone: only RecordWrongPickupCode changes it.
 func (r *Repository) Update(ctx context.Context, h domain.Hold, from domain.Status) error {
 	tag, err := r.db.Exec(ctx, `UPDATE holds
-		SET status = $1, pickup_code = $2, expires_at = $3, status_changed_at = $4, status_reason = $5
-		WHERE hold_id = $6 AND status = $7`,
+		SET status = $1, pickup_code = $2, expires_at = $3, status_changed_at = $4, status_reason = $5,
+		    stock_release_pending = $6
+		WHERE hold_id = $7 AND status = $8`,
 		string(h.Status), h.PickupCode, nullTime(h.ExpiresAt), h.StatusChangedAt, h.StatusReason,
-		h.ID, string(from))
+		h.StockReleasePending, h.ID, string(from))
 	if err != nil {
 		if name, ok := violatedUnique(err); ok && name == activeCodeIndex {
 			return domain.ErrPickupCodeTaken
@@ -173,6 +176,68 @@ func (r *Repository) List(ctx context.Context, f domain.ListFilter) ([]domain.Ho
 	return out, nil
 }
 
+// RecordWrongPickupCode counts one wrong code with a single UPDATE, so wrong
+// codes tried at the same moment are all counted.
+func (r *Repository) RecordWrongPickupCode(ctx context.Context, id string) (int, error) {
+	var attempts int
+	err := r.db.QueryRow(ctx, `UPDATE holds SET pickup_attempts = pickup_attempts + 1
+		WHERE hold_id = $1 AND status = 'ACTIVE'
+		RETURNING pickup_attempts`, id).Scan(&attempts)
+	if err == nil {
+		return attempts, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, fmt.Errorf("record wrong pickup code: %w", err)
+	}
+	// No row matched: either there is no such hold, or it is not ACTIVE.
+	var one int
+	err = r.db.QueryRow(ctx, `SELECT 1 FROM holds WHERE hold_id = $1`, id).Scan(&one)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return 0, domain.ErrNotFound
+	case err != nil:
+		return 0, fmt.Errorf("check hold: %w", err)
+	default:
+		return 0, domain.ErrConflict
+	}
+}
+
+// ListStalePending returns PENDING holds created before createdBefore, oldest first.
+func (r *Repository) ListStalePending(ctx context.Context, createdBefore time.Time, limit int) ([]domain.Hold, error) {
+	return r.query(ctx, `SELECT `+holdColumns+` FROM holds
+		WHERE status = 'PENDING' AND created_at < $1
+		ORDER BY created_at, hold_id
+		LIMIT $2`, createdBefore, limit)
+}
+
+// ListReleasePending returns holds whose stock is still to be released, longest-waiting first.
+func (r *Repository) ListReleasePending(ctx context.Context, limit int) ([]domain.Hold, error) {
+	return r.query(ctx, `SELECT `+holdColumns+` FROM holds
+		WHERE stock_release_pending
+		ORDER BY status_changed_at, hold_id
+		LIMIT $1`, limit)
+}
+
+func (r *Repository) query(ctx context.Context, sql string, args ...any) ([]domain.Hold, error) {
+	rows, err := r.db.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query holds: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Hold
+	for rows.Next() {
+		h, err := scanHold(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan hold: %w", err)
+		}
+		out = append(out, h)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("query holds: %w", err)
+	}
+	return out, nil
+}
+
 // scanner is the Scan method that pgx.Row and pgx.Rows share.
 type scanner interface {
 	Scan(dest ...any) error
@@ -183,7 +248,7 @@ func scanHold(s scanner) (domain.Hold, error) {
 	var status string
 	var expiresAt *time.Time
 	err := s.Scan(&h.ID, &h.UserID, &h.PharmacyID, &h.ProductID, &h.Quantity, &status, &h.PickupCode,
-		&h.CreatedAt, &expiresAt, &h.StatusChangedAt, &h.StatusReason)
+		&h.CreatedAt, &expiresAt, &h.StatusChangedAt, &h.StatusReason, &h.PickupAttempts, &h.StockReleasePending)
 	if err != nil {
 		return domain.Hold{}, err
 	}

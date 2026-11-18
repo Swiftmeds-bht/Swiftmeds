@@ -112,11 +112,14 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrInvalidListFilter),
 		errors.Is(err, domain.ErrInvalidPageToken):
 		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, domain.ErrNotFound),
+		errors.Is(err, domain.ErrNotStocked):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
-	case errors.Is(err, domain.ErrLimitReached):
+	case errors.Is(err, domain.ErrLimitReached),
+		errors.Is(err, domain.ErrPickupLocked):
+		// Too many open holds, or too many wrong pickup codes.
 		return status.Error(codes.ResourceExhausted, err.Error())
 	case errors.Is(err, domain.ErrWrongPickupCode),
 		errors.Is(err, domain.ErrWrongPharmacy),

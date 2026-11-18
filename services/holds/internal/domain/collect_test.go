@@ -38,6 +38,38 @@ func TestReserveChecksTheStatusBeforeTheCode(t *testing.T) {
 	}
 }
 
+func TestCollectLocksAfterMaxPickupAttempts(t *testing.T) {
+	for _, tc := range []struct {
+		attempts int
+		code     string
+		wantErr  error
+	}{
+		{MaxPickupAttempts - 1, testCode, nil},
+		{MaxPickupAttempts - 1, "ZZZ999", ErrWrongPickupCode},
+		{MaxPickupAttempts, testCode, ErrPickupLocked},
+		{MaxPickupAttempts, "ZZZ999", ErrPickupLocked},
+		{MaxPickupAttempts + 3, testCode, ErrPickupLocked},
+	} {
+		h := holdIn(Active)
+		h.PickupAttempts = tc.attempts
+		_, err := h.Collect(t0.Add(time.Hour), "ph-1", tc.code)
+		if !errors.Is(err, tc.wantErr) {
+			t.Errorf("%d wrong codes so far, code %s: err = %v, want %v", tc.attempts, tc.code, err, tc.wantErr)
+		}
+	}
+	// The status and pharmacy are still checked first.
+	locked := holdIn(Collected)
+	locked.PickupAttempts = MaxPickupAttempts
+	if _, err := locked.Collect(t0, "ph-1", testCode); !errors.Is(err, ErrInvalidTransition) {
+		t.Errorf("collected and locked: err = %v, want ErrInvalidTransition", err)
+	}
+	otherPharmacy := holdIn(Active)
+	otherPharmacy.PickupAttempts = MaxPickupAttempts
+	if _, err := otherPharmacy.Collect(t0, "ph-2", testCode); !errors.Is(err, ErrWrongPharmacy) {
+		t.Errorf("another pharmacy: err = %v, want ErrWrongPharmacy", err)
+	}
+}
+
 func TestCollect(t *testing.T) {
 	expiresAt := t0.Add(holdFor)
 	cases := []struct {

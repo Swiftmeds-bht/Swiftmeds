@@ -10,11 +10,11 @@ pharmacy, collects them with a **pickup code**, and the hold ends in `COLLECTED`
 
 | RPC | What it does | Errors |
 |---|---|---|
-| `CreateHold` | Stores a `PENDING` hold (quantity 1 to 5) and publishes `hold.requested`, which starts the [reservation saga](#reservation-saga). | `INVALID_ARGUMENT`, `RESOURCE_EXHAUSTED` when the patient already has 3 open holds, `UNAVAILABLE` if the event could not be sent (the hold is then `REJECTED`; try again) |
+| `CreateHold` | Asks Inventory whether the pharmacy stocks the product (`GetStock`), then stores a `PENDING` hold (quantity 1 to 5) and publishes `hold.requested`, which starts the [reservation saga](#reservation-saga). | `INVALID_ARGUMENT`, `NOT_FOUND` when the pharmacy or product is unknown or the pharmacy does not sell it, `RESOURCE_EXHAUSTED` when the patient already has 3 open holds, `UNAVAILABLE` if Inventory could not be asked or the event could not be sent (the hold is then `REJECTED`; try again) |
 | `GetHold` | Returns one hold. The patient's pickup code is included while the hold is `ACTIVE`. | `NOT_FOUND` |
 | `ListHolds` | Holds of a patient (`user_id`) **or** of a pharmacy (`pharmacy_id`), newest first, optional status filter, paged. Pickup codes are included only in the patient's list. | `INVALID_ARGUMENT` |
 | `CancelHold` | The patient who made the hold cancels it. An `ACTIVE` hold gives its stock back to Inventory first. | `PERMISSION_DENIED` (not their hold), `FAILED_PRECONDITION` (already finished), `UNAVAILABLE` (Inventory could not be reached; the hold is unchanged, try again) |
-| `CollectHold` | Pharmacy staff hand over the medicine. Needs `hold_id`, `pharmacy_id` and the patient's `pickup_code`. | `PERMISSION_DENIED` (wrong code or pharmacy), `FAILED_PRECONDITION` (already collected, expired, cancelled ...), `ABORTED` (lost a race with another change), `UNAVAILABLE` (Inventory could not be reached; the hold stays `ACTIVE`, try again) |
+| `CollectHold` | Pharmacy staff hand over the medicine. Needs `hold_id`, `pharmacy_id` and the patient's `pickup_code`. | `PERMISSION_DENIED` (wrong code or pharmacy), `RESOURCE_EXHAUSTED` (locked after 5 wrong codes, see [the lock](#pickup-code-lock-scrum-125)), `FAILED_PRECONDITION` (already collected, expired, cancelled ...), `ABORTED` (lost a race with another change), `UNAVAILABLE` (Inventory could not be reached; the hold stays `ACTIVE`, try again) |
 | `ExpireHold` | Called by Expiry once `expires_at` has passed. Gives the stock back to Inventory first. Does nothing unless the hold is `ACTIVE`. | `FAILED_PRECONDITION` if called before `expires_at`, `UNAVAILABLE` (Inventory could not be reached; the hold stays `ACTIVE`, Expiry calls again) |
 
 ## Rules
@@ -26,8 +26,8 @@ pharmacy, collects them with a **pickup code**, and the hold ends in `COLLECTED`
   (a database unique index; a clash makes the service pick a new code). Codes are compared in constant
   time and typed input is forgiven (`abc-234` equals `ABC234`).
 - **Collecting:** the hold must be `ACTIVE`, belong to the calling pharmacy, not be past `expires_at`,
-  and the code must match. A wrong code is refused and the hold stays `ACTIVE`. Collecting twice
-  fails because the second call finds a `COLLECTED` hold.
+  not be locked by 5 wrong codes, and the code must match. A wrong code is refused, counted, and the hold
+  stays `ACTIVE`. Collecting twice fails because the second call finds a `COLLECTED` hold.
 - **Open-hold limit:** a patient may have at most `HOLDS_MAX_ACTIVE_PER_USER` (default 3) holds that
   are `PENDING` or `ACTIVE`. The check and the insert are one database transaction under a per-patient
   advisory lock, so many `CreateHold` calls at once cannot get past the limit. Finished holds do not count.
@@ -92,18 +92,41 @@ If `hold.requested` cannot be published, `CreateHold` rejects the hold at once a
 Otherwise Inventory would never hear of it, and it would sit `PENDING` for ever and use up the
 patient's limit.
 
+## Stale-hold sweep (SCRUM-125)
+
+A hold stays `PENDING` for ever if its saga events are lost: Holds stopped between saving the hold and
+publishing `hold.requested`, that event was dead-lettered, or Inventory reserved the stock but its
+`stock.reserved` answer was lost. In the last case the units also stay reserved for ever. Every
+`HOLDS_SWEEP_INTERVAL` (default 1 minute) each Holds instance runs `SweepStaleHolds` (`internal/app/sweep.go`):
+
+1. **Reject** every hold still `PENDING` after `HOLDS_PENDING_TIMEOUT` (default 10 minutes), reason
+   `stock reservation timed out`, and mark it `stock_release_pending`. The update only succeeds while
+   the hold is still `PENDING`, so a reservation arriving at the same moment cleanly wins or loses.
+   Rejecting before releasing matters: a late `stock.reserved` then finds a `REJECTED` hold and
+   releases the stock itself (the table above), instead of making an `ACTIVE` hold whose stock was
+   already given back.
+2. **Release** the stock of every marked hold, then clear the mark. A failed release is retried on the
+   next sweep. Inventory answers "no such reservation" (the request never reached it) with the same
+   error as an outage, so after one hour of failures the sweep gives up on that hold and logs it.
+
+Several instances may sweep at once: every step is conditional or safe to repeat. This replaces the
+transactional outbox the old "known gaps" list suggested: the sweep also covers events lost after
+they were sent, which an outbox alone would not.
+
+## Pickup-code lock (SCRUM-125)
+
+Every wrong pickup code adds one to the hold's `pickup_attempts`, in a single `UPDATE`, so wrong codes
+tried at the same moment are all counted. After 5 wrong codes (`domain.MaxPickupAttempts`) the hold is
+locked: `CollectHold` answers `RESOURCE_EXHAUSTED` (HTTP 429) even for the right code, and the hold stays
+`ACTIVE` until it expires or the patient cancels it. A code that could not be counted is not answered
+as "wrong" (fail closed).
+
 ## Known gaps
 
-- **Crash between saving the hold and publishing `hold.requested`.** Holds saves, then publishes. If
-  the process dies in between, the hold stays `PENDING`. The fix is a transactional outbox (save the
-  event in the same transaction as the hold, and publish it from there).
-- **No timeout for a `PENDING` hold** that Inventory never answers. A small sweeper that rejects holds
-  `PENDING` for more than a few minutes would close this.
 - **Inventory reports "no such reservation" and "wrong state" as plain `INTERNAL` errors**, so Holds
-  cannot tell them from an outage and answers `UNAVAILABLE` for all of them. Mapping them to `NOT_FOUND`
-  and `FAILED_PRECONDITION` in Inventory would let Holds give a better answer.
-- **No lock-out for repeated wrong pickup codes.** A code has about a billion values, so guessing is not
-  practical yet, but staff-facing access needs an attempt limit when the gateway exposes `CollectHold`.
+  cannot tell them from an outage and answers `UNAVAILABLE` for all of them (and the sweep needs a retry
+  window, see above). Mapping them to `NOT_FOUND` and `FAILED_PRECONDITION` in Inventory would let Holds
+  give a better answer.
 
 ## Layout
 
@@ -111,9 +134,9 @@ patient's limit.
 cmd/server/main.go           wiring only: config -> logger -> postgres + migrations -> RabbitMQ + Inventory client -> app -> gRPC server and event consumer
 internal/domain/             Hold, status machine, pickup codes, errors (no outside imports)
 internal/ports/              HoldRepository, Inventory and Events interfaces
-internal/app/                the use cases: create, get, list, reserve, reject, cancel, collect, expire; saga.go: HandleStockReserved and HandleStockUnavailable
+internal/app/                the use cases: create, get, list, reserve, reject, cancel, collect, expire; saga.go: HandleStockReserved and HandleStockUnavailable; sweep.go: SweepStaleHolds
 internal/adapters/grpc/      gRPC handler: proto <-> app, errors -> status codes
-internal/adapters/clients/   Inventory gRPC client (ReleaseReservation, CommitReservation)
+internal/adapters/clients/   Inventory gRPC client (GetStock, ReleaseReservation, CommitReservation)
 internal/adapters/rabbitmq/  publisher for hold.requested and hold.confirmed; consumer for stock.reserved and stock.unavailable
 internal/adapters/postgres/  HoldRepository on holds_db
 internal/adapters/memory/    in-memory HoldRepository (tests)
@@ -133,6 +156,8 @@ test/integration/            end-to-end saga test (build tag `e2e`)
 | `RABBITMQ_URL` | required | RabbitMQ connection URL (the saga's events) |
 | `HOLDS_UPSTREAM` | `traefik:50051` | where calls to Inventory go. Traefik routes them by `:authority` (`inventory`). |
 | `HOLDS_CALL_TIMEOUT` | `3s` | time limit for one attempt of an Inventory call (up to 3 attempts on `UNAVAILABLE`) |
+| `HOLDS_PENDING_TIMEOUT` | `10m` | a hold still `PENDING` after this is rejected by the [sweep](#stale-hold-sweep-scrum-125) |
+| `HOLDS_SWEEP_INTERVAL` | `1m` | how often the sweep runs |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 
 ## Run

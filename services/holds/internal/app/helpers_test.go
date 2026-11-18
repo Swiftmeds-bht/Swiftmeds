@@ -96,6 +96,13 @@ func (errRepo) Update(context.Context, domain.Hold, domain.Status) error { retur
 func (errRepo) List(context.Context, domain.ListFilter) ([]domain.Hold, error) {
 	return nil, errBoom
 }
+func (errRepo) RecordWrongPickupCode(context.Context, string) (int, error) { return 0, errBoom }
+func (errRepo) ListStalePending(context.Context, time.Time, int) ([]domain.Hold, error) {
+	return nil, errBoom
+}
+func (errRepo) ListReleasePending(context.Context, int) ([]domain.Hold, error) {
+	return nil, errBoom
+}
 
 var _ ports.HoldRepository = errRepo{}
 

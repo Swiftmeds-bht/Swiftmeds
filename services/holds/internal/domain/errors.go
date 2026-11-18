@@ -23,6 +23,12 @@ var (
 	ErrMissingPickupCode = errors.New("pickup_code is required")
 	// ErrWrongPickupCode means the pickup code does not match the hold's code.
 	ErrWrongPickupCode = errors.New("pickup code does not match")
+	// ErrPickupLocked means MaxPickupAttempts wrong codes were tried for the hold,
+	// so it can no longer be collected, not even with the right code.
+	ErrPickupLocked = errors.New("too many wrong pickup codes: this hold can no longer be collected")
+	// ErrNotStocked means Inventory has no stock row for the pharmacy and product:
+	// one of the IDs is unknown, or the pharmacy does not sell that medicine.
+	ErrNotStocked = errors.New("this pharmacy does not stock this medicine")
 	// ErrWrongPharmacy means the hold was made at a different pharmacy.
 	ErrWrongPharmacy = errors.New("hold belongs to a different pharmacy")
 	// ErrNotHoldOwner means the hold belongs to a different patient.

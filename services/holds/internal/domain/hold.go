@@ -20,6 +20,11 @@ const (
 	MaxQuantity = 5
 )
 
+// MaxPickupAttempts is how many wrong pickup codes a hold accepts. After that
+// it is locked: even the right code is refused, so a 6-character code cannot
+// be found by trying.
+const MaxPickupAttempts = 5
+
 // Hold is a short reservation of stock for one patient.
 type Hold struct {
 	ID              string
@@ -33,20 +38,33 @@ type Hold struct {
 	StatusChangedAt time.Time // when the hold reached its current status
 	StatusReason    string    // set for REJECTED and CANCELLED
 	PickupCode      string    // set when the hold becomes ACTIVE; only the patient sees it
+	// PickupAttempts counts wrong pickup codes. Only the repository changes it
+	// (RecordWrongPickupCode), so two wrong codes at once are both counted.
+	PickupAttempts int
+	// StockReleasePending is set when the sweep rejected a stale PENDING hold and
+	// Inventory may still hold stock for it; it is cleared once the stock is released.
+	StockReleasePending bool
 }
 
 // NewHold validates and builds a PENDING hold.
+//
+// The checks are plain if statements, not a tagless switch: Go's coverage
+// profile does not record switch cases, so mutation testing (make mutation)
+// would count every mutant in them as not covered.
 func NewHold(id, userID, pharmacyID, productID string, quantity int, now time.Time) (Hold, error) {
-	switch {
-	case id == "":
+	if id == "" {
 		return Hold{}, ErrMissingHoldID
-	case userID == "":
+	}
+	if userID == "" {
 		return Hold{}, ErrMissingUserID
-	case pharmacyID == "":
+	}
+	if pharmacyID == "" {
 		return Hold{}, ErrMissingPharmacyID
-	case productID == "":
+	}
+	if productID == "" {
 		return Hold{}, ErrMissingProductID
-	case quantity < MinQuantity || quantity > MaxQuantity:
+	}
+	if quantity < MinQuantity || quantity > MaxQuantity {
 		return Hold{}, ErrInvalidQuantity
 	}
 	return Hold{
@@ -97,22 +115,31 @@ func (h Hold) Reject(now time.Time, reason string) (Hold, error) {
 
 // Collect is the collect event: ACTIVE -> COLLECTED. Pharmacy staff hand over
 // the medicine only if the hold was made at their pharmacy, its time has not
-// run out, and the patient's pickup code matches. The status is checked first,
-// so collecting a hold twice always fails with ErrInvalidTransition.
+// run out, it is not locked by too many wrong codes, and the patient's pickup
+// code matches. The status is checked first, so collecting a hold twice always
+// fails with ErrInvalidTransition. The lock is checked before the code, so a
+// locked hold gives the same answer for a right and a wrong code.
 func (h Hold) Collect(now time.Time, pharmacyID, pickupCode string) (Hold, error) {
 	if _, err := Next(h.Status, Collect); err != nil {
 		return Hold{}, err
 	}
-	switch {
-	case pharmacyID == "":
+	// Plain if statements for the same reason as in NewHold.
+	if pharmacyID == "" {
 		return Hold{}, ErrMissingPharmacyID
-	case pharmacyID != h.PharmacyID:
+	}
+	if pharmacyID != h.PharmacyID {
 		return Hold{}, ErrWrongPharmacy
-	case !h.ExpiresAt.IsZero() && !now.Before(h.ExpiresAt):
+	}
+	if !h.ExpiresAt.IsZero() && !now.Before(h.ExpiresAt) {
 		return Hold{}, ErrHoldExpired
-	case NormalizePickupCode(pickupCode) == "":
+	}
+	if h.PickupAttempts >= MaxPickupAttempts {
+		return Hold{}, ErrPickupLocked
+	}
+	if NormalizePickupCode(pickupCode) == "" {
 		return Hold{}, ErrMissingPickupCode
-	case !PickupCodeMatches(h.PickupCode, pickupCode):
+	}
+	if !PickupCodeMatches(h.PickupCode, pickupCode) {
 		return Hold{}, ErrWrongPickupCode
 	}
 	return h.move(Collect, now)
