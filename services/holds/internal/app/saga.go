@@ -102,8 +102,9 @@ func (s *Service) HandleStockUnavailable(ctx context.Context, holdID string) (Ou
 // noInventory is used when no Inventory client is set: no stock is touched.
 type noInventory struct{}
 
-func (noInventory) Release(context.Context, string) error { return nil }
-func (noInventory) Commit(context.Context, string) error  { return nil }
+func (noInventory) CheckStocked(context.Context, string, string) error { return nil }
+func (noInventory) Release(context.Context, string) error              { return nil }
+func (noInventory) Commit(context.Context, string) error               { return nil }
 
 // noEvents is used when no publisher is set: no event is sent.
 type noEvents struct{}

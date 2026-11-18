@@ -47,6 +47,11 @@ func Run(t *testing.T, newRepo func(*testing.T) ports.HoldRepository) {
 		{"list filters by patient, pharmacy and status", listFilters},
 		{"list orders ties by id", listTieBreak},
 		{"list returns pages after a cursor", listPages},
+		{"wrong pickup codes are counted on active holds only", wrongCodesAreCounted},
+		{"concurrent wrong pickup codes are all counted", concurrentWrongCodesAllCount},
+		{"update keeps the wrong-code count and stores the release mark", updateKeepsAttemptsStoresReleaseMark},
+		{"stale pending holds are listed oldest first", staleHoldsAreListed},
+		{"holds waiting for a release are listed oldest first", releasePendingHoldsAreListed},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) { tc.run(t, newRepo(t)) })
@@ -110,6 +115,7 @@ func assertSame(t *testing.T, got, want domain.Hold) {
 		got.ProductID != want.ProductID || got.Quantity != want.Quantity ||
 		got.Status != want.Status || got.StatusReason != want.StatusReason ||
 		got.PickupCode != want.PickupCode ||
+		got.PickupAttempts != want.PickupAttempts || got.StockReleasePending != want.StockReleasePending ||
 		!got.CreatedAt.Equal(want.CreatedAt) || !got.ExpiresAt.Equal(want.ExpiresAt) ||
 		!got.StatusChangedAt.Equal(want.StatusChangedAt) {
 		t.Errorf("got %+v, want %+v", got, want)

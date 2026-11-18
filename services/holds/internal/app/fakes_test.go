@@ -17,16 +17,27 @@ type inventoryCall struct{ op, holdID string }
 
 // fakeInventory records every Release and Commit. Set err to make calls fail.
 // onCall runs at the start of each call, so a test can look at the hold at that moment.
+// CheckStocked is not recorded; it returns checkErr.
 type fakeInventory struct {
-	calls  []inventoryCall
-	err    error
-	onCall func(op, holdID string)
+	calls    []inventoryCall
+	err      error
+	checkErr error
+	// failFor makes calls for these hold IDs fail, whatever err says.
+	failFor map[string]error
+	onCall  func(op, holdID string)
+}
+
+func (f *fakeInventory) CheckStocked(context.Context, string, string) error {
+	return f.checkErr
 }
 
 func (f *fakeInventory) record(op, holdID string) error {
 	f.calls = append(f.calls, inventoryCall{op, holdID})
 	if f.onCall != nil {
 		f.onCall(op, holdID)
+	}
+	if err, ok := f.failFor[holdID]; ok {
+		return err
 	}
 	return f.err
 }

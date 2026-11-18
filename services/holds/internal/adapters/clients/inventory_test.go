@@ -24,7 +24,15 @@ type fakeServer struct {
 	mu        sync.Mutex
 	released  []string
 	committed []string
+	checked   []string
 	err       error
+}
+
+func (f *fakeServer) GetStock(_ context.Context, r *inventoryv1.GetStockRequest) (*inventoryv1.GetStockResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.checked = append(f.checked, r.GetPharmacyId()+"/"+r.GetProductId())
+	return &inventoryv1.GetStockResponse{}, f.err
 }
 
 func (f *fakeServer) ReleaseReservation(_ context.Context, r *inventoryv1.ReleaseReservationRequest) (*inventoryv1.ReleaseReservationResponse, error) {
@@ -99,6 +107,32 @@ func TestEveryInventoryFailureIsErrInventoryUnavailable(t *testing.T) {
 			}
 			if err := inv.Commit(context.Background(), "h-1"); !errors.Is(err, domain.ErrInventoryUnavailable) {
 				t.Errorf("Commit: err = %v, want ErrInventoryUnavailable", err)
+			}
+		})
+	}
+}
+
+func TestCheckStocked(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{"stocked", nil, nil},
+		{"unknown pharmacy or product", status.Error(codes.NotFound, "inventory stock not found"), domain.ErrNotStocked},
+		{"inventory down", status.Error(codes.Unavailable, "down"), domain.ErrInventoryUnavailable},
+		{"inventory error", status.Error(codes.Internal, "boom"), domain.ErrInventoryUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fake := &fakeServer{err: tc.err}
+			inv := connect(t, fake)
+
+			err := inv.CheckStocked(context.Background(), "ph-1", "med-1")
+			if !errors.Is(err, tc.want) || (tc.want == nil) != (err == nil) {
+				t.Fatalf("err = %v, want %v", err, tc.want)
+			}
+			if len(fake.checked) != 1 || fake.checked[0] != "ph-1/med-1" {
+				t.Errorf("GetStock calls = %v, want ph-1/med-1", fake.checked)
 			}
 		})
 	}
