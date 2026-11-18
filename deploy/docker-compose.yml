@@ -96,11 +96,17 @@ services:
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    # Healthy only once the listeners accept connections. `ping` passes as soon
+    # as the Erlang node runs, before port 5672 opens: on a busy CI runner that
+    # was 16 s early, and services that depend on RabbitMQ crashed connecting to
+    # it. The Kubernetes readiness probe and the CI service use the same check.
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      start_period: 60s
+      start_interval: 2s
       interval: 10s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 6
 
   traefik:
     # v3.6+ negotiates the Docker API version; v3.3 used API 1.24, which
