@@ -13,23 +13,57 @@ kind: ServiceAccount
 metadata:
   name: traefik
 ---
+# Least privilege: Traefik reads only this namespace (the provider's
+# `namespaces: [swiftmed]` below), so its rights are a namespaced Role, not a
+# ClusterRole. A cluster-wide Secret read would include the Sealed Secrets
+# controller's key in kube-system and the Grafana password in monitoring.
+# Secrets stay in the list because the Ingress provider always watches them
+# (for TLS; none is used here, Cloudflare serves HTTPS). Traefik builds no
+# routes until every watch works, so a missing right here means 404 everywhere.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: swiftmed-traefik
+rules:
+  - apiGroups: [""]
+    resources: [services, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: swiftmed-traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: swiftmed-traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: swiftmed
+---
+# The cluster-wide objects the provider watches: IngressClasses and Nodes
+# (read-only, no credentials in either). That is all this ClusterRole allows.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: swiftmed-traefik
 rules:
   - apiGroups: [""]
-    resources: [services, secrets, nodes]
-    verbs: [get, list, watch]
-  - apiGroups: [discovery.k8s.io]
-    resources: [endpointslices]
-    verbs: [list, watch]
-  - apiGroups: [networking.k8s.io]
-    resources: [ingresses, ingressclasses]
+    resources: [nodes]
     verbs: [get, list, watch]
   - apiGroups: [networking.k8s.io]
-    resources: [ingresses/status]
-    verbs: [update]
+    resources: [ingressclasses]
+    verbs: [get, list, watch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
