@@ -39,6 +39,14 @@ spec:
       ports:
         - {port: 50051}
         - {port: 8081}
+    # Metrics (:8081/metrics) for Prometheus in the monitoring namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus}
+      ports:
+        - {port: 8081}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

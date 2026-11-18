@@ -73,12 +73,25 @@ data:
       # Dashboard on the "traefik" entrypoint, reachable only with kubectl port-forward.
       insecure: true
     ping: {}
+    # Request count and latency per entrypoint, router and service, at
+    # :8081/metrics, scraped by Prometheus (deploy/k8s/monitoring). Every gRPC call
+    # between services passes through here, so this covers all 20 services.
+    metrics:
+      prometheus:
+        entryPoint: traefik
+        addEntryPointsLabels: true
+        addRoutersLabels: true
+        addServicesLabels: true
+        buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]
     providers:
       kubernetesIngress:
         ingressClass: swiftmed
         namespaces: [swiftmed]
     log:
       level: INFO
+    # One line per request, as JSON, so Loki can query it by field.
+    accessLog:
+      format: json
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -100,7 +113,7 @@ spec:
         app.kubernetes.io/part-of: swiftmed
       annotations:
         # Restart Traefik when its static configuration changes.
-        swiftmed/config-version: "1"
+        swiftmed/config-version: "2"
     spec:
       serviceAccountName: traefik
       securityContext:

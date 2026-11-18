@@ -36,6 +36,10 @@ load, and rolling updates with rollback.
   cluster (images built locally, one replica, the Secret from a gitignored file).
   The deployment runs on the team laptop as k3s in Docker (k3d); the runbook is
   [docs/deployment.md](../deployment.md).
+- Monitoring runs beside it (`deploy/k8s/monitoring`): Prometheus with
+  kube-state-metrics for metrics, Loki fed by Grafana Alloy for central logs, and
+  Grafana with a provisioned dashboard. Request metrics come from Traefik, which
+  every call passes through, so the services need no metrics code.
 - CI validates every overlay (`kustomize build | kubeconform -strict`), and a
   version tag builds and pushes all images to GHCR, so production runs `v1.0.0`,
   never a moving tag.

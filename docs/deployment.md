@@ -26,6 +26,7 @@ deploy/k8s/
   overlays/local/       a development cluster: images built here (:dev), 1 replica,
                         the Secret from a local secrets.env (gitignored)
   platform/sealed-secrets/   the Sealed Secrets controller, once per cluster
+  monitoring/           Prometheus, Grafana, Loki, Alloy, kube-state-metrics (namespace monitoring)
   tools/backup-shell.yaml    a helper pod for listing and restoring backups
 ```
 
@@ -193,6 +194,58 @@ kubectl -n swiftmed delete pod backup-shell
 `ERROR: current user cannot be dropped` is expected: the dump also re-creates the
 user it is restored with. Into a new cluster, deploy first (so Postgres and the
 backups volume exist), copy the file in with `kubectl cp`, then follow the same steps.
+
+## Monitoring
+
+`deploy/k8s/monitoring` (namespace `monitoring`) adds metrics and central logs:
+
+| Part | What it does |
+|---|---|
+| Prometheus v3.15.1 | Scrapes Traefik (requests and latency per service: every gRPC call between services and every outside request passes through it), the kubelet's cAdvisor (CPU, memory, network per pod) and kube-state-metrics. Keeps 7 days on a 5 Gi volume. |
+| kube-state-metrics v2.20.0 | Replicas, HPA replicas, restarts, pod phases as metrics. |
+| Loki 3.7.9 | The logs of every SwiftMed pod, 7 days, on a 5 Gi volume. |
+| Grafana Alloy v1.21.3 | Ships the pod logs to Loki through the Kubernetes API (no access to node files), with the labels `namespace`, `app`, `pod`, `container` and `level` (from the services' JSON logs). Traefik's access log is JSON too. |
+| Grafana 13.2.5 | Prometheus and Loki as data sources and the "SwiftMed overview" dashboard (`monitoring/dashboards/swiftmed-overview.json`), all provisioned. |
+
+```bash
+kubectl apply -k deploy/k8s/monitoring
+kubectl -n monitoring port-forward --address 0.0.0.0 svc/grafana 3300:3000
+#   http://localhost:3300 in WSL; from a Windows browser use WSL's address,
+#   http://$(hostname -I | cut -d' ' -f1):3300
+```
+
+Grafana's admin password is a SealedSecret (`monitoring/grafana-admin-sealed.yaml`);
+`monitoring/make-grafana-secret.sh` makes a new random one, seals it, and writes the
+password to `~/swiftmed-grafana-admin.txt` (readable only by you). Anonymous access
+is off. Nothing in the namespace is exposed outside the cluster, and its own
+NetworkPolicies only let Grafana reach Prometheus and Loki, Alloy reach Loki, and
+Prometheus reach kube-state-metrics. In `swiftmed`, only Prometheus may read
+Traefik's metrics port.
+
+The dashboard shows requests per second and p95 latency per service, the gateway's
+and web apps' responses by HTTP status and the gateway's 5xx share, CPU and memory
+per pod, replicas (including the HPAs), restarts in the last hour, log lines per
+app and level, and the latest warnings and errors. Useful Loki queries in
+**Explore**:
+
+```
+{namespace="swiftmed", app="holds"}                          one service's logs
+{namespace="swiftmed", level="ERROR"}                        every error
+{namespace="swiftmed", app="gateway"} | json | status >= 400 failed API requests
+{namespace="swiftmed"} | json | request_id="<id>"           one request, by its X-Request-ID
+```
+
+Limit: gRPC calls always count as HTTP 200 at Traefik (their status travels in
+HTTP/2 trailers), so per-service error rates are visible only at the gateway's
+REST API. Counting gRPC status codes needs a metrics interceptor in `pkg/grpcx`
+exporting Prometheus metrics from every service; that is a later step.
+
+Verified on the laptop (18 Nov 2026): all 5 scrape targets up; 60 searches showed
+as 60 calls each to search, catalog, geo, inventory, ranking, freshness and
+pharmacy-registry (one search's fan-out); the dashboard's queries returned data
+for 10 services, 31 pods and both HPAs; Loki held the logs of 26 apps, and
+`| json | status >= 400` found the 404 sent on purpose; both data sources
+healthy; anonymous requests refused.
 
 ## Show in the report
 

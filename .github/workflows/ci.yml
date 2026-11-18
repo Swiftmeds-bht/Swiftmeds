@@ -279,7 +279,7 @@ jobs:
       - name: Build and validate base and overlays
         run: |
           cp deploy/k8s/base/secrets.env.example deploy/k8s/overlays/local/secrets.env
-          for dir in base overlays/local overlays/prod; do
+          for dir in base overlays/local overlays/prod monitoring; do
             echo "==> deploy/k8s/$dir"
             kubectl kustomize "deploy/k8s/$dir" | kubeconform -strict -summary \
               -schema-location default \
