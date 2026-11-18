@@ -101,8 +101,16 @@ metadata:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/part-of: swiftmed
 spec:
-  # Two, so one pod restarting or being updated never stops this path (SCRUM-108).
+  # Active-active (SCRUM-108, SCRUM-135): two replicas, both serving. Each builds
+  # its routes from the Kubernetes API on its own (Traefik keeps no state), and
+  # the Services spread connections over both. One pod restarting, being
+  # updated or evicted never stops this path; pdb.yaml keeps one up during a
+  # node drain.
   replicas: 2
+  # Start the new pod before stopping an old one, so an update never drops to one.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
   selector:
     matchLabels:
       app.kubernetes.io/name: traefik
@@ -115,6 +123,17 @@ spec:
         # Restart Traefik when its static configuration changes.
         swiftmed/config-version: "2"
     spec:
+      # Put the replicas on different nodes when there is more than one, so
+      # losing a node keeps one Traefik. "Preferred", so both still run on the
+      # single-node laptop cluster.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {app.kubernetes.io/name: traefik}
       serviceAccountName: traefik
       securityContext:
         runAsNonRoot: true
