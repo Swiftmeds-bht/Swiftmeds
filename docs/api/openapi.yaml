@@ -1180,8 +1180,10 @@ paths:
       summary: Hand over the medicine against the pickup code
       description: |
         Pharmacy staff enter the code the patient shows. A wrong code is rejected and the
-        hold stays `HOLD_STATUS_ACTIVE`. A hold can be collected only once. The hold must
-        belong to the signed-in staff member's pharmacy.
+        hold stays `HOLD_STATUS_ACTIVE`. After 5 wrong codes the hold is locked: every
+        later try is refused with 429, even with the right code, so a code cannot be found
+        by guessing. A hold can be collected only once. The hold must belong to the
+        signed-in staff member's pharmacy.
       x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/CollectHold
       x-roles: [ROLE_PHARMACY_STAFF]
@@ -1220,6 +1222,14 @@ paths:
           description: |
             The hold is not `HOLD_STATUS_ACTIVE`: it was already collected, or it expired or
             was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: |
+            Too many wrong pickup codes: the hold is locked and can no longer be collected.
+            It stays `HOLD_STATUS_ACTIVE` until it expires or the patient cancels it.
           content:
             application/json:
               schema:
