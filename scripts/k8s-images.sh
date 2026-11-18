@@ -33,7 +33,7 @@ for dockerfile in services/*/Dockerfile; do
 done
 images+=("patient-app|web/patient-app/Dockerfile|web/patient-app")
 images+=("pharmacy-dashboard|web/pharmacy-dashboard/Dockerfile|web/pharmacy-dashboard")
-images+=("seed|deploy/k8s/seed/Dockerfile|deploy")
+images+=("seed|deploy/k8s/base/seed/Dockerfile|deploy")
 
 built=()
 for entry in "${images[@]}"; do

@@ -24,13 +24,21 @@ load, and rolling updates with rollback.
   `make up`, `make seed` and `make down` wrap it. Configuration comes from `.env`
   (copied from `.env.example`; never committed). The Cypress tests (`make e2e`)
   run against it.
-- **Kubernetes (k3s) is the deployment.** `deploy/k8s/` holds Kustomize manifests,
-  applied with `kubectl apply -k deploy/k8s`: one Deployment, Service and Ingress
-  route per service, Postgres and RabbitMQ as StatefulSets with persistent
-  volumes, a ConfigMap for settings and a Secret made from a local file, gRPC
-  readiness and liveness probes, resource requests and limits, and HPAs on Search
-  and the gateway. It runs on the team laptop as k3s in Docker (k3d,
-  `deploy/k8s/local`); the runbook is [docs/deployment.md](../deployment.md).
+- **Kubernetes (k3s) is the deployment.** `deploy/k8s/base` holds Kustomize
+  manifests shared by every cluster: one Deployment, Service and Ingress route per
+  service, Postgres and RabbitMQ as StatefulSets with persistent volumes, a
+  ConfigMap for settings, gRPC readiness and liveness probes, resource requests and
+  limits, HPAs on Search and the gateway, PodDisruptionBudgets, default-deny
+  NetworkPolicies, and a nightly Postgres backup to its own volume.
+  `overlays/prod` is the deployment (versioned GHCR images, two replicas of
+  Traefik, the gateway, Search, Holds and Inventory, bigger volumes, the Secret as
+  a SealedSecret committed in encrypted form); `overlays/local` is a development
+  cluster (images built locally, one replica, the Secret from a gitignored file).
+  The deployment runs on the team laptop as k3s in Docker (k3d); the runbook is
+  [docs/deployment.md](../deployment.md).
+- CI validates every overlay (`kustomize build | kubeconform -strict`), and a
+  version tag builds and pushes all images to GHCR, so production runs `v1.0.0`,
+  never a moving tag.
 - **Traefik routes the same way in both.** In Compose it finds the services
   through its Docker provider ([ADR 0004](0004-traefik-for-discovery-and-load-balancing.md));
   in Kubernetes the same Traefik configuration reads standard Ingress objects. So
@@ -48,12 +56,22 @@ load, and rolling updates with rollback.
 - One command still starts everything for development; new members need only
   Docker and `make`. The deployment needs k3d and kubectl as well.
 - Two deployment descriptions must be kept in step. A new service or setting goes
-  into both `deploy/docker-compose.yml` and `deploy/k8s/` (`config.env`, and
-  `secrets.env.example` for secrets). The database init script and the demo
-  fixtures are shared, not copied: the `seed` image carries them for Kubernetes.
-- One Postgres server and one RabbitMQ broker remain single points of failure in
-  both. Kubernetes restarts them and keeps their data on volumes, but they are not
-  replicated: acceptable for the course deployment, not for production.
+  into both `deploy/docker-compose.yml` and `deploy/k8s/base` (`config.env`, and
+  `secrets.env.example` for secrets, then re-seal). The database init script and
+  the demo fixtures are shared, not copied: the `seed` image carries them for
+  Kubernetes. A new pod that uses Postgres or RabbitMQ needs the matching
+  `swiftmed/*-client` label, or the NetworkPolicies block it.
+- The request path has no single point of failure in prod (two pods each, with
+  disruption budgets). One Postgres server and one RabbitMQ broker remain single:
+  Kubernetes restarts them, keeps their data on volumes and backs Postgres up
+  nightly, but they are not replicated. Acceptable for the course deployment, not
+  for production.
+- The SealedSecret can only be decrypted by the controller's key, which is backed
+  up outside Git; losing both the cluster and that key means re-sealing.
+- Later, when there is more than one node: spread the replicas over nodes
+  (topology spread constraints), and move Postgres and RabbitMQ to a managed
+  service or an operator (CloudNativePG, the RabbitMQ cluster operator) for
+  replication and failover. Neither helps on a single-node laptop cluster.
 - A laptop host is only up while the laptop is; the public URL (SCRUM-75) goes
   through a Cloudflare Tunnel from it. Moving to a cloud VM later means installing
   k3s there and applying the same manifests.

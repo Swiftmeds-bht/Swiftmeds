@@ -161,15 +161,16 @@ local PostgreSQL and RabbitMQ data volumes.
 
 Docker Compose is for development; the deployment runs on Kubernetes (k3s), on
 the team laptop through k3d ([ADR 0005](docs/adr/0005-docker-compose-main-stack-kubernetes-demo.md)).
-One command builds the images, creates the cluster, deploys and seeds:
+Manifests are in [`deploy/k8s/`](deploy/k8s): a shared `base` and two overlays.
 
 ```bash
-deploy/k8s/local/up.sh     # patient app http://localhost:9000, dashboard :9001, gateway :9080
+kubectl apply -k deploy/k8s/overlays/prod   # the deployment: GHCR images v1.0.0, 2 replicas, sealed secret
+deploy/k8s/overlays/local/up.sh             # a development cluster from scratch: images built here, seeded
 ```
 
-Manifests are in [`deploy/k8s/`](deploy/k8s) (`kubectl apply -k deploy/k8s`). The
-runbook, with updates, rollbacks, scaling, backups and the self-healing,
-autoscaling and rolling-update demos, is [docs/deployment.md](docs/deployment.md).
+The runbook, with secrets, releases, rollbacks, scaling, backup and restore, and
+the measured self-healing, autoscaling and rolling-update demos, is
+[docs/deployment.md](docs/deployment.md).
 
 ### Tests
 

@@ -1,0 +1,44 @@
+name: Release images
+
+# On a version tag (v1.0.0, ...), build the 23 images the Kubernetes deployment
+# uses and push them to ghcr.io/swiftmeds-bht/<name>:<tag> (SCRUM-108). The prod
+# overlay (deploy/k8s/overlays/prod) pins that tag. Can also be started by hand
+# for an existing tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to build and push, for example v1.0.0"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        run: scripts/k8s-images.sh --tag "$TAG" --push

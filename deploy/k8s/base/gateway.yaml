@@ -1,0 +1,89 @@
+# gateway: the REST API (SCRUM-108). Reached on Traefik's "web" entrypoint
+# (:8080), like in Compose. Scaled by the HPA in hpa.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  # No replicas here: the HorizontalPodAutoscaler (hpa.yaml, minimum 2) owns the
+  # count, and a fixed number would reset it on every kubectl apply.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        app.kubernetes.io/part-of: swiftmed
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: ghcr.io/swiftmeds-bht/gateway
+          ports:
+            - {name: http, containerPort: 8080}
+          env:
+            - name: GATEWAY_HTTP_PORT
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: GATEWAY_HTTP_PORT}}
+            - name: TRAEFIK_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: TRAEFIK_GRPC_TARGET}}
+            - name: CORS_ALLOWED_ORIGINS
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: CORS_ALLOWED_ORIGINS}}
+            - name: LOG_LEVEL
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: LOG_LEVEL}}
+            - name: WORKER_SHARED_SECRET
+              valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: WORKER_SHARED_SECRET}}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          # Keep serving a few seconds after a delete, until Traefik has dropped this
+          # pod from its endpoints; otherwise calls in that gap fail (zero-downtime
+          # updates and self-healing).
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {cpu: "1", memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+spec:
+  selector:
+    app.kubernetes.io/name: gateway
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: swiftmed
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port: {name: http}

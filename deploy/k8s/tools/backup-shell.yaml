@@ -1,0 +1,41 @@
+# A helper pod with psql and the backups volume mounted, to list, copy or restore
+# Postgres backups (docs/deployment.md, "Back up and restore Postgres"). Not part
+# of any overlay: start it when needed and delete it afterwards.
+#   kubectl -n swiftmed apply -f deploy/k8s/tools/backup-shell.yaml
+#   kubectl -n swiftmed delete pod backup-shell
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backup-shell
+  namespace: swiftmed
+  labels:
+    app.kubernetes.io/name: backup-shell
+    swiftmed/postgres-client: "true"
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: shell
+      image: postgres:16-alpine
+      command: ["sleep", "infinity"]
+      env:
+        - {name: PGHOST, value: postgres}
+        - name: PGUSER
+          valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_USER}}
+        - name: PGPASSWORD
+          valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_PASSWORD}}
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: "1", memory: 512Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+      volumeMounts:
+        - {name: backups, mountPath: /backups}
+  volumes:
+    - name: backups
+      persistentVolumeClaim: {claimName: postgres-backups}
