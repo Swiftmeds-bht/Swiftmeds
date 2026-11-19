@@ -100,8 +100,11 @@ services:
     # as the Erlang node runs, before port 5672 opens: on a busy CI runner that
     # was 16 s early, and services that depend on RabbitMQ crashed connecting to
     # it. The Kubernetes readiness probe and the CI service use the same check.
+    # The check waits for the Erlang cookie: run before the server has written
+    # it, rabbitmq-diagnostics (as root) creates one the server cannot read, and
+    # RabbitMQ crashes with "erlang.cookie: eacces" (it failed CI on PR #103).
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      test: ["CMD-SHELL", "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"]
       start_period: 60s
       start_interval: 2s
       interval: 10s

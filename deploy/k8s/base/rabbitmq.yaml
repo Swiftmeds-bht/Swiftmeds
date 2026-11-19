@@ -33,7 +33,10 @@ spec:
               valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: RABBITMQ_DEFAULT_PASS}}
           readinessProbe:
             exec:
-              command: ["rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+              # Waits for the Erlang cookie, as in deploy/docker-compose.yml: run
+              # (as root) before the server writes it, the CLI creates one the
+              # server cannot read and RabbitMQ crashes.
+              command: ["sh", "-c", "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"]
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 10
