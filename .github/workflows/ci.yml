@@ -330,14 +330,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          failed=0
           while IFS= read -r module_dir; do
             echo "==> ${module_dir}"
-            (cd "${module_dir}" && GOWORK=off "$(go env GOPATH)/bin/govulncheck" ./...)
+            if (cd "${module_dir}" && GOWORK=off "$(go env GOPATH)/bin/govulncheck" ./...); then
+              echo "govulncheck passed for ${module_dir}"
+            else
+              status=$?
+              echo "govulncheck failed for ${module_dir} (exit ${status})"
+              failed=1
+            fi
           done < <(go list -m -f '{{.Dir}}')
+          exit "${failed}"
 
   mutation:
     name: Mutation tests (SCRUM-113)
-    if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'run-mutation')
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
