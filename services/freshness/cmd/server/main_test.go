@@ -233,6 +233,9 @@ func TestServeMigratesAnswersCallsAndStopsCleanly(t *testing.T) {
 		t.Errorf("healthcheck = %d, want 0", code)
 	}
 
+	if err := conn.Close(); err != nil {
+		t.Errorf("close client connection: %v", err)
+	}
 	if err := stop(); err != nil {
 		t.Errorf("serve returned %v after the context was cancelled, want nil", err)
 	}
