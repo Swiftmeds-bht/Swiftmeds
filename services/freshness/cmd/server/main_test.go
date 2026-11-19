@@ -27,7 +27,10 @@ import (
 const dbURL = "postgres://u:p@localhost:5432/freshness_db"
 
 func TestLoadSettingsDefaults(t *testing.T) {
-	s, err := loadSettings(config.NewFromMap(map[string]string{"FRESHNESS_DATABASE_URL": dbURL}))
+	s, err := loadSettings(config.NewFromMap(map[string]string{
+		"FRESHNESS_DATABASE_URL": dbURL,
+		"RABBITMQ_URL":           "amqp://guest:guest@localhost:5672/",
+	}))
 
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +46,7 @@ func TestLoadSettingsDefaults(t *testing.T) {
 func TestLoadSettingsReadsConfiguredValues(t *testing.T) {
 	s, err := loadSettings(config.NewFromMap(map[string]string{
 		"FRESHNESS_DATABASE_URL":  dbURL,
+		"RABBITMQ_URL":            "amqp://guest:guest@localhost:5672/",
 		"FRESHNESS_GRPC_PORT":     "6000",
 		"LOG_LEVEL":               "debug",
 		"FRESHNESS_HIGH_WITHIN":   "1h",
@@ -68,7 +72,7 @@ func TestLoadSettingsReportsEveryProblem(t *testing.T) {
 	if err == nil {
 		t.Fatal("err = nil, want an error")
 	}
-	for _, want := range []string{"FRESHNESS_DATABASE_URL", "FRESHNESS_HIGH_WITHIN"} {
+	for _, want := range []string{"FRESHNESS_DATABASE_URL", "RABBITMQ_URL", "FRESHNESS_HIGH_WITHIN"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %s", err, want)
 		}
@@ -84,6 +88,7 @@ func TestLoadSettingsRejectsBadThresholds(t *testing.T) {
 	for name, env := range cases {
 		t.Run(name, func(t *testing.T) {
 			env["FRESHNESS_DATABASE_URL"] = dbURL
+			env["RABBITMQ_URL"] = "amqp://guest:guest@localhost:5672/"
 
 			_, err := loadSettings(config.NewFromMap(env))
 
@@ -149,6 +154,7 @@ func TestServeFailsClearlyWhenTheDatabaseIsUnreachable(t *testing.T) {
 	defer func() { _ = lis.Close() }()
 	s := settings{
 		databaseURL: "postgres://u:p@127.0.0.1:1/freshness_db?sslmode=disable", // nothing listens on port 1
+		rabbitURL:   "amqp://guest:guest@localhost:5672/",
 		thresholds:  domain.DefaultThresholds(),
 		logLevel:    "error",
 	}
@@ -194,6 +200,7 @@ func testDatabaseURL(t *testing.T) string {
 func TestServeMigratesAnswersCallsAndStopsCleanly(t *testing.T) {
 	port, stop := startServer(t, settings{
 		databaseURL: testDatabaseURL(t),
+		rabbitURL:   "amqp://guest:guest@localhost:5672/",
 		thresholds:  domain.DefaultThresholds(),
 		logLevel:    "error",
 	})
