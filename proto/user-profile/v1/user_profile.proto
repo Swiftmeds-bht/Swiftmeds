@@ -5,6 +5,7 @@ syntax = "proto3";
 package swiftmed.userprofile.v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/field_mask.proto";
 
 option go_package = "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1;userprofilev1";
 
@@ -20,6 +21,8 @@ message Profile {
   string phone = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  string home_location = 6;
+  string preferred_language = 7;
 }
 
 message GetProfileRequest {
@@ -34,6 +37,9 @@ message UpdateProfileRequest {
   string user_id = 1;
   string display_name = 2;
   string phone = 3;
+  string home_location = 4;
+  string preferred_language = 5;
+  google.protobuf.FieldMask update_mask = 6;
 }
 
 message UpdateProfileResponse {

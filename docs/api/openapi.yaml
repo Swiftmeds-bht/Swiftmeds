@@ -2688,6 +2688,10 @@ components:
           type: string
         phone:
           type: string
+        homeLocation:
+          type: string
+        preferredLanguage:
+          type: string
         createdAt:
           type: string
           format: date-time

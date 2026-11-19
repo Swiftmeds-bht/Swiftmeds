@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	userprofilev1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/user-profile/internal/app"
@@ -128,6 +129,28 @@ func TestGetProfile(t *testing.T) {
 	// A nil request has no user ID, which is INVALID_ARGUMENT, not a crash.
 	_, err = h.GetProfile(context.Background(), nil)
 	wantCode(t, err, codes.InvalidArgument)
+}
+
+func TestUpdateProfileMaskPreservesUnselectedFields(t *testing.T) {
+	repo := &memoryRepository{profiles: map[string]domain.Profile{
+		"u-1": {UserID: "u-1", Name: "Tashi", Phone: "+97517123456", HomeLocation: "Thimphu", PreferredLanguage: "dz", CreatedAt: t1, UpdatedAt: t1},
+	}}
+	clock := t2
+	h := newHandler(repo, &clock)
+	resp, err := h.UpdateProfile(context.Background(), &userprofilev1.UpdateProfileRequest{
+		UserId: "u-1", DisplayName: "Pema", UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"display_name"}},
+	})
+	if err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	got := resp.GetProfile()
+	if got.GetDisplayName() != "Pema" || got.GetPhone() != "+97517123456" || got.GetHomeLocation() != "Thimphu" || got.GetPreferredLanguage() != "dz" {
+		t.Fatalf("partial update lost unselected fields: %v", got)
+	}
+	stored := repo.profiles["u-1"]
+	if stored.HomeLocation != "Thimphu" || stored.PreferredLanguage != "dz" {
+		t.Fatalf("stored profile lost unselected fields: %+v", stored)
+	}
 }
 
 func TestUpdateProfileValidationIsInvalidArgument(t *testing.T) {
