@@ -133,8 +133,19 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
   .header-actions { margin-left: auto; }
   .main-nav { order: 3; flex-basis: 100%; margin: 0 -1.25rem; padding: 0 1.25rem 0.45rem; overflow-x: auto; scrollbar-width: none; }
   .main-nav::-webkit-scrollbar { display: none; }
-  .main-nav ul { gap: 0.15rem; }
-  .main-nav .nav-link { min-height: 2.5rem; padding: 0 0.75rem; font-size: 0.9375rem; }
+  .main-nav ul { gap: 0.1rem; }
+  /* Tight enough for the portal's four sections on a 360 px phone. */
+  .main-nav .nav-link { min-height: 2.5rem; padding: 0 0.6rem; font-size: 0.9375rem; }
+  /* Signed out: the mark, Sign in and Create account share the first row. */
+  .header-actions > .nav-link { padding: 0 0.55rem; }
+  .header-cta { margin-left: 0; padding: 0.4rem 0.8rem; font-size: 0.9375rem; }
+}
+/* On a narrow phone, signed out, the mark alone is the logo so both actions fit;
+   the name stays for screen readers. */
+@media (max-width: 26rem) {
+  .header-inner:has(.header-cta) .brand-name {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
 }
 
 /* Bell and account menu: a button and the panel it opens. */

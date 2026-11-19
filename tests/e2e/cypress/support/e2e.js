@@ -86,8 +86,12 @@ Cypress.Commands.add("signUpPatient", () => {
   cy.get("input[name=email]").type(email);
   cy.get("input[name=password]").type(password, { log: false });
   cy.get("input[name=confirm]").type(password, { log: false });
-  cy.contains("button", "Create account").click();
-  cy.contains("a", "My holds").should("be.visible");
+  cy.contains("form button", "Create account").click();
+  // Signed in only once sign-up has finished: on My holds, with the account
+  // menu in the header. ("My holds" alone also shows in the footer, for
+  // everyone, so it would pass before the session cookie is set.)
+  cy.location("pathname").should("eq", "/holds");
+  cy.get("header button[aria-label^='Account:']").should("be.visible");
 });
 
 /** Opens the results for the test medicine near the test town. */
