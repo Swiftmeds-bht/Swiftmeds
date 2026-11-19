@@ -31,6 +31,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3.13-management
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out repository
@@ -149,7 +161,7 @@ jobs:
           - 5672:5672
         # `ping` passes before the AMQP listener accepts connections; this waits for it.
         options: >-
-          --health-cmd "rabbitmq-diagnostics -q check_port_connectivity"
+          --health-cmd "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
