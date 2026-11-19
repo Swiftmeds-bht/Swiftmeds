@@ -76,7 +76,8 @@ func run() error {
 		return fmt.Errorf("expiry client: %w", err)
 	}
 	expiry := clients.NewExpiryClient(expiryv1.NewExpiryServiceClient(expiryConn))
-	authConn, err := conns.Connection(context.Background(), "auth")
+	// Register and Login run bcrypt, so Auth gets a longer per-call limit.
+	authConn, err := conns.ConnectionWithTimeout(context.Background(), "auth", app.AuthCallTimeout)
 	if err != nil {
 		return fmt.Errorf("auth client: %w", err)
 	}
