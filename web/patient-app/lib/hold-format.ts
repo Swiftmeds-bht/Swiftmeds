@@ -1,6 +1,7 @@
 // Wording for holds: what each status means to a patient, and how long is left.
 import type { HoldErrorKind } from "./holds-core";
 import { MOCK_PHARMACIES, MOCK_PRODUCTS } from "./mock-data";
+import { EMPTY_BOOK, type NameBook } from "./name-book";
 import type { Hold, HoldStatus } from "./types";
 
 export type Tone = "high" | "medium" | "low" | "neutral";
@@ -66,12 +67,16 @@ export function errorMessage(kind: HoldErrorKind, detail?: string): string {
   return ERROR_MESSAGES[kind];
 }
 
-/** Names to show for a hold. The hold only carries IDs; the demo data knows the names. */
-export function holdNames(hold: Pick<Hold, "productId" | "pharmacyId">): { medicine: string; pharmacy: string; address?: string } {
-  const product = MOCK_PRODUCTS.find((p) => p.productId === hold.productId);
-  const pharmacy = MOCK_PHARMACIES.find((p) => p.pharmacyId === hold.pharmacyId);
+/**
+ * Names to show for a hold. The hold only carries IDs: the names come from the
+ * gateway's lookups gathered in `book` (lib/names.ts, SCRUM-138), else from the
+ * demo data (demo mode, or a lookup that failed).
+ */
+export function holdNames(hold: Pick<Hold, "productId" | "pharmacyId">, book: NameBook = EMPTY_BOOK): { medicine: string; pharmacy: string; address?: string } {
+  const product = book.products.get(hold.productId ?? "") ?? MOCK_PRODUCTS.find((p) => p.productId === hold.productId);
+  const pharmacy = book.pharmacies.get(hold.pharmacyId ?? "") ?? MOCK_PHARMACIES.find((p) => p.pharmacyId === hold.pharmacyId);
   return {
-    medicine: product ? `${product.brandName} ${product.strength}` : "Medicine",
+    medicine: product ? [product.brandName, product.strength].filter(Boolean).join(" ") : "Medicine",
     pharmacy: pharmacy?.name ?? "Pharmacy",
     address: pharmacy?.address,
   };

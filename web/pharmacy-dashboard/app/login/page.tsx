@@ -1,76 +1,44 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { loginAction } from "@/app/actions";
+import { BrandMark } from "@/components/Icons";
+import { Notices, queryText, type SearchParams } from "@/components/Notices";
 import { getSession } from "@/lib/session";
 
-type LoginPageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+export const metadata: Metadata = { title: "Sign in" };
 
-function queryText(value: string | string[] | undefined): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function LoginPage({ searchParams }: { searchParams: SearchParams }) {
   if (await getSession()) redirect("/");
-
   const params = await searchParams;
-  const error = queryText(params.error);
-  const notice = queryText(params.notice);
 
   return (
-    <main className="auth-page">
-      <section className="auth-card" aria-labelledby="login-title">
-        <div className="brand-mark" aria-hidden="true">
-          SM
-        </div>
+    <div className="page auth-page">
+      <section className="panel auth-card" aria-labelledby="login-title">
+        <span className="auth-mark">
+          <BrandMark size={40} />
+        </span>
+        <h1 id="login-title">Sign in to your pharmacy</h1>
+        <p className="muted">Manage your stock and hand over medicines that patients have reserved.</p>
 
-        <p className="eyebrow">SwiftMeds · Pharmacy</p>
-        <h1 id="login-title">Sign in to your dashboard</h1>
-        <p className="auth-description">
-          Manage your pharmacy stock and handle active medicine holds.
-        </p>
-
-        {error ? (
-          <p className="message message-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        {notice ? (
-          <p className="message message-success" role="status">
-            {notice}
-          </p>
-        ) : null}
+        <Notices error={queryText(params.error)} notice={queryText(params.notice)} />
 
         <form action={loginAction} className="auth-form">
-          <label htmlFor="email">Work email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="username"
-            required
-          />
-
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-
-          <button className="button button-primary" type="submit">
+          <div className="form-field">
+            <label htmlFor="email">Work email</label>
+            <input id="email" name="email" type="email" autoComplete="username" required />
+          </div>
+          <div className="form-field">
+            <label htmlFor="password">Password</label>
+            <input id="password" name="password" type="password" autoComplete="current-password" required />
+          </div>
+          <button className="button" type="submit">
             Sign in
           </button>
         </form>
 
-        <p className="auth-footnote">
-          Sign in with an account that has pharmacy staff access.
-        </p>
+        <p className="field-hint">Use an account with pharmacy staff access.</p>
       </section>
-    </main>
+    </div>
   );
 }

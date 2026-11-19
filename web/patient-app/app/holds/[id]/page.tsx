@@ -8,6 +8,7 @@ import { ArrowLeftIcon } from "@/components/Icons";
 import { requireSession } from "@/lib/auth";
 import { errorMessage, justActivated } from "@/lib/hold-format";
 import { HoldError, holdsBackend } from "@/lib/holds";
+import { nameBook } from "@/lib/names";
 import type { Hold } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Your hold" };
@@ -38,7 +39,7 @@ export default async function HoldPage({ params }: { params: Params }) {
         <ArrowLeftIcon size={16} /> My holds
       </Link>
       {hold ? (
-        <HoldCard hold={hold} cancelAction={cancelHoldAction} justActivated={settle} />
+        <HoldCard hold={hold} cancelAction={cancelHoldAction} justActivated={settle} book={await nameBook([hold])} />
       ) : (
         <div className="problem" role="alert">
           <h2>{failed ? "We could not load this hold" : "We could not find this hold"}</h2>

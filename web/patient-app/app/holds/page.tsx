@@ -8,6 +8,7 @@ import { HoldCard } from "@/components/HoldCard";
 import { requireSession } from "@/lib/auth";
 import { errorMessage, statusInfo } from "@/lib/hold-format";
 import { HoldError, holdsBackend } from "@/lib/holds";
+import { nameBook } from "@/lib/names";
 import type { Hold } from "@/lib/types";
 
 export const metadata: Metadata = { title: "My holds" };
@@ -25,6 +26,7 @@ export default async function HoldsPage() {
   }
   if (failed === "unauthorized") redirect("/session-ended?next=%2Fholds");
 
+  const book = await nameBook(holds);
   const current = holds.filter((h) => !statusInfo(h.status).final);
   const past = holds.filter((h) => statusInfo(h.status).final);
 
@@ -61,7 +63,7 @@ export default async function HoldsPage() {
               <ul className="hold-list">
                 {current.map((h) => (
                   <li key={h.holdId}>
-                    <HoldCard hold={h} cancelAction={cancelHoldAction} variant="row" />
+                    <HoldCard hold={h} cancelAction={cancelHoldAction} variant="row" book={book} />
                   </li>
                 ))}
               </ul>
@@ -75,7 +77,7 @@ export default async function HoldsPage() {
               <ul className="hold-list">
                 {past.map((h) => (
                   <li key={h.holdId}>
-                    <HoldCard hold={h} cancelAction={cancelHoldAction} variant="row" />
+                    <HoldCard hold={h} cancelAction={cancelHoldAction} variant="row" book={book} />
                   </li>
                 ))}
               </ul>
