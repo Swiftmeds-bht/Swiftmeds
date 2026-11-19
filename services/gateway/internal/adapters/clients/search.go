@@ -2,11 +2,14 @@ package clients
 
 import (
 	"context"
+	"strings"
 
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var _ ports.Searcher = (*SearchClient)(nil)
@@ -21,7 +24,10 @@ func NewSearchClient(client searchv1.SearchServiceClient) *SearchClient {
 }
 
 func (c *SearchClient) SearchMedicine(ctx context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
-	return c.client.SearchMedicine(ctx, req)
+	var headers metadata.MD
+	resp, err := c.client.SearchMedicine(ctx, req, grpc.Header(&headers))
+	ports.SetSearchDegraded(ctx, strings.Join(headers.Get("x-search-degraded"), ","))
+	return resp, err
 }
 
 func (c *SearchClient) Autocomplete(ctx context.Context, req *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error) {

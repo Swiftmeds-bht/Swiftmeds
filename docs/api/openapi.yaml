@@ -89,7 +89,8 @@ info:
 
     ## Request ID
 
-    Send `X-Request-ID` to name a request. If you do not, the gateway makes one. Every
+    Send an `X-Request-ID` of at most 128 characters to name a request. If you do not
+    send one or it is longer than 128 characters, the gateway makes one. Every
     response carries the same header, and it appears in the gateway's logs, so quote it
     when reporting a problem.
 
@@ -508,6 +509,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           description: A required service (Catalog, Geo or Inventory) is unavailable.
           content:
@@ -520,6 +525,120 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/nearby:
+    get:
+      tags: [Search, Pharmacies]
+      operationId: findNearbyPharmacies
+      summary: Find pharmacies near a location
+      description: Returns verified pharmacies within the requested radius.
+      security: []
+      x-status: implemented
+      x-grpc: swiftmed.geo.v1.GeoService/FindNearbyPharmacies
+      x-roles: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - name: radius_m
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 50000
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+      responses:
+        "200":
+          description: Nearby pharmacies.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pharmacies:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pharmacyId: { type: string }
+                        distanceM: { type: integer }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/medicines/{id}/alternatives:
+    get:
+      tags: [Search, Catalog]
+      operationId: getMedicineAlternatives
+      summary: Find alternatives for a medicine
+      description: Returns products with the same active ingredient and strength.
+      security: []
+      x-status: implemented
+      x-grpc: swiftmed.substitution.v1.SubstitutionService/GetSubstitutes
+      x-roles: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 5
+      responses:
+        "200":
+          description: Matching alternatives.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  moleculeId: { type: string }
+                  substitutes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        productId: { type: string }
+                        brandName: { type: string }
+                        genericName: { type: string }
+                        strength: { type: string }
+                        matchType:
+                          type: string
+                          enum: [SUBSTITUTE_MATCH_TYPE_UNSPECIFIED, SUBSTITUTE_MATCH_TYPE_EXACT, SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/search/autocomplete:
@@ -1281,6 +1400,12 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Feedback was already given for this hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "412":
+          description: The hold is not collected, so feedback cannot be submitted.
           content:
             application/json:
               schema:

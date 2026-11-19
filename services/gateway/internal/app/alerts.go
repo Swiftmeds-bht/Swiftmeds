@@ -97,8 +97,8 @@ func alertsHandler(client ports.WatchlistClient, logger *slog.Logger, heartbeat 
 				}
 			case err := <-ended:
 				if !errors.Is(err, io.EOF) && status.Code(err) != codes.Canceled && ctx.Err() == nil {
-					logger.Error("alert stream failed", "request_id", httpx.RequestIDFromContext(r.Context()), "error", err.Error())
 					code := httpx.StatusCode(err)
+					logRPCError(logger, "alert stream failed", httpx.RequestIDFromContext(r.Context()), err)
 					writeEvent(w, rc, fmt.Sprintf("event: error\ndata: {\"error\":%q}\n\n", errorMessage(code)))
 				}
 				return

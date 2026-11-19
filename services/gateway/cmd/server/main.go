@@ -83,7 +83,7 @@ func run() error {
 		return fmt.Errorf("auth client: %w", err)
 	}
 	auth := clients.NewAuthClient(authv1.NewAuthServiceClient(authConn))
-	searchConn, err := conns.Connection(context.Background(), "search")
+	searchConn, err := conns.ConnectionWithTimeout(context.Background(), "search", app.SearchCallTimeout)
 	if err != nil {
 		return fmt.Errorf("search client: %w", err)
 	}

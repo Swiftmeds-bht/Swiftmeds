@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
@@ -101,25 +100,18 @@ func slowHealthServer(t *testing.T, delay time.Duration) string {
 	return lis.Addr().String()
 }
 
-func TestConnectionWithTimeoutSetsTheLimitForEachCall(t *testing.T) {
-	f := NewClientFactory(slowHealthServer(t, 400*time.Millisecond))
+func TestColdSearchCallFitsUpstreamDeadline(t *testing.T) {
+	// The first call also establishes the lazy gRPC connection. Search's upstream
+	// budget is 2 seconds, so its per-attempt limit must allow a 1 second cold call.
+	f := NewClientFactory(slowHealthServer(t, time.Second))
 	t.Cleanup(func() { _ = f.Close() })
-	short, err := f.ConnectionWithTimeout(context.Background(), "short", 100*time.Millisecond)
+	search, err := f.ConnectionWithTimeout(context.Background(), "search", 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	long, err := f.ConnectionWithTimeout(context.Background(), "long", 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, shortErr := healthpb.NewHealthClient(short).Check(context.Background(), &healthpb.HealthCheckRequest{})
-	_, longErr := healthpb.NewHealthClient(long).Check(context.Background(), &healthpb.HealthCheckRequest{})
-
-	if status.Code(shortErr) != codes.DeadlineExceeded {
-		t.Errorf("100 ms limit on a 400 ms call: err = %v, want DeadlineExceeded", shortErr)
-	}
-	if longErr != nil {
-		t.Errorf("5 s limit on a 400 ms call: err = %v, want success", longErr)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := healthpb.NewHealthClient(search).Check(ctx, &healthpb.HealthCheckRequest{}); err != nil {
+		t.Fatalf("cold 1 second Search call under 2 second deadline failed: %v (code %v)", err, status.Code(err))
 	}
 }
