@@ -159,11 +159,11 @@ func loadSettings(cfg *config.Loader) (settings, error) {
 	return s, nil
 }
 
-// healthcheck returns 0 if the service on localhost:port reports healthy, otherwise 1.
+// healthcheck returns 0 if the service on 127.0.0.1:port reports healthy, otherwise 1.
 func healthcheck(port int) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := grpcx.CheckHealth(ctx, fmt.Sprintf("localhost:%d", port)); err != nil {
+	if err := grpcx.CheckHealth(ctx, fmt.Sprintf("127.0.0.1:%d", port)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
