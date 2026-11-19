@@ -24,7 +24,7 @@ func Run(t *testing.T, factory Factory) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != want {
+		if !sameProfile(got, want) {
 			t.Fatalf("got %+v want %+v", got, want)
 		}
 	})
@@ -69,11 +69,19 @@ func Run(t *testing.T, factory Factory) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != p {
+		if !sameProfile(got, p) {
 			t.Fatalf("got %+v want %+v", got, p)
 		}
 	})
 }
+
+func sameProfile(a, b domain.Profile) bool {
+	return a.UserID == b.UserID && a.Name == b.Name && a.Phone == b.Phone &&
+		a.HomeLocation == b.HomeLocation && a.PreferredLanguage == b.PreferredLanguage &&
+		a.CreatedAt.Equal(b.CreatedAt) && a.UpdatedAt.Equal(b.UpdatedAt)
+}
+
 func profile(id, name string, at time.Time) domain.Profile {
+	at = at.UTC().Truncate(time.Microsecond)
 	return domain.Profile{UserID: id, Name: name, Phone: "+97517123456", HomeLocation: "Paro", PreferredLanguage: "en", CreatedAt: at, UpdatedAt: at}
 }

@@ -30,7 +30,7 @@ func Run(t *testing.T, factory Factory) {
 			t.Fatal(err)
 		}
 		for _, got := range []domain.User{gotID, gotEmail} {
-			if got != want {
+			if got.ID != want.ID || got.Email != want.Email || got.PasswordHash != want.PasswordHash || got.Role != want.Role || got.PharmacyID != want.PharmacyID || !got.CreatedAt.Equal(want.CreatedAt) {
 				t.Fatalf("got %+v, want %+v", got, want)
 			}
 		}
