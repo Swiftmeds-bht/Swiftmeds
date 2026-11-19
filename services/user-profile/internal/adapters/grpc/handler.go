@@ -30,6 +30,38 @@ func (h *Handler) GetProfile(ctx context.Context, req *userprofilev1.GetProfileR
 
 func (h *Handler) UpdateProfile(ctx context.Context, req *userprofilev1.UpdateProfileRequest) (*userprofilev1.UpdateProfileResponse, error) {
 	input := app.Input{UserID: req.GetUserId(), Name: req.GetDisplayName(), Phone: req.GetPhone()}
+	input.HomeLocation = req.GetHomeLocation()
+	input.PreferredLanguage = req.GetPreferredLanguage()
+	if mask := req.GetUpdateMask(); mask != nil && len(mask.GetPaths()) > 0 {
+		for _, path := range mask.GetPaths() {
+			switch path {
+			case "display_name", "phone", "home_location", "preferred_language":
+			default:
+				return nil, status.Errorf(codes.InvalidArgument, "unsupported update mask path %q", path)
+			}
+		}
+		existing, err := h.svc.GetProfile(ctx, req.GetUserId())
+		if err == nil {
+			input.Name = existing.Name
+			input.Phone = existing.Phone
+			input.HomeLocation = existing.HomeLocation
+			input.PreferredLanguage = existing.PreferredLanguage
+			for _, path := range mask.GetPaths() {
+				switch path {
+				case "display_name":
+					input.Name = req.GetDisplayName()
+				case "phone":
+					input.Phone = req.GetPhone()
+				case "home_location":
+					input.HomeLocation = req.GetHomeLocation()
+				case "preferred_language":
+					input.PreferredLanguage = req.GetPreferredLanguage()
+				}
+			}
+		} else if !errors.Is(err, domain.ErrProfileNotFound) {
+			return nil, toStatus(err)
+		}
+	}
 	p, err := h.svc.UpdateProfile(ctx, input)
 	if errors.Is(err, domain.ErrProfileNotFound) {
 		p, err = h.svc.CreateProfile(ctx, input)
@@ -43,6 +75,7 @@ func (h *Handler) UpdateProfile(ctx context.Context, req *userprofilev1.UpdatePr
 func toProto(p domain.Profile) *userprofilev1.Profile {
 	return &userprofilev1.Profile{
 		UserId: p.UserID, DisplayName: p.Name, Phone: p.Phone,
+		HomeLocation: p.HomeLocation, PreferredLanguage: p.PreferredLanguage,
 		CreatedAt: timestamppb.New(p.CreatedAt), UpdatedAt: timestamppb.New(p.UpdatedAt),
 	}
 }
