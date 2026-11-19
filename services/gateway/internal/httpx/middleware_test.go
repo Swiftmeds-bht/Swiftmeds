@@ -42,3 +42,18 @@ func TestCORSRejectsUnknownPreflight(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusForbidden)
 	}
 }
+
+func TestRequestIDRejectsOverlongClientValue(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set(requestIDHeader, strings.Repeat("a", maxRequestIDLength+1))
+	response := httptest.NewRecorder()
+	RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := RequestIDFromContext(r.Context())
+		if len(got) == 0 || len(got) > maxRequestIDLength {
+			t.Errorf("request ID length = %d, want 1..%d", len(got), maxRequestIDLength)
+		}
+	})).ServeHTTP(response, request)
+	if got := response.Header().Get(requestIDHeader); len(got) == 0 || len(got) > maxRequestIDLength {
+		t.Fatalf("response request ID length = %d, want 1..%d", len(got), maxRequestIDLength)
+	}
+}

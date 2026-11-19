@@ -278,6 +278,8 @@ func TestFeedbackHandlerRejectsInvalidRequests(t *testing.T) {
 	handler := feedbackHandler(&fakeFeedbackClient{}, nil)
 	tests := []string{
 		`{`,
+		`{"rating":5}`,
+		`{"wasInStock":true,"rating":5,"unexpected":true}`,
 		`{"rating":6}`,
 		`{"rating":1,"comment":"` + strings.Repeat("x", 501) + `"}`,
 	}
