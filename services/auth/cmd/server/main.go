@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -44,6 +45,16 @@ func run() error {
 	port := cfg.Int(portEnv, defaultPort)
 	databaseURL := cfg.Required("AUTH_DATABASE_URL")
 	secret := cfg.Required("JWT_SECRET")
+
+	if err := cfg.Err(); err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	if len([]byte(secret)) < 32 {
+		return fmt.Errorf("config: JWT_SECRET must be at least 32 bytes")
+	}
+	if isPlaceholderSecret(secret) {
+		return fmt.Errorf("config: JWT_SECRET must not be a placeholder")
+	}
 	issuer := cfg.String("JWT_ISSUER", "swiftmed")
 	accessTTL := cfg.Duration("JWT_TTL", 15*time.Minute)
 	refreshTTL := cfg.Duration("JWT_REFRESH_TTL", 30*24*time.Hour)
@@ -82,6 +93,13 @@ func run() error {
 	srv := grpcx.NewServer(log)
 	authv1.RegisterAuthServiceServer(srv, grpcadapter.NewHandler(svc))
 	return srv.Serve(signalCtx, fmt.Sprintf(":%d", port))
+}
+
+func isPlaceholderSecret(secret string) bool {
+	value := strings.ToLower(strings.TrimSpace(secret))
+	return strings.Contains(value, "change-me") || strings.Contains(value, "changeme") ||
+		strings.Contains(value, "replace-with") || strings.Contains(value, "placeholder") ||
+		value == "secret" || value == "password"
 }
 
 func healthcheck() int {
