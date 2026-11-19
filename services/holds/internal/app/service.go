@@ -16,7 +16,7 @@ import (
 const DefaultMaxActivePerUser = 3
 
 // DefaultHoldDuration is how long an ACTIVE hold lasts before it expires.
-const DefaultHoldDuration = 2 * time.Hour
+func DefaultHoldDuration() time.Duration { return 2 * time.Hour }
 
 // DefaultPageSize is the page size of ListHolds when the caller does not ask for one.
 const DefaultPageSize = 20

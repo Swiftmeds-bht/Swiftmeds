@@ -22,7 +22,7 @@ types and delete the pricing rules. Keep the folder names.
 ```
 module github.com/Swiftmeds-bht/Swiftmeds/services/<name>
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/Swiftmeds-bht/Swiftmeds/pkg v0.0.0

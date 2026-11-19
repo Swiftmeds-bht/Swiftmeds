@@ -13,7 +13,7 @@ changes, update these pages in the same PR.
 
 ## Summary
 
-- **20 Go services** (Go 1.25, one module each in `go.work`). Each has a hexagonal
+- **20 Go services** (Go 1.26, one module each in `go.work`). Each has a hexagonal
   layout, `internal/{domain,ports,app,adapters}`; see
   [docs/new-service.md](../new-service.md).
 - **REST at the edge, gRPC inside.** Browsers and Workers call the REST gateway

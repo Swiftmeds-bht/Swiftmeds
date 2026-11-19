@@ -48,13 +48,14 @@ docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test 
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Docker with Compose v2
 - `make`
 - `protoc` and the Go plugins:
   ```bash
-  go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+  # Install protoc 3.21.12 from https://github.com/protocolbuffers/protobuf/releases/tag/v21.12
   ```
 - `golangci-lint` (for `make lint`)
 - Node.js 20+ (for `web/` and `workers/`)
@@ -194,9 +195,11 @@ the measured self-healing, autoscaling and rolling-update demos, is
 ### Tests
 
 ```bash
-make test               # unit tests in every Go module
+make test               # race-enabled unit tests in every Go module
 make lint               # golangci-lint in every Go module
-make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
+make coverage           # every service must keep >= 65% on domain + app (CI enforces this)
+make proto-check        # fail if generated protobuf code differs from proto/
+make openapi-lint       # lint docs/api/openapi.yaml
 ./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (see below)
 ```
 

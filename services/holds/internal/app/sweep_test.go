@@ -38,7 +38,7 @@ func TestSweepRecoversAHoldWhosePublishWasKilled(t *testing.T) {
 	svc, repo, inv, ev, clk := sweepService(t)
 	h := storeOnly(t, repo, "h-lost", clk.now())
 
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 	res, err := svc.SweepStaleHolds(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestSweepReleasesStockWhenStockReservedWasLost(t *testing.T) {
 	}
 	// ... Inventory reserves; stock.reserved never arrives ...
 
-	clk.advance(DefaultPendingTimeout + time.Minute)
+	clk.advance(DefaultPendingTimeout() + time.Minute)
 	if _, err := svc.SweepStaleHolds(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestSweepLeavesFreshAndFinishedHoldsAlone(t *testing.T) {
 	svc, repo, inv, ev, clk := sweepService(t)
 	fresh := storeOnly(t, repo, "h-fresh", clk.now())
 	active := activeHold(t, svc)
-	clk.advance(DefaultPendingTimeout) // exactly the timeout: not older than it yet
+	clk.advance(DefaultPendingTimeout()) // exactly the timeout: not older than it yet
 
 	res, err := svc.SweepStaleHolds(context.Background())
 	if err != nil {
@@ -154,7 +154,7 @@ func TestSweepLosesTheRaceToAReservation(t *testing.T) {
 		WithInventory(inv), WithEvents(ev), WithCodeGenerator(always(testCode)))
 	h := storeOnly(t, base, "h-race", clk.now())
 	other := storeOnly(t, base, "h-other", clk.now().Add(time.Second)) // swept after h-race
-	clk.advance(DefaultPendingTimeout + 2*time.Second)
+	clk.advance(DefaultPendingTimeout() + 2*time.Second)
 
 	hooked.beforeUpdate = func() {
 		if _, err := svc.ReserveHold(context.Background(), h.ID); err != nil {
@@ -187,7 +187,7 @@ func TestSweepGoesOnAfterOneHoldFails(t *testing.T) {
 		svc, repo, inv, _, clk := sweepService(t)
 		storeOnly(t, repo, "h-1", clk.now())
 		storeOnly(t, repo, "h-2", clk.now().Add(time.Second))
-		clk.advance(DefaultPendingTimeout + 2*time.Second)
+		clk.advance(DefaultPendingTimeout() + 2*time.Second)
 		inv.failFor = map[string]error{"h-1": domain.ErrInventoryUnavailable}
 
 		res, _ := svc.SweepStaleHolds(context.Background())
@@ -202,12 +202,12 @@ func TestSweepGoesOnAfterOneHoldFails(t *testing.T) {
 	t.Run("release gives up", func(t *testing.T) {
 		svc, repo, inv, _, clk := sweepService(t)
 		storeOnly(t, repo, "h-old", clk.now())
-		clk.advance(DefaultPendingTimeout + time.Second)
+		clk.advance(DefaultPendingTimeout() + time.Second)
 		inv.err = errBoom
 		_, _ = svc.SweepStaleHolds(context.Background()) // h-old: rejected, release failed
 
 		clk.advance(releaseRetryWindow)
-		storeOnly(t, repo, "h-new", clk.now().Add(-DefaultPendingTimeout-time.Second))
+		storeOnly(t, repo, "h-new", clk.now().Add(-DefaultPendingTimeout()-time.Second))
 		inv.err = nil
 		inv.failFor = map[string]error{"h-old": errBoom}
 
@@ -225,7 +225,7 @@ func TestSweepGoesOnAfterOneHoldFails(t *testing.T) {
 		svc := NewService(repo, testConfig(), clk.now)
 		storeOnly(t, repo.Repository, "h-1", clk.now())
 		storeOnly(t, repo.Repository, "h-2", clk.now().Add(time.Second))
-		clk.advance(DefaultPendingTimeout + 2*time.Second)
+		clk.advance(DefaultPendingTimeout() + 2*time.Second)
 
 		res, err := svc.SweepStaleHolds(context.Background())
 		if !errors.Is(err, errBoom) || res != (SweepResult{Rejected: 2, Released: 1}) {
@@ -237,7 +237,7 @@ func TestSweepGoesOnAfterOneHoldFails(t *testing.T) {
 func TestSweepRetriesAFailedReleaseOnTheNextSweep(t *testing.T) {
 	svc, repo, inv, _, clk := sweepService(t)
 	h := storeOnly(t, repo, "h-1", clk.now())
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 
 	inv.err = domain.ErrInventoryUnavailable
 	res, err := svc.SweepStaleHolds(context.Background())
@@ -268,7 +268,7 @@ func TestSweepRetriesAFailedReleaseOnTheNextSweep(t *testing.T) {
 func TestSweepGivesUpAfterTheRetryWindow(t *testing.T) {
 	svc, repo, inv, _, clk := sweepService(t)
 	h := storeOnly(t, repo, "h-1", clk.now())
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 	inv.err = errBoom // for example "no such reservation": hold.requested never reached Inventory
 
 	if _, err := svc.SweepStaleHolds(context.Background()); err == nil {
@@ -292,7 +292,7 @@ func TestSweepGivesUpAfterTheRetryWindow(t *testing.T) {
 func TestSweepStillReleasesWhenHoldRejectedCannotBePublished(t *testing.T) {
 	svc, repo, inv, ev, clk := sweepService(t)
 	storeOnly(t, repo, "h-1", clk.now())
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 	ev.errRejected = errBoom
 
 	res, err := svc.SweepStaleHolds(context.Background())
@@ -323,7 +323,7 @@ func TestSweepReportsAFailedReleaseListing(t *testing.T) {
 	clk := &clock{t: t0}
 	svc := NewService(repo, testConfig(), clk.now)
 	storeOnly(t, repo.Repository, "h-1", clk.now())
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 
 	res, err := svc.SweepStaleHolds(context.Background())
 	if !errors.Is(err, errBoom) || res.Rejected != 1 {
@@ -350,7 +350,7 @@ func TestSweepReportsUpdateErrors(t *testing.T) {
 		clk := &clock{t: t0}
 		svc := NewService(repo, testConfig(), clk.now)
 		storeOnly(t, repo.Repository, "h-1", clk.now())
-		clk.advance(DefaultPendingTimeout + time.Second)
+		clk.advance(DefaultPendingTimeout() + time.Second)
 
 		res, err := svc.SweepStaleHolds(context.Background())
 		if !errors.Is(err, errBoom) || res.Rejected != 0 {
@@ -364,7 +364,7 @@ func TestSweepReportsUpdateErrors(t *testing.T) {
 		clk := &clock{t: t0}
 		svc := NewService(repo, testConfig(), clk.now)
 		storeOnly(t, repo.Repository, "h-1", clk.now())
-		clk.advance(DefaultPendingTimeout + time.Second)
+		clk.advance(DefaultPendingTimeout() + time.Second)
 
 		res, err := svc.SweepStaleHolds(context.Background())
 		if !errors.Is(err, errBoom) || res != (SweepResult{Rejected: 1}) {
@@ -392,7 +392,7 @@ func TestSweepSkipsAHoldItCannotReject(t *testing.T) {
 	clk := &clock{t: t0}
 	svc := NewService(repo, testConfig(), clk.now)
 	storeOnly(t, inner, "h-1", clk.now())
-	clk.advance(DefaultPendingTimeout + time.Second)
+	clk.advance(DefaultPendingTimeout() + time.Second)
 
 	res, err := svc.SweepStaleHolds(context.Background())
 	if !errors.Is(err, domain.ErrInvalidTransition) || res.Rejected != 1 {

@@ -116,8 +116,10 @@ func startServer(t *testing.T, s settings) (port int, stop func() error) {
 		select {
 		case err := <-done:
 			return err
-		case <-time.After(5 * time.Second):
-			return fmt.Errorf("server did not stop within 5s")
+		// GracefulStop may wait for the shared gRPC shutdown timeout while the
+		// race detector slows client teardown on CI runners.
+		case <-time.After(grpcx.DefaultShutdownTimeout + 5*time.Second):
+			return fmt.Errorf("server did not stop within %s", grpcx.DefaultShutdownTimeout+5*time.Second)
 		}
 	}
 }
