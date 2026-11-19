@@ -381,7 +381,7 @@ paths:
       operationId: getProduct
       summary: Get one medicine
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.catalog.v1.CatalogService/GetProduct
       x-roles: []
       parameters:
@@ -641,8 +641,9 @@ paths:
       description: |
         Public, so the patient app can show a pharmacy's details. `ownerUserId` and
         `licenseNumber` are returned only to the pharmacy's own staff and to administrators.
+        The gateway reads no token on this route, so it never returns either (SCRUM-138).
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/GetPharmacy
       x-roles: []
       parameters:
