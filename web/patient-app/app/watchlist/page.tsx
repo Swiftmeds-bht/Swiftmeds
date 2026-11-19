@@ -7,6 +7,7 @@ import { UnwatchForm } from "@/components/UnwatchForm";
 import { requireSession } from "@/lib/auth";
 import { formatClock, errorMessage, holdNames } from "@/lib/hold-format";
 import { HoldError } from "@/lib/holds";
+import { nameBook } from "@/lib/names";
 import type { WatchSubscription } from "@/lib/types";
 import { watchlistBackend } from "@/lib/watchlist";
 
@@ -24,6 +25,7 @@ export default async function WatchlistPage() {
     failed = err instanceof HoldError ? err.kind : "server";
   }
   if (failed === "unauthorized") redirect("/session-ended?next=%2Fwatchlist");
+  const book = await nameBook(subs);
 
   return (
     <div className="page narrow watchlist-page">
@@ -50,7 +52,7 @@ export default async function WatchlistPage() {
       ) : (
         <ul className="watch-list">
           {subs.map((s) => {
-            const { medicine } = holdNames({ productId: s.productId, pharmacyId: "" });
+            const { medicine } = holdNames({ productId: s.productId, pharmacyId: "" }, book);
             const back = Boolean(s.notifiedAt);
             return (
               <li key={s.subscriptionId} className="watch-row">

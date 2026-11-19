@@ -17,6 +17,7 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
 	analyticsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/analytics/v1"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
+	catalogv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/catalog/v1"
 	expiryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1"
 	feedbackv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
@@ -114,6 +115,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("user profile client: %w", err)
 	}
+	catalogConn, err := conns.Connection(context.Background(), "catalog")
+	if err != nil {
+		return fmt.Errorf("catalog client: %w", err)
+	}
 	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
 	if err != nil {
 		return fmt.Errorf("pharmacy registry client: %w", err)
@@ -139,6 +144,7 @@ func run() error {
 		Handler: app.NewRouter(cfg, log,
 			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
 			app.WithPharmacyRegistry(clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn))),
+			app.WithProducts(clients.NewCatalogClient(catalogv1.NewCatalogServiceClient(catalogConn))),
 			app.WithAnalytics(clients.NewAnalyticsClient(analyticsv1.NewAnalyticsServiceClient(analyticsConn))),
 			app.WithFreshness(freshness),
 			app.WithExpiry(expiry),

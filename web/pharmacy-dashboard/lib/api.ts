@@ -1,7 +1,7 @@
 // Server-side client for the pharmacy dashboard's REST Gateway.
 import type { DashboardSession } from "./session";
 
-const GATEWAY_URL = (process.env.GATEWAY_URL ?? "http://localhost:8080").replace(/\/+$/, "");
+export const GATEWAY_URL = (process.env.GATEWAY_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 const REQUEST_TIMEOUT_MS = 5_000;
 
 export interface LoginResponse {

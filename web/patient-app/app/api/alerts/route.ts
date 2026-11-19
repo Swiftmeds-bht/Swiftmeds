@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { holdNames } from "@/lib/hold-format";
 import { HoldError } from "@/lib/holds";
+import { nameBook } from "@/lib/names";
 import { formatSSE } from "@/lib/sse";
 import { ALERT_HEARTBEAT_MS, watchlistBackend, type AlertEvent } from "@/lib/watchlist";
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
       write(": connected\n\n");
       try {
         for await (const alert of backend.alerts(session, upstream.signal)) {
-          const names = holdNames(alert);
+          const names = holdNames(alert, await nameBook([alert]));
           const event: AlertEvent = { ...alert, medicine: names.medicine, pharmacy: names.pharmacy };
           write(formatSSE("alert", event, alert.subscriptionId));
         }

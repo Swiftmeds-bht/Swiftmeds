@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { FormState } from "@/app/actions";
 import { formatClock, holdNames, statusInfo } from "@/lib/hold-format";
+import type { NameBook } from "@/lib/name-book";
 import type { Hold } from "@/lib/types";
 
 import { AutoRefresh } from "./AutoRefresh";
@@ -17,6 +18,8 @@ interface Props {
   variant?: "detail" | "row";
   /** The hold turned active moments ago: play the ticket's one-time settle. */
   justActivated?: boolean;
+  /** Names the page looked up (lib/names.ts); without it, the demo data names the hold. */
+  book?: NameBook;
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -59,8 +62,8 @@ function Message({ hold }: { hold: Hold }) {
   }
 }
 
-export function HoldCard({ hold, cancelAction, variant = "detail", justActivated = false }: Props) {
-  const names = holdNames(hold);
+export function HoldCard({ hold, cancelAction, variant = "detail", justActivated = false, book }: Props) {
+  const names = holdNames(hold, book);
   const detail = variant === "detail";
   const active = hold.status === "HOLD_STATUS_ACTIVE";
   const quantity = hold.quantity ? `${hold.quantity} ${hold.quantity === 1 ? "unit" : "units"}` : "";

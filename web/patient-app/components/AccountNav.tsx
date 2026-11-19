@@ -11,6 +11,7 @@ import {
   unreadCount,
   type AppNotification,
 } from "@/lib/notifications";
+import { nameBook } from "@/lib/names";
 import { initialOf, profileBackend, type Profile } from "@/lib/profile";
 import type { Session } from "@/lib/types";
 
@@ -59,6 +60,8 @@ export async function AccountNav() {
 
   const [notifications, profile, jar] = await Promise.all([loadNotifications(session), loadProfile(session), cookies()]);
   const list = notifications ?? [];
+  // Back-in-stock notifications name a medicine and a pharmacy (SCRUM-138).
+  const book = await nameBook(list.map((n) => ({ productId: n.params.product_id, pharmacyId: n.params.pharmacy_id })));
   const seenAt = parseSeenAt(jar.get(NOTIFICATIONS_SEEN_COOKIE)?.value);
   const name = profile?.displayName || undefined;
 
@@ -67,7 +70,7 @@ export async function AccountNav() {
       <MainNav signedIn />
       <div className="header-actions">
         <NotificationBell
-          items={list.map(describeNotification)}
+          items={list.map((n) => describeNotification(n, book))}
           unread={unreadCount(list, seenAt)}
           newest={newestCreatedAt(list)}
           failed={notifications === undefined}

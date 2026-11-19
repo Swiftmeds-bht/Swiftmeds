@@ -8,6 +8,7 @@ import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { holdNames } from "./hold-format";
 import { errorForStatus } from "./holds";
 import { HoldError } from "./holds-core";
+import { EMPTY_BOOK, type NameBook } from "./name-book";
 import type { Session } from "./types";
 
 /** Cookie with the creation time of the newest notification the patient has seen. */
@@ -36,8 +37,8 @@ export interface NotificationView {
 const holdLink = (params: Record<string, string>) =>
   params.hold_id ? `/holds/${encodeURIComponent(params.hold_id)}` : "/holds";
 
-/** Plain words for a notification, from its template and values. */
-export function describeNotification(n: AppNotification): NotificationView {
+/** Plain words for a notification, from its template and values; `book` names the medicine and pharmacy. */
+export function describeNotification(n: AppNotification, book: NameBook = EMPTY_BOOK): NotificationView {
   const p = n.params;
   const base = { id: n.notificationId, createdAt: n.createdAt };
   switch (n.template) {
@@ -53,7 +54,7 @@ export function describeNotification(n: AppNotification): NotificationView {
     case "TEMPLATE_HOLD_REJECTED":
       return { ...base, title: "Hold not placed", body: "The pharmacy could not set the medicine aside. Try another pharmacy.", href: holdLink(p) };
     case "TEMPLATE_BACK_IN_STOCK": {
-      const { medicine, pharmacy } = holdNames({ productId: p.product_id ?? "", pharmacyId: p.pharmacy_id ?? "" });
+      const { medicine, pharmacy } = holdNames({ productId: p.product_id ?? "", pharmacyId: p.pharmacy_id ?? "" }, book);
       return {
         ...base,
         title: `${medicine} is back in stock`,

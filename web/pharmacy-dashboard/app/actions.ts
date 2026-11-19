@@ -45,7 +45,7 @@ export async function loginAction(form: FormData): Promise<void> {
 
   try {
     const response = await login(email, password);
-    const session = sessionFromLogin(response);
+    const session = sessionFromLogin(response, email);
     await saveSession(session);
   } catch (error) {
     message = loginError(error);
@@ -64,14 +64,14 @@ export async function setStockAction(form: FormData): Promise<void> {
   const productId = formText(form, "productId");
   const rawQuantity = formText(form, "quantityOnHand");
 
-  if (!productId) redirectWith("/", "error", "The product ID is missing.");
+  if (!productId) redirectWith("/stock", "error", "The product ID is missing.");
   if (!/^\d+$/.test(rawQuantity)) {
-    redirectWith("/", "error", "Enter a whole stock quantity of zero or more.");
+    redirectWith("/stock", "error", "Enter a whole stock quantity of zero or more.");
   }
 
   const quantityOnHand = Number(rawQuantity);
   if (!Number.isSafeInteger(quantityOnHand) || quantityOnHand > 2_147_483_647) {
-    redirectWith("/", "error", "Enter a valid stock quantity.");
+    redirectWith("/stock", "error", "Enter a valid stock quantity.");
   }
 
   const session = await getSession();
@@ -85,16 +85,16 @@ export async function setStockAction(form: FormData): Promise<void> {
     message = actionError(error, "Could not update stock. Please try again.");
   }
 
-  if (message) redirectWith("/", "error", message);
-  redirectWith("/", "notice", "Stock quantity updated.");
+  if (message) redirectWith("/stock", "error", message);
+  redirectWith("/stock", "notice", "Stock quantity updated.");
 }
 
 export async function collectHoldAction(form: FormData): Promise<void> {
   const holdId = formText(form, "holdId");
   const pickupCode = formText(form, "pickupCode");
 
-  if (!holdId) redirectWith("/", "error", "The hold ID is missing.");
-  if (!pickupCode) redirectWith("/", "error", "Enter the pickup code shown by the patient.");
+  if (!holdId) redirectWith("/holds", "error", "The hold ID is missing.");
+  if (!pickupCode) redirectWith("/holds", "error", "Enter the pickup code shown by the patient.");
 
   const session = await getSession();
   if (!session) redirect("/login");
@@ -107,8 +107,8 @@ export async function collectHoldAction(form: FormData): Promise<void> {
     message = collectError(error);
   }
 
-  if (message) redirectWith("/", "error", message);
-  redirectWith("/", "notice", "Hold collected.");
+  if (message) redirectWith("/holds", "error", message);
+  redirectWith("/holds", "notice", "Hold collected.");
 }
 export async function uploadStockCsvAction(form: FormData): Promise<void> {
   const value = form.get("file");

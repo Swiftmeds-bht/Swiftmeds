@@ -12,6 +12,8 @@ export interface DashboardSession {
   accessToken: string;
   refreshToken: string;
   expiresAt?: string;
+  /** The sign-in email, shown in the account menu (SCRUM-138). */
+  email?: string;
 }
 
 interface LoginResponse {
@@ -53,7 +55,7 @@ function pharmacyIDFromAccessToken(accessToken: string): string {
   return payload.pharmacy_id;
 }
 
-export function sessionFromLogin(response: LoginResponse): DashboardSession {
+export function sessionFromLogin(response: LoginResponse, email?: string): DashboardSession {
   if (typeof response.userId !== "string" || !response.userId) {
     throw new Error("Auth returned no user ID.");
   }
@@ -90,6 +92,7 @@ export function sessionFromLogin(response: LoginResponse): DashboardSession {
     accessToken,
     refreshToken,
     ...(typeof expiresAt === "string" ? { expiresAt } : {}),
+    ...(email ? { email } : {}),
   };
 }
 
@@ -101,7 +104,7 @@ export async function getSession(): Promise<DashboardSession | undefined> {
     const parsed: unknown = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
     if (!isRecord(parsed)) return undefined;
 
-    const { userId, role, pharmacyId, accessToken, refreshToken, expiresAt } = parsed;
+    const { userId, role, pharmacyId, accessToken, refreshToken, expiresAt, email } = parsed;
 
     if (
       typeof userId !== "string" ||
@@ -130,6 +133,7 @@ export async function getSession(): Promise<DashboardSession | undefined> {
       accessToken,
       refreshToken,
       ...(typeof expiresAt === "string" ? { expiresAt } : {}),
+      ...(typeof email === "string" && email ? { email } : {}),
     };
   } catch {
     return undefined;

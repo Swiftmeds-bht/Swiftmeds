@@ -1,18 +1,15 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { logoutAction, uploadStockCsvAction } from "@/app/actions";
+import { uploadStockCsvAction } from "@/app/actions";
+import { Notices, queryText, type SearchParams } from "@/components/Notices";
 import { DashboardApiError, getSyncJob, type SyncJob } from "@/lib/api";
-import { getSession } from "@/lib/session";
+import { currentSession } from "@/lib/data";
 import { CSV_HEADER, jobSummary } from "@/lib/stock-csv";
 
-type PageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+export const metadata: Metadata = { title: "Upload stock CSV" };
 
-function queryText(value: string | string[] | undefined): string | undefined {
-  return typeof value === "string" && value ? value : undefined;
-}
+type PageProps = { searchParams: SearchParams };
 
 function ImportReport({ job }: { job: SyncJob }) {
   const summary = jobSummary(job);
@@ -21,29 +18,26 @@ function ImportReport({ job }: { job: SyncJob }) {
   return (
     <section className="panel" aria-labelledby="report-heading">
       <div className="panel-heading">
-        <div>
-          <p className="eyebrow">Import report</p>
-          <h2 id="report-heading">{job.filename ?? "Uploaded file"}</h2>
-        </div>
+        <h2 id="report-heading">Import report: {job.filename ?? "uploaded file"}</h2>
       </div>
 
       <p className={`message message-${summary.tone}`} role="status">
         {summary.label}
       </p>
 
-      <div className="summary-grid" aria-label="Import totals">
-        <article className="summary-card">
-          <span className="summary-label">Rows in file</span>
-          <strong className="summary-value">{job.rowsTotal ?? 0}</strong>
-        </article>
-        <article className="summary-card">
-          <span className="summary-label">Imported</span>
-          <strong className="summary-value">{job.rowsApplied ?? 0}</strong>
-        </article>
-        <article className="summary-card">
-          <span className="summary-label">Rejected</span>
-          <strong className="summary-value">{job.rowsRejected ?? rowErrors.length}</strong>
-        </article>
+      <div className="stat-grid" aria-label="Import totals">
+        <div className="stat">
+          <span className="stat-value num">{job.rowsTotal ?? 0}</span>
+          <span className="stat-label">Rows in file</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value num">{job.rowsApplied ?? 0}</span>
+          <span className="stat-label">Imported</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value num">{job.rowsRejected ?? rowErrors.length}</span>
+          <span className="stat-label">Rejected</span>
+        </div>
       </div>
 
       {rowErrors.length > 0 ? (
@@ -76,7 +70,7 @@ function ImportReport({ job }: { job: SyncJob }) {
 }
 
 export default async function UploadPage({ searchParams }: PageProps) {
-  const session = await getSession();
+  const session = await currentSession();
   if (!session) redirect("/login");
 
   const params = await searchParams;
@@ -93,38 +87,17 @@ export default async function UploadPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">SwiftMeds · Pharmacy</p>
-          <h1>Upload stock CSV</h1>
-          <p className="dashboard-subtitle">Update many medicines at once from a spreadsheet.</p>
-        </div>
+    <div className="page">
+      <div className="page-heading">
+        <h1>Upload stock CSV</h1>
+        <p className="muted">Update many medicines at once from a spreadsheet.</p>
+      </div>
 
-        <div className="header-actions">
-          <Link className="button button-secondary" href="/">
-            Back to dashboard
-          </Link>
-          <form action={logoutAction}>
-            <button className="button button-secondary" type="submit">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </header>
-
-      {error ? (
-        <p className="message message-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <Notices error={error} />
 
       <section className="panel" aria-labelledby="upload-heading">
         <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Stock Sync</p>
-            <h2 id="upload-heading">Choose a file</h2>
-          </div>
+          <h2 id="upload-heading">Choose a file</h2>
           <a className="text-link" href="/upload/template" download>
             Download CSV template
           </a>
@@ -149,6 +122,6 @@ export default async function UploadPage({ searchParams }: PageProps) {
       </section>
 
       {job ? <ImportReport job={job} /> : null}
-    </main>
+    </div>
   );
 }

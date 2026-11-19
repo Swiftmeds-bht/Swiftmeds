@@ -25,6 +25,7 @@ type routes struct {
 	feedback         ports.FeedbackClient
 	notifications    ports.NotificationClient
 	profile          ports.ProfileClient
+	products         ports.ProductLookup
 	pharmacyRegistry ports.PharmacyRegistryClient
 	analytics        ports.AnalyticsClient
 	inventory        ports.InventoryClient
@@ -107,6 +108,11 @@ func WithProfile(client ports.ProfileClient) RouterOption {
 	return func(r *routes) { r.profile = client }
 }
 
+// WithProducts adds the public medicine lookup, getProduct (SCRUM-138).
+func WithProducts(client ports.ProductLookup) RouterOption {
+	return func(r *routes) { r.products = client }
+}
+
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
 	var wired routes
 	for _, opt := range opts {
@@ -168,6 +174,13 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.notifications != nil {
 		mux.Handle("GET /api/v1/notifications", notificationsHandler(wired.notifications, logger))
+	}
+	// Public lookups by ID (SCRUM-138); httpx.Auth lets exactly these through.
+	if wired.products != nil {
+		mux.Handle("GET /api/v1/products/{productId}", productHandler(wired.products, logger))
+	}
+	if wired.pharmacyRegistry != nil {
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}", pharmacyHandler(wired.pharmacyRegistry, logger))
 	}
 	if wired.profile != nil {
 		mux.Handle("GET "+ProfilePath, profileHandler(wired.profile, logger))
