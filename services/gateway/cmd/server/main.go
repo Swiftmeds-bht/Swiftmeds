@@ -28,6 +28,7 @@ import (
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	stocksyncv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/stock-sync/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
+	userprofilev1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1"
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/app"
@@ -108,6 +109,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("notification client: %w", err)
 	}
+	profileConn, err := conns.Connection(context.Background(), "user-profile")
+	if err != nil {
+		return fmt.Errorf("user profile client: %w", err)
+	}
 	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
 	if err != nil {
 		return fmt.Errorf("pharmacy registry client: %w", err)
@@ -143,6 +148,7 @@ func run() error {
 			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
 			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
+			app.WithProfile(clients.NewProfileClient(userprofilev1.NewUserProfileServiceClient(profileConn))),
 			app.WithInventory(clients.NewInventoryClient(inventoryv1.NewInventoryServiceClient(inventoryConn))),
 			app.WithStockSync(clients.NewStockSyncClient(stocksyncv1.NewStockSyncServiceClient(stockSyncConn))),
 		),
