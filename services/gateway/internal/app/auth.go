@@ -1,15 +1,24 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
+
+// AuthCallTimeout is the limit for an auth route and for each gRPC call to
+// Auth (cmd/server), longer than the usual 2 s per request and 800 ms per call.
+// Register and Login hash or check a bcrypt password, which is slow on purpose:
+// they normally take 0.1-0.15 s, but on a cold path (the first call after a
+// restart) a sign-up went past 800 ms and failed as "took too long" (SCRUM-136).
+const AuthCallTimeout = 3 * time.Second
 
 type authRequest struct {
 	Email        string `json:"email"`
@@ -25,7 +34,7 @@ func authHandler(client ports.AuthRoutes, logger *slog.Logger) http.HandlerFunc 
 			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		ctx, cancel := callContext(r)
+		ctx, cancel := context.WithTimeout(r.Context(), AuthCallTimeout)
 		defer cancel()
 		var response interface{ ProtoReflect() protoreflect.Message }
 		var err error

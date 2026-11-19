@@ -25,6 +25,29 @@ export function freshnessLabel(score: number | undefined): { text: string; level
   return { text: "Stock not confirmed lately. Call ahead", level: "low" };
 }
 
+const RELATIVE = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+// Each unit and how many of it make the next one: 60 minutes, 24 hours, 7 days.
+const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["minute", 60],
+  ["hour", 24],
+  ["day", 7],
+];
+
+/** "just now", "5 minutes ago", "yesterday", or a date after four weeks. */
+export function formatRelativeTime(iso: string, now = Date.now()): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  let value = Math.round((then - now) / 1000);
+  if (Math.abs(value) < 45) return "just now";
+  value = Math.round(value / 60);
+  for (const [unit, next] of STEPS) {
+    if (Math.abs(value) < next) return RELATIVE.format(value, unit);
+    value = Math.round(value / next);
+  }
+  if (Math.abs(value) <= 4) return RELATIVE.format(value, "week");
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Thimphu" }).format(then);
+}
+
 /** "1 unit" / "12 units". */
 export function formatQuantity(n: number | undefined): string {
   const q = n ?? 0;
