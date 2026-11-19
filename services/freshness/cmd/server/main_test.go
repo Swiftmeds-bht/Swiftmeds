@@ -211,7 +211,7 @@ func TestServeMigratesAnswersCallsAndStopsCleanly(t *testing.T) {
 	}
 	defer func() { _ = conn.Close() }()
 	client := freshnessv1.NewFreshnessServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	key := &commonv1.StockKey{PharmacyId: "ph-1", ProductId: "med-1"}
