@@ -211,7 +211,7 @@ jobs:
     env:
       GATEWAY_URL: http://127.0.0.1:8080
       RABBITMQ_URL: amqp://swiftmed:change-me@127.0.0.1:5672/
-      WORKER_SHARED_SECRET: change-me-worker-secret
+      WORKER_SHARED_SECRET: ci-worker-shared-secret-32-bytes-minimum
       HOLDS_HOLD_DURATION: 5s
       EXPIRY_HOLD_DURATION: 5s
 
@@ -230,6 +230,9 @@ jobs:
         run: |
           set -euo pipefail
           cp .env.example .env
+          jwt_secret="$(openssl rand -hex 32)"
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/" .env
+          sed -i "s/^WORKER_SHARED_SECRET=.*/WORKER_SHARED_SECRET=${WORKER_SHARED_SECRET}/" .env
           env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env up -d --build --wait --wait-timeout 900
           env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env --profile seed run --rm seed
 
