@@ -30,15 +30,17 @@ function HoldsTable({ holds }: { holds: NamedHold[] }) {
             const inputId = `pickup-code-${h.holdId}`;
             return (
               <tr key={h.holdId} id={`hold-${h.holdId}`}>
-                <td>
+                <td className="row-main">
                   <MedicineCell medicine={h.medicine} productId={h.productId} />
                 </td>
-                <td className="num-col num">{h.quantity ?? "—"}</td>
+                <td className="num-col num" data-label="Units">
+                  {h.quantity ?? "—"}
+                </td>
                 <td>
                   <span className={`pickup-time${h.timeLeft === "Expired" ? " is-expired" : ""}`}>{h.timeLeft}</span>
                   <span className="cell-detail">{displayDate(h.expiresAt)}</span>
                 </td>
-                <td>
+                <td className="row-action">
                   <form action={collectHoldAction} className="inline-form">
                     <input type="hidden" name="holdId" value={h.holdId} />
                     <label className="sr-only" htmlFor={inputId}>
@@ -81,7 +83,7 @@ export default async function HoldsPage({ searchParams }: { searchParams: Search
       </div>
       <Notices error={queryText(params.error) ?? error} notice={queryText(params.notice)} />
       {error ? null : (
-        <section className="panel" aria-label="Holds waiting for pickup">
+        <section className="panel stack-table" aria-label="Holds waiting for pickup">
           <HoldsTable holds={holds} />
         </section>
       )}

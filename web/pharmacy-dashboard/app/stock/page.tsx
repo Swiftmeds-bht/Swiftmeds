@@ -44,16 +44,22 @@ function StockTable({ stock }: { stock: NamedStock[] }) {
             const inputId = `quantity-${item.productId}`;
             return (
               <tr key={item.productId}>
-                <td>
+                <td className="row-main">
                   <MedicineCell medicine={item.medicine} productId={item.productId} />
                 </td>
-                <td className="num-col num">{item.quantityOnHand ?? 0}</td>
-                <td className="num-col num">{reserved}</td>
-                <td className="num-col num">
+                <td className="num-col num" data-label="On hand">
+                  {item.quantityOnHand ?? 0}
+                </td>
+                <td className="num-col num" data-label="Reserved">
+                  {reserved}
+                </td>
+                <td className="num-col num" data-label="Available">
                   {available > 0 ? <strong>{available}</strong> : <span className="badge badge-low">Out</span>}
                 </td>
-                <td className="cell-detail-only">{displayDate(item.confirmedAt)}</td>
-                <td>
+                <td className="cell-detail-only" data-label="Confirmed">
+                  {displayDate(item.confirmedAt)}
+                </td>
+                <td className="row-action">
                   <form action={setStockAction} className="inline-form">
                     <input type="hidden" name="productId" value={item.productId} />
                     <label className="sr-only" htmlFor={inputId}>
@@ -105,7 +111,7 @@ export default async function StockPage({ searchParams }: { searchParams: Search
       </div>
       <Notices error={queryText(params.error) ?? error} notice={queryText(params.notice)} />
       {error ? null : (
-        <section className="panel" aria-label="Medicine stock">
+        <section className="panel stack-table" aria-label="Medicine stock">
           <StockTable stock={stock} />
         </section>
       )}
