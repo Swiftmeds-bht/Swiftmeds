@@ -83,7 +83,8 @@ export function SearchForm({
         </details> : areaFields}
       <button type="submit" className="button button-lg search-submit" disabled={pending}>
         <SearchIcon size={18} />
-        {pending ? "Searching…" : "Search"}
+        {/* On the home page's search card the button is a round icon; the text stays its name. */}
+        <span className="search-submit-text">{pending ? "Searching…" : "Search"}</span>
       </button>
     </form>
   );
