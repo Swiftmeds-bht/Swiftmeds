@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
@@ -113,5 +114,42 @@ func TestAuthRoutesRejectInvalidBodies(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("%s body %q: status=%d, want 400", tc.path, tc.body, rec.Code)
 		}
+	}
+}
+
+// deadlineAuthRoutes records how much time Register and Login were given.
+type deadlineAuthRoutes struct {
+	fakeAuthRoutes
+	budget time.Duration
+}
+
+func (f *deadlineAuthRoutes) record(ctx context.Context) {
+	if deadline, ok := ctx.Deadline(); ok {
+		f.budget = time.Until(deadline)
+	}
+}
+func (f *deadlineAuthRoutes) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
+	f.record(ctx)
+	return f.fakeAuthRoutes.Register(ctx, req)
+}
+func (f *deadlineAuthRoutes) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
+	f.record(ctx)
+	return f.fakeAuthRoutes.Login(ctx, req)
+}
+
+// Register and Login run bcrypt, so they get AuthCallTimeout instead of the 2 s
+// every other route gets (SCRUM-136).
+func TestAuthRoutesGetTheLongerAuthBudget(t *testing.T) {
+	for _, path := range []string{"/api/v1/auth/register", "/api/v1/auth/login"} {
+		t.Run(path, func(t *testing.T) {
+			fake := &deadlineAuthRoutes{}
+			h := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, slog.Default(), WithAuth(fake))
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"email":"a@example.com","password":"password"}`))
+			h.ServeHTTP(httptest.NewRecorder(), req)
+
+			if fake.budget <= downstreamTimeout || fake.budget > AuthCallTimeout {
+				t.Fatalf("auth call budget = %v, want more than %v and at most %v", fake.budget, downstreamTimeout, AuthCallTimeout)
+			}
+		})
 	}
 }
