@@ -1,35 +1,80 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 
-import { logoutAction } from "@/app/actions";
 import { getSession } from "@/lib/auth";
+import {
+  NOTIFICATIONS_SEEN_COOKIE,
+  describeNotification,
+  newestCreatedAt,
+  notificationsBackend,
+  parseSeenAt,
+  unreadCount,
+  type AppNotification,
+} from "@/lib/notifications";
+import { initialOf, profileBackend, type Profile } from "@/lib/profile";
+import type { Session } from "@/lib/types";
 
+import { AccountMenu } from "./AccountMenu";
 import { AlertListener } from "./AlertListener";
+import { MainNav } from "./MainNav";
+import { NotificationBell } from "./NotificationBell";
 
-// Header links: Sign in, or My holds, Watchlist and Sign out. Reads the session cookie on the server.
+// The header never fails the page: if a call fails, the bell says so and the
+// account menu shows the email.
+async function loadNotifications(session: Session): Promise<AppNotification[] | undefined> {
+  try {
+    return await notificationsBackend().list(session);
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadProfile(session: Session): Promise<Profile | undefined> {
+  try {
+    return await profileBackend().get(session);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Header navigation (SCRUM-137): the main sections and, signed in, the
+ * notification bell and the account menu; signed out, a Sign in link. Reads the
+ * session cookie on the server, so tokens never reach the browser.
+ */
 export async function AccountNav() {
   const session = await getSession();
+  if (!session) {
+    return (
+      <div className="header-nav">
+        <MainNav signedIn={false} />
+        <div className="header-actions">
+          <Link href="/login" className="nav-link nav-link-boxed">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const [notifications, profile, jar] = await Promise.all([loadNotifications(session), loadProfile(session), cookies()]);
+  const list = notifications ?? [];
+  const seenAt = parseSeenAt(jar.get(NOTIFICATIONS_SEEN_COOKIE)?.value);
+  const name = profile?.displayName || undefined;
+
   return (
-    <nav aria-label="Account" className="account-nav">
-      {session ? (
-        <>
-          <Link href="/holds" className="nav-link">
-            My holds
-          </Link>
-          <Link href="/watchlist" className="nav-link">
-            Watchlist
-          </Link>
-          <form action={logoutAction}>
-            <button type="submit" className="link-button nav-link">
-              Sign out
-            </button>
-          </form>
-        </>
-      ) : (
-        <Link href="/login" className="nav-link nav-link-boxed">
-          Sign in
-        </Link>
-      )}
-    </nav>
+    <div className="header-nav">
+      <MainNav signedIn />
+      <div className="header-actions">
+        <NotificationBell
+          items={list.map(describeNotification)}
+          unread={unreadCount(list, seenAt)}
+          newest={newestCreatedAt(list)}
+          failed={notifications === undefined}
+        />
+        <AccountMenu email={session.email} name={name} initial={initialOf(name, session.email)} />
+      </div>
+    </div>
   );
 }
 

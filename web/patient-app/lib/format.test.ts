@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDistance, formatPrice, formatQuantity, freshnessLabel } from "./format";
+import { formatDistance, formatPrice, formatQuantity, formatRelativeTime, freshnessLabel } from "./format";
+
+describe("formatRelativeTime", () => {
+  const now = Date.parse("2026-11-19T12:00:00Z");
+  it.each([
+    ["2026-11-19T11:59:40Z", "just now"],
+    ["2026-11-19T11:55:00Z", "5 minutes ago"],
+    ["2026-11-19T09:00:00Z", "3 hours ago"],
+    ["2026-11-18T10:00:00Z", "yesterday"],
+    ["2026-11-12T12:00:00Z", "last week"],
+    ["2026-09-01T12:00:00Z", "1 Sept"],
+    ["not a date", ""],
+  ])("%s reads as %s", (iso, text) => {
+    expect(formatRelativeTime(iso, now)).toBe(text);
+  });
+});
 
 describe("formatPrice", () => {
   it.each([

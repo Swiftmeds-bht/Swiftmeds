@@ -24,6 +24,7 @@ type routes struct {
 	watchlist        ports.WatchlistClient
 	feedback         ports.FeedbackClient
 	notifications    ports.NotificationClient
+	profile          ports.ProfileClient
 	pharmacyRegistry ports.PharmacyRegistryClient
 	analytics        ports.AnalyticsClient
 	inventory        ports.InventoryClient
@@ -101,6 +102,11 @@ func WithNotifications(client ports.NotificationClient) RouterOption {
 	return func(r *routes) { r.notifications = client }
 }
 
+// WithProfile adds the signed-in user's own profile routes (SCRUM-137).
+func WithProfile(client ports.ProfileClient) RouterOption {
+	return func(r *routes) { r.profile = client }
+}
+
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
 	var wired routes
 	for _, opt := range opts {
@@ -162,6 +168,10 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.notifications != nil {
 		mux.Handle("GET /api/v1/notifications", notificationsHandler(wired.notifications, logger))
+	}
+	if wired.profile != nil {
+		mux.Handle("GET "+ProfilePath, profileHandler(wired.profile, logger))
+		mux.Handle("PUT "+ProfilePath, profileHandler(wired.profile, logger))
 	}
 	mux.Handle("/api/v1/", http.NotFoundHandler())
 

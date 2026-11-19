@@ -3,11 +3,15 @@
 // Form actions for accounts and holds. They run on the server, so the access
 // token stays in the httpOnly cookie. Each returns { error } for the form to
 // show, or redirects on success. redirect() throws, so it is never inside try.
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { clearSession, getSession, saveSession, withFreshToken } from "@/lib/auth";
 import { errorMessage } from "@/lib/hold-format";
 import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
+import { NOTIFICATIONS_SEEN_COOKIE, parseSeenAt } from "@/lib/notifications";
+import { checkProfile, profileBackend } from "@/lib/profile";
 import { safeNext } from "@/lib/session";
 import type { Session } from "@/lib/types";
 import { watchlistBackend } from "@/lib/watchlist";
@@ -131,6 +135,47 @@ export async function unwatchAction(_prev: FormState, form: FormData): Promise<F
     if (!(err instanceof HoldError && err.kind === "not_found")) return failure(err);
   }
   redirect("/watchlist");
+}
+
+export interface ProfileState extends FormState {
+  /** Set after a successful save. */
+  saved?: boolean;
+  /** Typed back into the form after an error. */
+  displayName?: string;
+  phone?: string;
+}
+
+/** Saves the patient's name and phone (SCRUM-137). */
+export async function saveProfileAction(_prev: ProfileState, form: FormData): Promise<ProfileState> {
+  const session = await sessionOrSignIn("/profile");
+  const typed = { displayName: text(form, "displayName"), phone: text(form, "phone") };
+  const checked = checkProfile(typed);
+  if ("error" in checked) return { error: checked.error, ...typed };
+  try {
+    const saved = await withFreshToken(session, (s) => profileBackend().save(s, checked.profile));
+    // The header shows the name: refresh every page's layout.
+    revalidatePath("/", "layout");
+    return { saved: true, ...saved };
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain("/profile");
+    return { ...failure(err), ...typed };
+  }
+}
+
+/**
+ * Remembers the newest notification the patient has seen, so the bell stops
+ * counting it as unread (there is no read API). Called when the bell opens.
+ */
+export async function markNotificationsSeenAction(newestCreatedAt: string): Promise<void> {
+  const seenAt = parseSeenAt(newestCreatedAt);
+  if (!seenAt || !(await getSession())) return;
+  (await cookies()).set(NOTIFICATIONS_SEEN_COOKIE, seenAt, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
 }
 
 export async function cancelHoldAction(_prev: FormState, form: FormData): Promise<FormState> {

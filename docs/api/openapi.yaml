@@ -1431,7 +1431,7 @@ paths:
       tags: [Profile]
       operationId: getMyProfile
       summary: Get the signed-in user's profile
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.userprofile.v1.UserProfileService/GetProfile
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       responses:
@@ -1455,8 +1455,13 @@ paths:
       tags: [Profile]
       operationId: updateMyProfile
       summary: Save the signed-in user's profile
-      description: Creates the profile if it does not exist yet.
-      x-status: planned
+      description: >-
+        Creates the profile if it does not exist yet. The user is always the
+        caller (from the token). Both fields are required: `displayName` (1 to 80
+        characters) and `phone` (8 to 15 digits with an optional leading `+`;
+        spaces, dashes, dots and brackets are removed before checking). A failed
+        check answers 400 with a sentence the app can show.
+      x-status: implemented
       x-grpc: swiftmed.userprofile.v1.UserProfileService/UpdateProfile
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       requestBody:
