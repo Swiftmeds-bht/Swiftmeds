@@ -28,7 +28,7 @@ export function parseSession(value: string | undefined): Session | undefined {
   } catch {
     return undefined;
   }
-  const { userId, email, accessToken, expiresAt, refreshToken } = parsed ?? {};
+  const { userId, email, accessToken, expiresAt, refreshToken, role, pharmacyId } = parsed ?? {};
   if (typeof userId !== "string" || typeof email !== "string" || typeof accessToken !== "string") return undefined;
   if (!userId || !accessToken) return undefined;
   if (expiresAt !== undefined && (typeof expiresAt !== "string" || Number.isNaN(Date.parse(expiresAt)))) return undefined;
@@ -36,6 +36,8 @@ export function parseSession(value: string | undefined): Session | undefined {
   const session: Session = { userId, email, accessToken };
   if (expiresAt !== undefined) session.expiresAt = expiresAt;
   if (refreshToken !== undefined) session.refreshToken = refreshToken;
+  if (typeof role === "string" && role) session.role = role;
+  if (typeof pharmacyId === "string" && pharmacyId) session.pharmacyId = pharmacyId;
   return session;
 }
 

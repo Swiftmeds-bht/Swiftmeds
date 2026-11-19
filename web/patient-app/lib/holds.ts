@@ -6,7 +6,8 @@ import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { demoBackend } from "./demo-holds";
 import { HoldError, type HoldsBackend } from "./holds-core";
 import { tokenFields } from "./refresh";
-import type { Hold } from "./types";
+import { pharmacyIdFromToken } from "./roles";
+import type { Hold, Session } from "./types";
 
 export { HoldError, MAX_HOLD_QUANTITY, type HoldErrorKind, type HoldsBackend } from "./holds-core";
 
@@ -110,13 +111,19 @@ export function gatewayBackend(options: GatewayOptions): HoldsBackend {
     async login(email, password) {
       const body = (await call("POST", "/api/v1/auth/login", "login", { body: { email, password } })) as {
         userId?: string;
+        role?: unknown;
         tokens?: Parameters<typeof tokenFields>[0];
       } | null;
       const tokens = tokenFields(body?.tokens);
       if (typeof body?.userId !== "string" || !body.userId || !tokens) {
         throw new HoldError("server", "The gateway sent a login answer without a user or token");
       }
-      return { userId: body.userId, email, ...tokens };
+      // The role and the staff's pharmacy decide patient pages or the pharmacy portal (SCRUM-139).
+      const session: Session = { userId: body.userId, email, ...tokens };
+      if (typeof body.role === "string" && body.role) session.role = body.role;
+      const pharmacyId = pharmacyIdFromToken(tokens.accessToken);
+      if (pharmacyId) session.pharmacyId = pharmacyId;
+      return session;
     },
 
     async createHold(session, input) {

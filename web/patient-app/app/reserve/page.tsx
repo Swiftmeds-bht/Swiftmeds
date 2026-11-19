@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createHoldAction } from "@/app/actions";
 import { ArrowLeftIcon, InfoIcon } from "@/components/Icons";
 import { ReserveForm } from "@/components/ReserveForm";
-import { requireSession } from "@/lib/auth";
+import { requirePatient } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 import { HOLD_MINUTES } from "@/lib/demo-holds";
 import { MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
@@ -24,7 +24,7 @@ export default async function ReservePage({ searchParams }: { searchParams: Sear
   const returnTo = `/reserve?${new URLSearchParams(
     Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : [])),
   )}`;
-  await requireSession(returnTo);
+  await requirePatient(returnTo);
 
   if (!productId || !pharmacyId) {
     return (

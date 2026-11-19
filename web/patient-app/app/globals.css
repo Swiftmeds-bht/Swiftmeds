@@ -106,7 +106,7 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
 @supports (backdrop-filter: blur(8px)) {
   .site-header { background: rgba(255, 255, 255, 0.86); backdrop-filter: saturate(160%) blur(10px); }
 }
-.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4rem; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4.5rem; }
 .header-start { display: flex; align-items: center; gap: 1rem; min-width: 0; }
 .brand {
   display: inline-flex; align-items: center; gap: 0.55rem; min-height: 2.75rem;
@@ -114,20 +114,23 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
 }
 .brand:hover { color: var(--text); }
 .brand-mark { display: inline-flex; color: var(--primary); }
-.header-tagline { color: var(--muted); font-size: 0.9375rem; padding-left: 1rem; border-left: 1px solid var(--border); }
-/* The tagline gives way to the section links. */
-@media (max-width: 68rem) { .header-tagline { display: none; } }
 
-/* ---------- Header navigation (SCRUM-137) ----------
-   Main sections on the left, the bell and the account menu on the right. On a
-   phone the sections move to their own row, scrolling sideways if needed. */
-.header-nav { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex: 1; min-width: 0; }
+/* ---------- Header navigation (SCRUM-137, laid out in SCRUM-139) ----------
+   The mark on the left; everything else grouped on the right, as booking sites
+   commonly do: the sections, a thin divider, then the account actions (bell and
+   account menu, or Sign in and Create account). On a phone the sections move
+   to their own row, scrolling sideways if needed. */
+.header-nav { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; flex: 1; min-width: 0; }
 .main-nav ul { display: flex; align-items: center; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
 .main-nav .nav-link { white-space: nowrap; }
-.header-actions { display: flex; align-items: center; gap: 0.25rem; flex-shrink: 0; margin-left: auto; }
+.header-divider { flex-shrink: 0; width: 1px; height: 1.75rem; margin: 0 0.5rem; background: var(--border); }
+.header-actions { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+.header-cta { margin-left: 0.25rem; }
 @media (max-width: 47.99rem) {
   .header-inner { flex-wrap: wrap; row-gap: 0; }
   .header-nav { display: contents; }
+  .header-divider { display: none; }
+  .header-actions { margin-left: auto; }
   .main-nav { order: 3; flex-basis: 100%; margin: 0 -1.25rem; padding: 0 1.25rem 0.45rem; overflow-x: auto; scrollbar-width: none; }
   .main-nav::-webkit-scrollbar { display: none; }
   .main-nav ul { gap: 0.15rem; }
@@ -208,9 +211,24 @@ a.bell-item:hover { color: var(--text); background: var(--surface); text-decorat
 .nav-link-boxed { border: 1px solid var(--border); background: var(--bg); }
 .nav-link-boxed:hover { border-color: var(--primary); background: var(--bg); }
 
+/* One footer for patients and pharmacies (SCRUM-139): the mark and what
+   SwiftMed is, then a column of links for each audience. */
 .site-footer { margin-top: 5rem; border-top: 1px solid var(--border); background: var(--bg); }
-.footer-inner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-top: 1.5rem; padding-bottom: 2rem; font-size: 0.9375rem; }
-.footer-brand { font-weight: 700; letter-spacing: -0.02em; }
+.footer-inner {
+  display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 2rem 3rem;
+  padding-top: 2.5rem; padding-bottom: 2.5rem; font-size: 0.9375rem;
+}
+.footer-brand { margin: 0 0 0.35rem; font-weight: 750; font-size: 1.0625rem; letter-spacing: -0.02em; }
+.footer-about p { max-width: 38ch; }
+.footer-col h2 { margin: 0 0 0.6rem; font-size: 0.9375rem; font-weight: 700; }
+.footer-col ul { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.footer-col a { color: var(--muted); text-decoration: none; }
+.footer-col a:hover { color: var(--primary-hover); text-decoration: underline; }
+.footer-legal { grid-column: 1 / -1; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
+@media (max-width: 39.99rem) {
+  .footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.75rem 1.5rem; }
+  .footer-about { grid-column: 1 / -1; }
+}
 
 /* ---------- Buttons ---------- */
 .button {

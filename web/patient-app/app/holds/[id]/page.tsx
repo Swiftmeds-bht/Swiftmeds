@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { cancelHoldAction } from "@/app/actions";
 import { HoldCard } from "@/components/HoldCard";
 import { ArrowLeftIcon } from "@/components/Icons";
-import { requireSession } from "@/lib/auth";
+import { requirePatient } from "@/lib/auth";
 import { errorMessage, justActivated } from "@/lib/hold-format";
 import { HoldError, holdsBackend } from "@/lib/holds";
 import { nameBook } from "@/lib/names";
@@ -20,7 +20,7 @@ type Params = Promise<{ id: string }>;
 export default async function HoldPage({ params }: { params: Params }) {
   const { id } = await params;
   const self = `/holds/${encodeURIComponent(id)}`;
-  const session = await requireSession(self);
+  const session = await requirePatient(self);
 
   let hold: Hold | undefined;
   let failed: HoldError["kind"] | undefined;

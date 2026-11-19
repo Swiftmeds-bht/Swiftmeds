@@ -12,10 +12,12 @@ export interface AccountMenuProps {
   /** The saved display name, when the patient has one. */
   name?: string;
   initial: string;
+  /** For pharmacy staff: the pharmacy they work at (SCRUM-139). */
+  pharmacy?: string;
 }
 
 /** The account button (SCRUM-137): who is signed in, the profile, and signing out. */
-export function AccountMenu({ email, name, initial }: AccountMenuProps) {
+export function AccountMenu({ email, name, initial, pharmacy }: AccountMenuProps) {
   const { open, close, toggle, rootRef, buttonRef, panelId } = usePopover();
   return (
     <div className="popover" ref={rootRef}>
@@ -37,6 +39,7 @@ export function AccountMenu({ email, name, initial }: AccountMenuProps) {
         <div className="account-who">
           {name ? <p className="account-name">{name}</p> : null}
           <p className="account-email">{email}</p>
+          {pharmacy ? <p className="account-email">Pharmacy staff · {pharmacy}</p> : null}
         </div>
         <ul className="account-links">
           <li>

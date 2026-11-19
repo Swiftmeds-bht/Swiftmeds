@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { unwatchAction } from "@/app/actions";
 import { UnwatchForm } from "@/components/UnwatchForm";
-import { requireSession } from "@/lib/auth";
+import { requirePatient } from "@/lib/auth";
 import { formatClock, errorMessage, holdNames } from "@/lib/hold-format";
 import { HoldError } from "@/lib/holds";
 import { nameBook } from "@/lib/names";
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Watchlist" };
 export const dynamic = "force-dynamic";
 
 export default async function WatchlistPage() {
-  const session = await requireSession("/watchlist");
+  const session = await requirePatient("/watchlist");
 
   let subs: WatchSubscription[] = [];
   let failed: HoldError["kind"] | undefined;

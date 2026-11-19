@@ -37,7 +37,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
                 <span className="brand-name">SwiftMed</span>
               </Link>
-              <span className="header-tagline">Medicine finder for Bhutan</span>
             </div>
             <AccountNav />
           </div>
@@ -45,8 +44,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <footer className="site-footer">
           <div className="wrap footer-inner">
-            <p className="footer-brand">SwiftMed</p>
-            <p className="muted">SwiftMed shows availability only. It does not give medical advice.</p>
+            <div className="footer-about">
+              <p className="footer-brand">SwiftMed</p>
+              <p className="muted">Find which pharmacies near you in Bhutan have your medicine, reserve it, and collect it with a code.</p>
+            </div>
+            <nav className="footer-col" aria-labelledby="footer-patients">
+              <h2 id="footer-patients">For patients</h2>
+              <ul>
+                <li><Link href="/">Search medicines</Link></li>
+                <li><Link href="/holds">My holds</Link></li>
+                <li><Link href="/watchlist">Watchlist</Link></li>
+              </ul>
+            </nav>
+            <nav className="footer-col" aria-labelledby="footer-pharmacies">
+              <h2 id="footer-pharmacies">For pharmacies</h2>
+              <ul>
+                <li><Link href="/pharmacy-portal">Pharmacy portal</Link></li>
+                <li><Link href="/pharmacy-portal/upload">Upload stock</Link></li>
+              </ul>
+            </nav>
+            <p className="footer-legal">SwiftMed shows availability only. It does not give medical advice.</p>
           </div>
         </footer>
         <SignedInAlerts />

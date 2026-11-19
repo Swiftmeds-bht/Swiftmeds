@@ -22,23 +22,43 @@ describe("MainNav", () => {
     ["/holds", "My holds"],
     ["/holds/h1", "My holds"],
     ["/watchlist", "Watchlist"],
-  ])("marks %s as %s", (path, current) => {
+  ])("marks %s as %s for a patient", (path, current) => {
     nav.path = path;
-    render(<MainNav signedIn />);
+    render(<MainNav audience="patient" />);
     const currentLinks = screen.getAllByRole("link").filter((l) => l.getAttribute("aria-current") === "page");
     expect(currentLinks.map((l) => l.textContent)).toEqual([current]);
   });
 
-  it("offers Search to everyone, and holds and watchlist only when signed in", () => {
+  it("offers a visitor Search and the way in for pharmacies", () => {
     nav.path = "/";
-    render(<MainNav signedIn={false} />);
-    expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Search"]);
+    render(<MainNav audience="guest" />);
+    expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Search", "For pharmacies"]);
+    expect(screen.getByRole("link", { name: "For pharmacies" }).getAttribute("href")).toBe("/pharmacy-portal");
     expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
+  });
+
+  it.each([
+    ["/pharmacy-portal", "Overview"],
+    ["/pharmacy-portal/holds", "Holds"],
+    ["/pharmacy-portal/stock", "Stock"],
+    ["/pharmacy-portal/upload", "Upload CSV"],
+  ])("shows staff the portal's sections, marking %s as %s", (path, current) => {
+    nav.path = path;
+    render(<MainNav audience="staff" />);
+    expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Overview", "Holds", "Stock", "Upload CSV"]);
+    const currentLinks = screen.getAllByRole("link").filter((l) => l.getAttribute("aria-current") === "page");
+    expect(currentLinks.map((l) => l.textContent)).toEqual([current]);
+  });
+
+  it("does not mark the patient's pharmacy pages as the portal", () => {
+    nav.path = "/pharmacy/p1";
+    render(<MainNav audience="guest" />);
+    expect(screen.getByRole("link", { name: "For pharmacies" }).hasAttribute("aria-current")).toBe(false);
   });
 
   it("marks nothing on a page outside the sections", () => {
     nav.path = "/profile";
-    render(<MainNav signedIn />);
+    render(<MainNav audience="patient" />);
     expect(screen.getAllByRole("link").some((l) => l.hasAttribute("aria-current"))).toBe(false);
   });
 });

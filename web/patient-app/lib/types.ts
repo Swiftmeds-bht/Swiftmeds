@@ -114,6 +114,10 @@ export interface Session {
    * Server-side only, like the access token. Absent in demo mode.
    */
   refreshToken?: string;
+  /** The account's role from the gateway, e.g. "ROLE_PATIENT" or "ROLE_PHARMACY_STAFF" (SCRUM-139). */
+  role?: string;
+  /** For pharmacy staff: the pharmacy they work at (the token's pharmacy_id). */
+  pharmacyId?: string;
 }
 
 export interface PharmacySummary {

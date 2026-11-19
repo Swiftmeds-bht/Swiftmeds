@@ -64,7 +64,15 @@ describe("gateway backend", () => {
       accessToken: "a",
       expiresAt: "2026-11-05T09:15:00Z",
       refreshToken: "r",
+      role: "ROLE_PATIENT",
     });
+  });
+
+  it("keeps a staff member's role and pharmacy from the token (SCRUM-139)", async () => {
+    // A JWT whose payload carries pharmacy_id; the signature is not checked here.
+    const payload = Buffer.from(JSON.stringify({ sub: "s-1", pharmacy_id: "ph-1" })).toString("base64url");
+    const { backend } = backendReturning(json(200, { userId: "s-1", role: "ROLE_PHARMACY_STAFF", tokens: { accessToken: `h.${payload}.s` } }));
+    expect(await backend.login("demo-tim-001@demo.swiftmeds.test", "pw-123456")).toMatchObject({ role: "ROLE_PHARMACY_STAFF", pharmacyId: "ph-1" });
   });
 
   it("assumes the default lifetime when the login answer has no expiry", async () => {

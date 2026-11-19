@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { gatewayUrl as configuredGatewayUrl } from "./data-source";
 import { retryAfterRefresh, revokeRefreshToken } from "./refresh";
+import { isPharmacyStaff, PORTAL_PATH } from "./roles";
 import { SESSION_COOKIE, decodeSession, encodeSession, parseSession, sessionCookieOptions } from "./session";
 import type { Session } from "./types";
 
@@ -17,6 +18,16 @@ export async function getSession(): Promise<Session | undefined> {
 export async function requireSession(returnTo: string): Promise<Session> {
   const session = await getSession();
   if (!session) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+  return session;
+}
+
+/**
+ * Like requireSession, for pages only patients use (holds, reserving, the
+ * watchlist): pharmacy staff are sent to their portal instead (SCRUM-139).
+ */
+export async function requirePatient(returnTo: string): Promise<Session> {
+  const session = await requireSession(returnTo);
+  if (isPharmacyStaff(session)) redirect(PORTAL_PATH);
   return session;
 }
 

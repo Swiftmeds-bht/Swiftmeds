@@ -12,6 +12,7 @@ import { errorMessage } from "@/lib/hold-format";
 import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
 import { NOTIFICATIONS_SEEN_COOKIE, parseSeenAt } from "@/lib/notifications";
 import { checkProfile, profileBackend } from "@/lib/profile";
+import { homeAfterSignIn } from "@/lib/roles";
 import { safeNext } from "@/lib/session";
 import type { Session } from "@/lib/types";
 import { watchlistBackend } from "@/lib/watchlist";
@@ -37,12 +38,15 @@ export async function loginAction(_prev: FormState, form: FormData): Promise<For
   const email = text(form, "email");
   const password = form.get("password");
   if (!email || typeof password !== "string" || !password) return { error: "Enter your email and password.", email };
+  let session: Session;
   try {
-    await saveSession(await holdsBackend().login(email, password));
+    session = await holdsBackend().login(email, password);
+    await saveSession(session);
   } catch (err) {
     return { ...failure(err), email };
   }
-  redirect(safeNext(text(form, "next")));
+  // One sign-in for everyone (SCRUM-139): staff go to the pharmacy portal.
+  redirect(homeAfterSignIn(session, safeNext(text(form, "next"))));
 }
 
 export async function registerAction(_prev: FormState, form: FormData): Promise<FormState> {

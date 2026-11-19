@@ -6,6 +6,7 @@ import { AuthForm } from "@/components/AuthForm";
 import { InfoIcon } from "@/components/Icons";
 import { getSession } from "@/lib/auth";
 import { holdsBackend } from "@/lib/holds";
+import { homeAfterSignIn } from "@/lib/roles";
 import { safeNext } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -16,13 +17,14 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 export default async function LoginPage({ searchParams }: { searchParams: SearchParamsIn }) {
   const sp = await searchParams;
   const next = safeNext(first(sp.next));
-  if (await getSession()) redirect(next);
+  const session = await getSession();
+  if (session) redirect(homeAfterSignIn(session, next));
   const demo = holdsBackend().source === "demo";
 
   return (
     <div className="page narrow auth-page">
       <h1>Sign in</h1>
-      <p className="lead">Sign in to reserve medicine and see your holds.</p>
+      <p className="lead">Patients reserve medicine and follow their holds. Pharmacy staff go straight to the pharmacy portal.</p>
       {first(sp.expired) && (
         <p className="notice notice-warning" role="note">
           <InfoIcon />

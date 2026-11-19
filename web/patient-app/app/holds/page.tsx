@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { cancelHoldAction } from "@/app/actions";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { HoldCard } from "@/components/HoldCard";
-import { requireSession } from "@/lib/auth";
+import { requirePatient } from "@/lib/auth";
 import { errorMessage, statusInfo } from "@/lib/hold-format";
 import { HoldError, holdsBackend } from "@/lib/holds";
 import { nameBook } from "@/lib/names";
@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "My holds" };
 export const dynamic = "force-dynamic";
 
 export default async function HoldsPage() {
-  const session = await requireSession("/holds");
+  const session = await requirePatient("/holds");
 
   let holds: Hold[] = [];
   let failed: HoldError["kind"] | undefined;
