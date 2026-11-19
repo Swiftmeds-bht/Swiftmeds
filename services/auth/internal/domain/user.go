@@ -25,6 +25,7 @@ var (
 	ErrInvalidPassword    = errors.New("password must be between 8 and 72 bytes")
 	ErrInvalidRole        = errors.New("role is invalid")
 	ErrAdminRegistration  = errors.New("admin accounts cannot self-register")
+	ErrStaffRegistration  = errors.New("pharmacy staff accounts cannot self-register")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserExists         = errors.New("user already exists")
 	ErrUserNotFound       = errors.New("user not found")
@@ -58,10 +59,13 @@ func ValidateRegistration(email, password string, role Role) error {
 	if len(password) < MinPasswordLength || len(password) > MaxPasswordLength {
 		return ErrInvalidPassword
 	}
-	if role != RolePatient && role != RolePharmacist {
-		if role == RoleAdmin {
-			return ErrAdminRegistration
-		}
+	if role == RoleAdmin {
+		return ErrAdminRegistration
+	}
+	if role == RolePharmacist {
+		return ErrStaffRegistration
+	}
+	if role != RolePatient {
 		return ErrInvalidRole
 	}
 	return nil

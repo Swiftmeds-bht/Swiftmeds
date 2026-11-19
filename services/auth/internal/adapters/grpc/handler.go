@@ -106,7 +106,8 @@ func toProtoTokens(tokens app.TokenPair) *authv1.TokenPair {
 func toStatus(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrInvalidPassword),
-		errors.Is(err, domain.ErrInvalidRole), errors.Is(err, domain.ErrAdminRegistration):
+		errors.Is(err, domain.ErrInvalidRole), errors.Is(err, domain.ErrAdminRegistration),
+		errors.Is(err, domain.ErrStaffRegistration):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrUserExists):
 		return status.Error(codes.AlreadyExists, err.Error())

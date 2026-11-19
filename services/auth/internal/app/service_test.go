@@ -3,10 +3,12 @@ package app
 import (
 	"context"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/auth/internal/domain"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type fakeRepository struct {
@@ -91,6 +93,9 @@ func TestRegisterAndLoginHashPassword(t *testing.T) {
 	if user.Email != "test@example.com" || user.PasswordHash == "correct horse" {
 		t.Fatalf("user was not normalized and hashed: %+v", user)
 	}
+	if !regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(user.ID) {
+		t.Fatalf("user ID %q is not an RFC 4122 version 4 UUID", user.ID)
+	}
 	_, _, err = svc.Login(context.Background(), user.Email, "wrong password")
 	if !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("wrong password error = %v, want invalid credentials", err)
@@ -133,6 +138,30 @@ func TestValidateTokenRejectsTamperedAndExpiredTokens(t *testing.T) {
 	}
 	if _, err := svc.ValidateToken(context.Background(), expired.AccessToken); !errors.Is(err, domain.ErrInvalidToken) {
 		t.Fatalf("expired token error = %v", err)
+	}
+}
+
+func TestLinkedStaffPharmacyIsIncludedInTokenIdentity(t *testing.T) {
+	repo := newFakeRepository()
+	hash, err := bcrypt.GenerateFromPassword([]byte("correct horse"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user := domain.User{ID: "32000000-0000-4000-8000-000000000001", Email: "staff@example.com", PasswordHash: string(hash), Role: domain.RolePharmacist, PharmacyID: "pharmacy-123", CreatedAt: time.Now()}
+	if err := repo.CreateUser(context.Background(), user); err != nil {
+		t.Fatal(err)
+	}
+	svc := newTestService(repo, time.Now)
+	_, tokens, err := svc.Login(context.Background(), user.Email, "correct horse")
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, err := svc.ValidateToken(context.Background(), tokens.AccessToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identity.Role != domain.RolePharmacist || identity.PharmacyID != user.PharmacyID {
+		t.Fatalf("identity = %+v, want linked pharmacy %q", identity, user.PharmacyID)
 	}
 }
 

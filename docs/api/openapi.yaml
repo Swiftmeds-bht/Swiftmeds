@@ -1850,6 +1850,7 @@ components:
     RegisterRequest:
       type: object
       required: [email, password, role]
+      description: Public registration creates patient accounts only. Pharmacy staff accounts are provisioned through the development seed data.
       properties:
         email:
           type: string
@@ -1861,7 +1862,7 @@ components:
           description: 8 to 72 bytes. The limit is in bytes, so multi-byte characters count more than once.
         role:
           type: string
-          enum: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+          enum: [ROLE_PATIENT]
     RegisterResponse:
       type: object
       required: [userId]
