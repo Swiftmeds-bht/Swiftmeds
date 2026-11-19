@@ -48,7 +48,7 @@ docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test 
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Docker with Compose v2
 - `make`
 - `protoc` and the Go plugins:

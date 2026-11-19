@@ -3,7 +3,7 @@
 #   docker build -f services/holds/Dockerfile -t swiftmed/holds .
 
 # ---- build stage ----
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 ENV CGO_ENABLED=0 GOWORK=off
 WORKDIR /src
 

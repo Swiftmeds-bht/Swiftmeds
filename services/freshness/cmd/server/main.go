@@ -94,12 +94,12 @@ func serve(ctx context.Context, s settings, lis net.Listener) error {
 	if err != nil {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}
-	defer func() { _ = rabbitConn.Close() }()
+	// Bound the AMQP close handshake so shutdown cannot hang after gRPC stops.
+	defer func() { _ = rabbitConn.CloseDeadline(time.Now().Add(2 * time.Second)) }()
 	consumerChannel, err := rabbitConn.Channel()
 	if err != nil {
 		return fmt.Errorf("RabbitMQ consumer channel: %w", err)
 	}
-	defer func() { _ = consumerChannel.Close() }()
 	deduper, err := messaging.NewPostgresDeduper(db)
 	if err != nil {
 		return fmt.Errorf("create event deduper: %w", err)
