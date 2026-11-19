@@ -53,8 +53,9 @@ docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test 
 - `make`
 - `protoc` and the Go plugins:
   ```bash
-  go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+  # Install protoc 3.21.12 from https://github.com/protocolbuffers/protobuf/releases/tag/v21.12
   ```
 - `golangci-lint` (for `make lint`)
 - Node.js 20+ (for `web/` and `workers/`)

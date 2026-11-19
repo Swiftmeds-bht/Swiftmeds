@@ -337,7 +337,36 @@ func (x *UpdateProfileResponse) GetProfile() *Profile {
 var File_user_profile_v1_user_profile_proto protoreflect.FileDescriptor
 
 const file_user_profile_v1_user_profile_proto_rawDesc = "" +
-	"\n\"user-profile/v1/user_profile.proto\x12\x17swiftmed.userprofile.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\"\xa5\x02\n\aProfile\x12\x17\n\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n\x05phone\x18\x03 \x01(\tR\x05phone\x129\n\ncreated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n\nupdated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n\rhome_location\x18\x06 \x01(\tR\fhomeLocation\x12-\n\x12preferred_language\x18\a \x01(\tR\x11preferredLanguage\",\n\x11GetProfileRequest\x12\x17\n\auser_id\x18\x01 \x01(\tR\x06userId\"P\n\x12GetProfileResponse\x12:\n\aprofile\x18\x01 \x01(\v2 .swiftmed.userprofile.v1.ProfileR\aprofile\"\xf9\x01\n\x14UpdateProfileRequest\x12\x17\n\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n\x05phone\x18\x03 \x01(\tR\x05phone\x12#\n\rhome_location\x18\x04 \x01(\tR\fhomeLocation\x12-\n\x12preferred_language\x18\x05 \x01(\tR\x11preferredLanguage\x12;\n\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskR\nupdateMask\"S\n\x15UpdateProfileResponse\x12:\n\aprofile\x18\x01 \x01(\v2 .swiftmed.userprofile.v1.ProfileR\aprofile2\xeb\x01\n\x12UserProfileService\x12e\n\nGetProfile\x12*.swiftmed.userprofile.v1.GetProfileRequest\x1a+.swiftmed.userprofile.v1.GetProfileResponse\x12n\n\rUpdateProfile\x12-.swiftmed.userprofile.v1.UpdateProfileRequest\x1a..swiftmed.userprofile.v1.UpdateProfileResponseBOZMgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1;userprofilev1b\x06proto3"
+	"\n" +
+	"\"user-profile/v1/user_profile.proto\x12\x17swiftmed.userprofile.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a google/protobuf/field_mask.proto\"\xa5\x02\n" +
+	"\aProfile\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05phone\x18\x03 \x01(\tR\x05phone\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\rhome_location\x18\x06 \x01(\tR\fhomeLocation\x12-\n" +
+	"\x12preferred_language\x18\a \x01(\tR\x11preferredLanguage\",\n" +
+	"\x11GetProfileRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"P\n" +
+	"\x12GetProfileResponse\x12:\n" +
+	"\aprofile\x18\x01 \x01(\v2 .swiftmed.userprofile.v1.ProfileR\aprofile\"\xf9\x01\n" +
+	"\x14UpdateProfileRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05phone\x18\x03 \x01(\tR\x05phone\x12#\n" +
+	"\rhome_location\x18\x04 \x01(\tR\fhomeLocation\x12-\n" +
+	"\x12preferred_language\x18\x05 \x01(\tR\x11preferredLanguage\x12;\n" +
+	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
+	"updateMask\"S\n" +
+	"\x15UpdateProfileResponse\x12:\n" +
+	"\aprofile\x18\x01 \x01(\v2 .swiftmed.userprofile.v1.ProfileR\aprofile2\xeb\x01\n" +
+	"\x12UserProfileService\x12e\n" +
+	"\n" +
+	"GetProfile\x12*.swiftmed.userprofile.v1.GetProfileRequest\x1a+.swiftmed.userprofile.v1.GetProfileResponse\x12n\n" +
+	"\rUpdateProfile\x12-.swiftmed.userprofile.v1.UpdateProfileRequest\x1a..swiftmed.userprofile.v1.UpdateProfileResponseBOZMgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1;userprofilev1b\x06proto3"
 
 var (
 	file_user_profile_v1_user_profile_proto_rawDescOnce sync.Once
@@ -364,8 +393,8 @@ var file_user_profile_v1_user_profile_proto_goTypes = []any{
 var file_user_profile_v1_user_profile_proto_depIdxs = []int32{
 	5, // 0: swiftmed.userprofile.v1.Profile.created_at:type_name -> google.protobuf.Timestamp
 	5, // 1: swiftmed.userprofile.v1.Profile.updated_at:type_name -> google.protobuf.Timestamp
-	6, // 2: swiftmed.userprofile.v1.UpdateProfileRequest.update_mask:type_name -> google.protobuf.FieldMask
-	0, // 3: swiftmed.userprofile.v1.GetProfileResponse.profile:type_name -> swiftmed.userprofile.v1.Profile
+	0, // 2: swiftmed.userprofile.v1.GetProfileResponse.profile:type_name -> swiftmed.userprofile.v1.Profile
+	6, // 3: swiftmed.userprofile.v1.UpdateProfileRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0, // 4: swiftmed.userprofile.v1.UpdateProfileResponse.profile:type_name -> swiftmed.userprofile.v1.Profile
 	1, // 5: swiftmed.userprofile.v1.UserProfileService.GetProfile:input_type -> swiftmed.userprofile.v1.GetProfileRequest
 	3, // 6: swiftmed.userprofile.v1.UserProfileService.UpdateProfile:input_type -> swiftmed.userprofile.v1.UpdateProfileRequest
