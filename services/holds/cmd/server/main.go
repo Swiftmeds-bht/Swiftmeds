@@ -56,8 +56,8 @@ func run() error {
 	port := cfg.Int(portEnv, defaultPort)
 	databaseURL := cfg.Required("HOLDS_DATABASE_URL")
 	maxActive := cfg.Int("HOLDS_MAX_ACTIVE_PER_USER", app.DefaultMaxActivePerUser)
-	holdDuration := cfg.Duration("HOLDS_HOLD_DURATION", app.DefaultHoldDuration)
-	pendingTimeout := cfg.Duration("HOLDS_PENDING_TIMEOUT", app.DefaultPendingTimeout)
+	holdDuration := cfg.Duration("HOLDS_HOLD_DURATION", app.DefaultHoldDuration())
+	pendingTimeout := cfg.Duration("HOLDS_PENDING_TIMEOUT", app.DefaultPendingTimeout())
 	sweepInterval := cfg.Duration("HOLDS_SWEEP_INTERVAL", time.Minute)
 	rabbitURL := cfg.Required("RABBITMQ_URL")
 	// Calls to Inventory go through Traefik, which routes by :authority (the service name).

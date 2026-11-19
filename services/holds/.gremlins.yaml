@@ -8,9 +8,7 @@ unleash:
   integration: false
   timeout-coefficient: 10
   # Fail the run if fewer than 90% of covered mutants are killed, or fewer than
-  # 50% of all mutants are on tested code. SCRUM-113 asks for at least 70%
-  # efficacy. Gremlins reports arithmetic mutations in duration constants as
-  # NOT COVERED because Go does not record coverage for const expressions.
+  # 60% of all mutants are on tested code. SCRUM-113 asks for at least 70% efficacy.
   # Write input checks as plain if statements, not tagless switch cases: Go's
   # coverage profile does not record switch cases, so their mutants show as NOT
   # COVERED although the tests run them (SCRUM-125 rewrote NewHold and Collect
@@ -18,7 +16,7 @@ unleash:
   # -> `&&`, is equivalent: the constant-time compare refuses those codes anyway.
   threshold:
     efficacy: 90
-    mutant-coverage: 50
+    mutant-coverage: 60
 
 mutants:
   # Every mutator Gremlins has, not only the default ones.
