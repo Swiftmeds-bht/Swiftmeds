@@ -194,9 +194,11 @@ the measured self-healing, autoscaling and rolling-update demos, is
 ### Tests
 
 ```bash
-make test               # unit tests in every Go module
+make test               # race-enabled unit tests in every Go module
 make lint               # golangci-lint in every Go module
-make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
+make coverage           # every service must keep >= 65% on domain + app (CI enforces this)
+make proto-check        # fail if generated protobuf code differs from proto/
+make openapi-lint       # lint docs/api/openapi.yaml
 ./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (see below)
 ```
 

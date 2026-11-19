@@ -8,13 +8,19 @@ UP_TIMEOUT  ?= 900
 # Every Go module listed in go.work
 GO_MODULES   = $(shell go list -m -f '{{.Dir}}')
 
-.PHONY: help proto up down seed smoke e2e test lint coverage mutation
+.PHONY: help proto proto-check openapi-lint up down seed smoke e2e test lint coverage mutation
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 proto: ## Generate Go code from proto/**/*.proto into proto/gen/go
 	@./scripts/gen-proto.sh
+
+proto-check: ## Fail if generated Go protobuf code is out of date
+	@bash ./scripts/check-proto-drift.sh
+
+openapi-lint: ## Lint docs/api/openapi.yaml
+	@npx --yes @redocly/cli@1.34.5 lint docs/api/openapi.yaml
 
 up: ## Build and start all 20 services, wait until every one is healthy, then load the demo data
 	@test -f .env || { echo "Missing .env: run 'cp .env.example .env' first."; exit 1; }
@@ -39,10 +45,10 @@ test: ## Run unit tests in every Go module in go.work
 	@for d in $(GO_MODULES); do \
 		if [ -z "$$(cd $$d && go list ./... 2>/dev/null)" ]; then echo "==> $$d (no packages yet, skipped)"; continue; fi; \
 		echo "==> $$d"; \
-		(cd $$d && go test -cover ./...) || exit 1; \
+		(cd $$d && go test -race -cover ./...) || exit 1; \
 	done
 
-coverage: ## Fail if a core service's domain+app coverage is below 80%
+coverage: ## Fail if any Go service's domain+app coverage is below 65%
 	@./scripts/coverage-gate.sh
 
 mutation: ## Run Gremlins on the Ranking, Inventory and Holds domain/app packages
