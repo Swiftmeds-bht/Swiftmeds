@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the 23 images the Kubernetes deployment uses (SCRUM-108) with the
+# Builds the 22 images the Kubernetes deployment uses (SCRUM-108) with the
 # existing Dockerfiles: the 20 services, the two web apps and the seed image.
 #
 #   scripts/k8s-images.sh                       build, tag :dev
@@ -31,8 +31,7 @@ for dockerfile in services/*/Dockerfile; do
   svc="$(basename "$(dirname "$dockerfile")")"
   images+=("$svc|$dockerfile|.")
 done
-images+=("patient-app|web/patient-app/Dockerfile|web/patient-app")
-images+=("pharmacy-dashboard|web/pharmacy-dashboard/Dockerfile|web/pharmacy-dashboard")
+images+=("web|web/swiftmed/Dockerfile|web/swiftmed")
 images+=("seed|deploy/k8s/base/seed/Dockerfile|deploy")
 
 built=()

@@ -40,9 +40,10 @@ changes, update these pages in the same PR.
 - **Scheduled jobs** are two Cloudflare Workers that call internal gateway routes
   with `X-Worker-Secret`: `workers/hold-expiry` every minute and
   `workers/freshness-decay` every hour.
-- **Clients.** The Next.js patient app (`web/patient-app`) calls the gateway from
-  the server only (server actions and route handlers), so the access token stays in
-  an httpOnly cookie. `web/pharmacy-dashboard` is not built yet.
+- **Clients.** One Next.js web app (`web/swiftmed`, SCRUM-139): patients at `/`,
+  pharmacy staff at `/pharmacy-portal`, one sign-in whose session carries the role.
+  It calls the gateway from the server only (server actions and route handlers), so
+  the access token stays in an httpOnly cookie.
 - **Deployment.** Docker Compose (`deploy/docker-compose.yml`) is the main stack;
   a Kubernetes demo of the core path is planned (SCRUM-108). See
   [ADR 0005](../adr/0005-docker-compose-main-stack-kubernetes-demo.md).

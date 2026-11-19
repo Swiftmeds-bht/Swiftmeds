@@ -48,6 +48,5 @@ images:
   - {name: ghcr.io/swiftmeds-bht/trust, newTag: v1.0.0}
   - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: v1.0.0}
   - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/patient-app, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/pharmacy-dashboard, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/web, newTag: v1.0.0}
   - {name: ghcr.io/swiftmeds-bht/seed, newTag: v1.0.0}

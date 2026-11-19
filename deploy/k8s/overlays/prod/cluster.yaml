@@ -1,8 +1,8 @@
 # The deployment's cluster on the team laptop (overlays/prod): k3s in Docker, made with k3d.
 #   k3d cluster create --config deploy/k8s/overlays/prod/cluster.yaml
-#   http://localhost:9000  patient app
-#   http://localhost:9001  pharmacy dashboard
-#   http://localhost:9080  API gateway
+#   http://localhost:9000                  SwiftMed (patients)
+#   http://localhost:9000/pharmacy-portal  pharmacy portal
+#   http://localhost:9080                  API gateway
 # The public URL comes through a Cloudflare Tunnel to Traefik (SCRUM-75).
 apiVersion: k3d.io/v1alpha5
 kind: Simple
@@ -16,7 +16,6 @@ ports:
     nodeFilters: [loadbalancer]
   - port: 9000:3000
     nodeFilters: [loadbalancer]
-  - port: 9001:3001
     nodeFilters: [loadbalancer]
 options:
   k3s:

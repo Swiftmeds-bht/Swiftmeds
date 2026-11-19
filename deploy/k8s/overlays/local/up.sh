@@ -43,8 +43,8 @@ kubectl -n swiftmed get pods
 cat <<EOF
 
 SwiftMed (development cluster) is running:
-  patient app         http://localhost:9100
-  pharmacy dashboard  http://localhost:9101
+  SwiftMed            http://localhost:9100
+  pharmacy portal     http://localhost:9100/pharmacy-portal
   API gateway         http://localhost:9180/healthz
 Demo accounts: patient@demo.swiftmeds.test, demo-tim-001@demo.swiftmeds.test (password swiftmeds-demo).
 EOF

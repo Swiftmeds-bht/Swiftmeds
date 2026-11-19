@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # The patient app as a small Next.js standalone server (SCRUM-117).
-# Build from THIS FOLDER (Compose does: deploy/docker-compose.yml, service patient-app):
-#   docker build -t swiftmed/patient-app web/patient-app
+# Build from THIS FOLDER (Compose does: deploy/docker-compose.yml, service web):
+#   docker build -t swiftmed/web web/swiftmed
 # At run time set GATEWAY_URL (e.g. http://gateway:8080), or USE_DEMO_DATA=true.
 
 # ---- dependencies: cached until package-lock.json changes ----

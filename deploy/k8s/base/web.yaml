@@ -1,22 +1,23 @@
-# The two Next.js apps (SCRUM-108), each on its own Traefik entrypoint as in
-# Compose: patient app on :3000, pharmacy dashboard on :3001. They call the
-# gateway inside the cluster, from the server side only.
+# The SwiftMed web app (SCRUM-108; one app since SCRUM-139): patients at "/",
+# pharmacy staff at /pharmacy-portal, on Traefik's "patient" entrypoint (:3000;
+# the name predates the merge). It calls the gateway inside the cluster, from
+# the server side only.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: patient-app
+  name: web
   labels:
-    app.kubernetes.io/name: patient-app
+    app.kubernetes.io/name: web
     app.kubernetes.io/part-of: swiftmed
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: patient-app
+      app.kubernetes.io/name: web
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: patient-app
+        app.kubernetes.io/name: web
         app.kubernetes.io/part-of: swiftmed
     spec:
       securityContext:
@@ -26,8 +27,8 @@ spec:
         runAsGroup: 1000
         seccompProfile: {type: RuntimeDefault}
       containers:
-        - name: patient-app
-          image: ghcr.io/swiftmeds-bht/patient-app
+        - name: web
+          image: ghcr.io/swiftmeds-bht/web
           ports:
             - {name: http, containerPort: 3000}
           env:
@@ -59,19 +60,19 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: patient-app
+  name: web
   labels:
-    app.kubernetes.io/name: patient-app
+    app.kubernetes.io/name: web
 spec:
   selector:
-    app.kubernetes.io/name: patient-app
+    app.kubernetes.io/name: web
   ports:
     - {name: http, port: 3000, targetPort: http}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: patient-app
+  name: web
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: patient
 spec:
@@ -83,87 +84,5 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: patient-app
-                port: {name: http}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: pharmacy-dashboard
-  labels:
-    app.kubernetes.io/name: pharmacy-dashboard
-    app.kubernetes.io/part-of: swiftmed
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: pharmacy-dashboard
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: pharmacy-dashboard
-        app.kubernetes.io/part-of: swiftmed
-    spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        seccompProfile: {type: RuntimeDefault}
-      containers:
-        - name: pharmacy-dashboard
-          image: ghcr.io/swiftmeds-bht/pharmacy-dashboard
-          ports:
-            - {name: http, containerPort: 3000}
-          env:
-            - name: GATEWAY_URL
-              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: GATEWAY_URL}}
-          readinessProbe:
-            httpGet: {path: /login, port: http}
-            periodSeconds: 10
-            timeoutSeconds: 5
-          livenessProbe:
-            httpGet: {path: /login, port: http}
-            periodSeconds: 20
-            timeoutSeconds: 5
-          # Keep serving a few seconds after a delete, until Traefik has dropped this
-          # pod from its endpoints; otherwise calls in that gap fail (zero-downtime
-          # updates and self-healing).
-          lifecycle:
-            preStop:
-              sleep: {seconds: 5}
-          resources:
-            requests: {cpu: 50m, memory: 128Mi}
-            limits: {cpu: "1", memory: 512Mi}
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities: {drop: [ALL]}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: pharmacy-dashboard
-  labels:
-    app.kubernetes.io/name: pharmacy-dashboard
-spec:
-  selector:
-    app.kubernetes.io/name: pharmacy-dashboard
-  ports:
-    - {name: http, port: 3000, targetPort: http}
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: pharmacy-dashboard
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: dashboard
-spec:
-  ingressClassName: swiftmed
-  rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: pharmacy-dashboard
+                name: web
                 port: {name: http}

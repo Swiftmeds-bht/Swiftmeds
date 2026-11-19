@@ -2,7 +2,7 @@
 
 Browser tests of the main journey, search -> reserve -> collect, against the
 Docker Compose stack (SCRUM-72). They are written from the Gherkin scenarios in
-[tests/features](../features) and use the real patient app, pharmacy dashboard,
+[tests/features](../features) and use the real SwiftMed web app (patient pages and the pharmacy portal),
 gateway and services, with no mocks.
 
 | Spec | Scenarios | Test cases |
@@ -41,7 +41,7 @@ the Cloudflare Worker would.
 The web apps set their session cookies with the `Secure` flag in production, and
 browsers accept those over plain HTTP only from `localhost`. Inside the Cypress
 container, [scripts/forward.mjs](scripts/forward.mjs) forwards `localhost:3000`
-(patient app), `localhost:3001` (dashboard) and `localhost:8080` (gateway) to
+(the web app, pharmacy portal included) and `localhost:8080` (gateway) to
 Traefik, so the browser sees the same addresses as on a developer machine.
 
 ## Test data
@@ -69,8 +69,7 @@ On Linux this needs Cypress's system libraries (see the Cypress docs). Settings:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `E2E_PATIENT_URL` | `http://localhost:3000` | patient app |
-| `E2E_DASHBOARD_URL` | `http://localhost:3001` | pharmacy dashboard |
+| `E2E_PATIENT_URL` | `http://localhost:3000` | the SwiftMed web app (the pharmacy portal is at `/pharmacy-portal`) |
 | `E2E_GATEWAY_URL` | `http://localhost:8080` | API gateway, for test setup |
 | `E2E_HOLD_SECONDS` | `7200` | how long holds last in the stack; the expiry test runs only at 120 or less |
 | `E2E_WORKER_SECRET` | empty | `WORKER_SHARED_SECRET`, to run the expiry sweep |

@@ -34,8 +34,8 @@ remains the executable traceability baseline.
   `docker compose -f deploy/docker-compose.yml up -d`
   or `make up`.
 - Gateway: `http://localhost:8080`
-- Patient app: `http://localhost:3000`
-- Pharmacy dashboard: `http://localhost:3001`
+- SwiftMed (patients): `http://localhost:3000`
+- Pharmacy portal: `http://localhost:3000/pharmacy-portal` (staff sign in at `/login`)
 - RabbitMQ management UI: `http://localhost:15672`
 - Traefik dashboard: `http://localhost:8081/dashboard/`
 
@@ -198,7 +198,7 @@ idempotent repeated expiry.
 - **Requirements / TCs:** FR-14 / TC-014
 - **Role:** Pharmacist
 - **Precondition:** A different session created an active hold for Thimphu 02.
-  Sign in to the pharmacy dashboard with the seeded pharmacist for that pharmacy.
+  Sign in at `/login` with the seeded pharmacist for that pharmacy; SwiftMed opens the pharmacy portal.
 
 1. Find the active hold.
 2. Enter an obviously wrong code once and observe the response.

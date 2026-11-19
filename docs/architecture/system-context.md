@@ -16,22 +16,19 @@ flowchart LR
     admin(["SwiftMed admin"])
 
     subgraph swiftmed["SwiftMed"]
-        patientApp["Patient web app<br/>Next.js"]
-        dashboard["Pharmacy dashboard<br/>Next.js (not built yet)"]
+        patientApp["SwiftMed web app<br/>Next.js: patients at /,<br/>pharmacy portal at /pharmacy-portal"]
         backend["Backend<br/>REST gateway, Traefik, 20 Go services,<br/>RabbitMQ, Postgres"]
     end
 
     cloudflare["Cloudflare Workers<br/>cron: hold expiry (every minute),<br/>freshness decay (hourly)"]
 
     patient -->|"search, reserve, collect,<br/>watch for restock"| patientApp
-    staff -.->|"stock, pickups"| dashboard
-    admin -.->|"verify pharmacies"| dashboard
+    staff -->|"stock, pickups"| patientApp
+    admin -.->|"verify pharmacies"| patientApp
     patientApp -->|"REST + JWT<br/>(server side only)"| backend
-    dashboard -.->|"REST + JWT"| backend
     cloudflare -->|"REST + X-Worker-Secret"| backend
 
     classDef planned stroke-dasharray: 5 5
-    class dashboard planned
 ```
 
 ## 2. Containers
@@ -114,9 +111,9 @@ flowchart TB
     class notification,analytics planned
 ```
 
-The browser never talks to the gateway directly: the patient app's server code
+The browser never talks to the gateway directly: the web app's server code
 calls `GATEWAY_URL`, so the access token stays in the `swiftmed_session` httpOnly
-cookie (`web/patient-app/lib/auth.ts`, `app/actions.ts`). The gateway's port 8080
+cookie (`web/swiftmed/lib/auth.ts`, `app/actions.ts`). The gateway's port 8080
 is the Traefik `web` entrypoint, which forwards everything to the gateway.
 
 ### Services

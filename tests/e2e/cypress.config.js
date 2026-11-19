@@ -1,6 +1,7 @@
 // Cypress end-to-end tests for search -> reserve -> collect (SCRUM-72).
-// They drive the patient app and the pharmacy dashboard in a browser against
-// the Docker Compose stack. Run them with tests/e2e/run.sh (see README.md).
+// They drive the SwiftMed web app in a browser, as a patient and, at
+// /pharmacy-portal, as a pharmacist (one app since SCRUM-139), against the
+// Docker Compose stack. Run them with tests/e2e/run.sh (see README.md).
 //
 // Every setting can be changed with an environment variable, so the same specs
 // run against localhost (the default) or any other stack. Cypress 16: public
@@ -20,7 +21,6 @@ module.exports = {
     screenshotOnRunFailure: true,
   },
   expose: {
-    dashboardUrl: fromEnv("E2E_DASHBOARD_URL", "http://localhost:3001"),
     gatewayUrl: fromEnv("E2E_GATEWAY_URL", "http://localhost:8080"),
     // Seeded by `make seed` (deploy/seed): a verified pharmacy, a medicine,
     // and the pharmacist linked to that pharmacy.

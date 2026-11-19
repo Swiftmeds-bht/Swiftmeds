@@ -24,10 +24,12 @@
 # Deployment (Compose, Traefik, RabbitMQ, Postgres init, seed): Yeshey
 /deploy/                        @Zhennue
 
-# Web apps
-/web/                           @PemaLoselMaurer
-/web/patient-app/               @PemaLoselMaurer
-/web/pharmacy-dashboard/        @JigmeZ
+# Web app (one app since SCRUM-139). The pharmacy portal keeps its owner.
+/web/                                       @PemaLoselMaurer
+/web/swiftmed/                              @PemaLoselMaurer
+/web/swiftmed/app/pharmacy-portal/          @JigmeZ
+/web/swiftmed/lib/portal/                   @JigmeZ
+/web/swiftmed/components/portal/            @JigmeZ
 
 # Identity and platform: Yeshey
 /services/gateway/              @Zhennue

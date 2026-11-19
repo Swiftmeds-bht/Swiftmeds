@@ -393,7 +393,7 @@ testcontainers, the real Holds and Inventory built with `-race`). Sprint 5 adds
 | TC-032 RabbitMQ contract | Yes (IT: the saga's routing keys and payloads observed on `swiftmed.events`) | `tests/integration/saga` |
 | TC-033 Feedback/accuracy | Yes (UT: only a collected hold, once per hold, one `feedback.submitted`; Compose: collected hold, gateway feedback, and trust score observed in search) | `services/feedback/internal/app`, `tests/integration/compose` |
 | TC-035 / TC-036 Load profiles | Scripts only (k6 search and reservation burst with thresholds in the scripts). Results are not recorded yet | `tests/load` (SCRUM-77) |
-| TC-037 Patient accessibility | Partly (UT: axe on the search, results, hold, sign-in and reserve components) | `web/patient-app/components` |
+| TC-037 Patient accessibility | Partly (UT: axe on the search, results, hold, sign-in and reserve components) | `web/swiftmed/components` |
 
 Not yet covered in Sprint 4: TC-026 and TC-038 (pharmacy dashboard: SCRUM-58 and
 SCRUM-70 carried over to Sprint 5).

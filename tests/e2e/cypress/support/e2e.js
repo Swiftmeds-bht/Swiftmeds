@@ -123,44 +123,51 @@ Cypress.Commands.add("holdId", () =>
   cy.location("pathname").then((path) => decodeURIComponent(path.split("/").pop())),
 );
 
-// The dashboard is another origin (another port), so its steps run in
-// cy.origin. That callback sees only what is passed in args, not custom
-// commands, so the short sign-in is written out in each one.
-const pharmacist = () =>
-  cy.env(["pharmacistPassword"]).then(({ pharmacistPassword }) => ({
-    email: setting("pharmacistEmail"),
-    password: pharmacistPassword,
-  }));
+// Patients and the pharmacy portal are one app since SCRUM-139: one sign-in and
+// one session cookie. A pharmacist step therefore saves the patient's session,
+// signs in as the pharmacist on the same site, and backToPatient() puts the
+// patient's session back for the rest of the test.
+const SESSION_COOKIE = "swiftmed_session";
+const PORTAL_HOLDS = "/pharmacy-portal/holds";
+let patientCookie;
 
-/** The pharmacist signs in to the dashboard and enters `code` for the hold. */
-Cypress.Commands.add("pharmacistEntersCode", (holdId, code) =>
-  pharmacist().then((who) =>
-    cy.origin(setting("dashboardUrl"), { args: { ...who, holdId, code } }, ({ email, password, holdId, code }) => {
-      cy.visit("/login");
-      cy.get("#email").type(email);
-      cy.get("#password").type(password, { log: false });
-      cy.contains("button", "Sign in").click();
-      cy.contains("h1", "Pharmacy dashboard");
-      cy.get(`[id="pickup-code-${holdId}"]`).type(code);
-      cy.get(`[id="pickup-code-${holdId}"]`).closest("form").contains("button", "Collect").click();
-    }),
-  ),
+/** Saves the patient's session and signs in as the seeded pharmacist, on the portal's Holds page. */
+Cypress.Commands.add("signInAsPharmacist", () =>
+  cy.getCookie(SESSION_COOKIE).then((cookie) => {
+    patientCookie = cookie;
+    cy.clearCookie(SESSION_COOKIE);
+    cy.env(["pharmacistPassword"]).then(({ pharmacistPassword }) => {
+      cy.visit(`/login?next=${encodeURIComponent(PORTAL_HOLDS)}`);
+      cy.get("input[name=email]").type(setting("pharmacistEmail"));
+      cy.get("input[name=password]").type(pharmacistPassword, { log: false });
+      cy.contains("form button", "Sign in").click();
+      cy.location("pathname").should("eq", PORTAL_HOLDS);
+      cy.contains("h1", "Holds");
+    });
+  }),
 );
 
-/** The pharmacist signs in to the dashboard: the hold is not in the active list. */
-Cypress.Commands.add("pharmacistDoesNotSeeHold", (holdId) =>
-  pharmacist().then((who) =>
-    cy.origin(setting("dashboardUrl"), { args: { ...who, holdId } }, ({ email, password, holdId }) => {
-      cy.visit("/login");
-      cy.get("#email").type(email);
-      cy.get("#password").type(password, { log: false });
-      cy.contains("button", "Sign in").click();
-      cy.contains("h1", "Pharmacy dashboard");
-      cy.contains("h2", "Active holds");
-      cy.get(`[id="pickup-code-${holdId}"]`).should("not.exist");
-    }),
-  ),
-);
+/** Back to the patient who was signed in before the pharmacist step. */
+Cypress.Commands.add("backToPatient", () => {
+  cy.clearCookie(SESSION_COOKIE);
+  if (!patientCookie) return;
+  const { name, value, path, domain, secure, httpOnly, sameSite } = patientCookie;
+  cy.setCookie(name, value, { path, domain, secure, httpOnly, sameSite });
+});
+
+/** The pharmacist enters `code` for the hold on the portal's Holds page. */
+Cypress.Commands.add("pharmacistEntersCode", (holdId, code) => {
+  cy.signInAsPharmacist();
+  cy.get(`[id="pickup-code-${holdId}"]`).type(code);
+  cy.get(`[id="pickup-code-${holdId}"]`).closest("form").contains("button", "Collect").click();
+});
+
+/** The hold is not on the pharmacist's list of holds waiting; then back to the patient. */
+Cypress.Commands.add("pharmacistDoesNotSeeHold", (holdId) => {
+  cy.signInAsPharmacist();
+  cy.get(`[id="pickup-code-${holdId}"]`).should("not.exist");
+  cy.backToPatient();
+});
 
 /** Runs the hold-expiry sweep the Cloudflare Worker normally triggers. */
 Cypress.Commands.add("runExpirySweep", () =>
