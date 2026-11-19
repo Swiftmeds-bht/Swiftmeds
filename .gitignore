@@ -17,9 +17,12 @@ coverage.*
 !coverage.go
 *.coverprofile
 profile.cov
+.local-cache/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+tests/accessibility/node_modules/
+tests/accessibility/.cache/
 
 # env file
 .env
