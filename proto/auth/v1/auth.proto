@@ -14,6 +14,13 @@ service AuthService {
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // LinkPharmacy makes the account the staff account of a pharmacy it has just
+  // registered (SCRUM-141). Only the gateway calls it, after
+  // PharmacyRegistryService.RegisterPharmacy succeeded for this user as owner.
+  // Idempotent for the same pharmacy. FAILED_PRECONDITION for an admin, or an
+  // account already linked to another pharmacy; NOT_FOUND for an unknown user.
+  // The next RefreshToken carries the staff role and the pharmacy_id claim.
+  rpc LinkPharmacy(LinkPharmacyRequest) returns (LinkPharmacyResponse);
 }
 
 enum Role {
@@ -76,3 +83,14 @@ message LogoutRequest {
 }
 
 message LogoutResponse {}
+
+message LinkPharmacyRequest {
+  string user_id = 1;
+  string pharmacy_id = 2;
+}
+
+message LinkPharmacyResponse {
+  string user_id = 1;
+  Role role = 2;
+  string pharmacy_id = 3;
+}

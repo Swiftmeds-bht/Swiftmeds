@@ -144,6 +144,11 @@ func run() error {
 		Handler: app.NewRouter(cfg, log,
 			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
 			app.WithPharmacyRegistry(clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn))),
+			app.WithPharmacyOnboarding(
+				clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn)),
+				auth,
+				clients.NewGeoClient(geov1.NewGeoServiceClient(geoConn)),
+			),
 			app.WithProducts(clients.NewCatalogClient(catalogv1.NewCatalogServiceClient(catalogConn))),
 			app.WithAnalytics(clients.NewAnalyticsClient(analyticsv1.NewAnalyticsServiceClient(analyticsConn))),
 			app.WithFreshness(freshness),

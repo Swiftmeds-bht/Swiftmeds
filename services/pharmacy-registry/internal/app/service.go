@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/pharmacy-registry/internal/domain"
@@ -17,6 +19,8 @@ type RegisterInput struct {
 	OwnerID       string
 	Name          string
 	LicenseNumber string
+	Phone         string
+	Address       string
 	Dzongkhag     string
 	Location      domain.GeoPoint
 	Hours         []domain.OpeningHours
@@ -32,10 +36,21 @@ func NewService(repo ports.PharmacyRepository, now func() time.Time, newID func(
 	return &Service{repo: repo, now: now, newID: newID}
 }
 
+// Register creates a pending pharmacy. It is idempotent per owner (SCRUM-141):
+// if the owner already has a pharmacy, that one is returned unchanged, so a
+// client that lost the answer can safely send the same request again.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (domain.Pharmacy, error) {
 	p, err := domain.NewPharmacy(s.newID(), in.OwnerID, in.Name, in.LicenseNumber, in.Dzongkhag, in.Location, in.Hours, s.now())
 	if err != nil {
 		return domain.Pharmacy{}, err
+	}
+	p.Phone, p.Address = strings.TrimSpace(in.Phone), strings.TrimSpace(in.Address)
+	existing, err := s.repo.FindByOwner(ctx, in.OwnerID)
+	switch {
+	case err == nil:
+		return existing, nil
+	case !errors.Is(err, domain.ErrNotFound):
+		return domain.Pharmacy{}, fmt.Errorf("find owner's pharmacy: %w", err)
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
 		return domain.Pharmacy{}, fmt.Errorf("create pharmacy: %w", err)

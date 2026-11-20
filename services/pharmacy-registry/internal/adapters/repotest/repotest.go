@@ -90,6 +90,53 @@ func Run(t *testing.T, factory Factory) {
 			t.Fatalf("stored=%+v want=%+v", stored, got)
 		}
 	})
+	t.Run("phone and address round trip", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		want := pharmacy("ph-1", "LIC-1")
+		want.Phone, want.Address = "+975 17 123 456", "Norzin Lam, Thimphu"
+		if err := r.Create(ctx, want); err != nil {
+			t.Fatal(err)
+		}
+		got, err := r.Get(ctx, want.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Phone != want.Phone || got.Address != want.Address {
+			t.Fatalf("got phone=%q address=%q", got.Phone, got.Address)
+		}
+	})
+	t.Run("a second pharmacy with the same licence number is refused", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		if err := r.Create(ctx, pharmacy("ph-1", "LIC-1")); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Create(ctx, pharmacy("ph-2", "LIC-1")); !errors.Is(err, domain.ErrLicenseTaken) {
+			t.Fatalf("duplicate licence=%v", err)
+		}
+	})
+	t.Run("find by owner returns the owner's oldest pharmacy or not found", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		if _, err := r.FindByOwner(ctx, "owner-1"); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("empty=%v", err)
+		}
+		newer := pharmacy("ph-a", "LIC-A")
+		newer.CreatedAt = t0.Add(time.Hour)
+		older := pharmacy("ph-b", "LIC-B")
+		other := pharmacy("ph-c", "LIC-C")
+		other.OwnerID = "owner-2"
+		for _, p := range []domain.Pharmacy{newer, older, other} {
+			if err := r.Create(ctx, p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := r.FindByOwner(ctx, "owner-1")
+		if err != nil || got.ID != "ph-b" {
+			t.Fatalf("got=%+v err=%v", got, err)
+		}
+	})
 	t.Run("invalid transition and missing rejection reason are returned", func(t *testing.T) {
 		r := factory(t)
 		ctx := context.Background()

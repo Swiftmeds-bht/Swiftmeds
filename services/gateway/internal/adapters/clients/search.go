@@ -15,6 +15,7 @@ import (
 var _ ports.Searcher = (*SearchClient)(nil)
 var _ ports.Suggester = (*SearchClient)(nil)
 var _ ports.NearbyPharmacyFinder = (*GeoClient)(nil)
+var _ ports.PharmacyLocations = (*GeoClient)(nil)
 var _ ports.SubstituteFinder = (*SubstitutionClient)(nil)
 
 type SearchClient struct{ client searchv1.SearchServiceClient }
@@ -42,6 +43,14 @@ func NewGeoClient(client geov1.GeoServiceClient) *GeoClient {
 
 func (c *GeoClient) FindNearbyPharmacies(ctx context.Context, req *geov1.FindNearbyPharmaciesRequest) (*geov1.FindNearbyPharmaciesResponse, error) {
 	return c.client.FindNearbyPharmacies(ctx, req)
+}
+
+func (c *GeoClient) UpsertPharmacyLocation(ctx context.Context, req *geov1.UpsertPharmacyLocationRequest) (*geov1.UpsertPharmacyLocationResponse, error) {
+	return c.client.UpsertPharmacyLocation(ctx, req)
+}
+
+func (c *GeoClient) RemovePharmacyLocation(ctx context.Context, req *geov1.RemovePharmacyLocationRequest) (*geov1.RemovePharmacyLocationResponse, error) {
+	return c.client.RemovePharmacyLocation(ctx, req)
 }
 
 type SubstitutionClient struct {

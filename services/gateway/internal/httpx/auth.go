@@ -73,7 +73,7 @@ func Auth(authenticator ports.Authenticator, next http.Handler) http.Handler {
 			WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth service unavailable"})
 			return
 		}
-		if requiredRole := roleForRoute(r.URL.Path); !roleAllowed(identity.Role, requiredRole) {
+		if requiredRole := roleForRequest(r); !roleAllowed(identity.Role, requiredRole) {
 			WriteJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
 			return
 		}
@@ -121,6 +121,17 @@ func isPublicLookup(r *http.Request) bool {
 		}
 	}
 	return false
+}
+
+// roleForRequest is roleForRoute, except that registering a pharmacy
+// (POST /api/v1/pharmacies, SCRUM-141) is open to any signed-in account: a new
+// pharmacy owner signs up as a patient and becomes the pharmacy's staff
+// account when it registers. The handler checks the rest.
+func roleForRequest(r *http.Request) authv1.Role {
+	if r.Method == http.MethodPost && r.URL.Path == "/api/v1/pharmacies" {
+		return authv1.Role_ROLE_UNSPECIFIED
+	}
+	return roleForRoute(r.URL.Path)
 }
 
 func roleForRoute(path string) authv1.Role {

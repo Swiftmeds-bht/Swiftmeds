@@ -80,6 +80,23 @@ func (r *Repository) ConsumeRefreshToken(_ context.Context, hash string) (string
 	r.tokens[hash] = tok
 	return tok.userID, nil
 }
+func (r *Repository) LinkPharmacy(_ context.Context, userID, pharmacyID string) (domain.User, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	u, ok := r.users[userID]
+	switch {
+	case !ok:
+		return domain.User{}, domain.ErrUserNotFound
+	case u.Role == domain.RoleAdmin:
+		return domain.User{}, domain.ErrAdminLink
+	case u.PharmacyID != "" && u.PharmacyID != pharmacyID:
+		return domain.User{}, domain.ErrAlreadyLinked
+	}
+	u.Role, u.PharmacyID = domain.RolePharmacist, pharmacyID
+	r.users[userID] = u
+	return u, nil
+}
+
 func (r *Repository) RevokeRefreshToken(_ context.Context, hash string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

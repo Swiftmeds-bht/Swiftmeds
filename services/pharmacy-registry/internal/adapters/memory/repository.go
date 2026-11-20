@@ -24,8 +24,32 @@ func NewRepository() *Repository {
 func (r *Repository) Create(_ context.Context, p domain.Pharmacy) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for _, other := range r.pharmacies {
+		if other.LicenseNumber == p.LicenseNumber {
+			return domain.ErrLicenseTaken
+		}
+	}
 	r.pharmacies[p.ID] = p
 	return nil
+}
+
+func (r *Repository) FindByOwner(_ context.Context, ownerID string) (domain.Pharmacy, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var found *domain.Pharmacy
+	for _, p := range r.pharmacies {
+		if p.OwnerID != ownerID {
+			continue
+		}
+		if found == nil || p.CreatedAt.Before(found.CreatedAt) || (p.CreatedAt.Equal(found.CreatedAt) && p.ID < found.ID) {
+			p := p
+			found = &p
+		}
+	}
+	if found == nil {
+		return domain.Pharmacy{}, domain.ErrNotFound
+	}
+	return *found, nil
 }
 
 func (r *Repository) Get(_ context.Context, id string) (domain.Pharmacy, error) {

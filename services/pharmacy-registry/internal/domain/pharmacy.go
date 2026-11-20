@@ -27,6 +27,8 @@ var (
 	ErrInvalidTransition = errors.New("invalid verification status transition")
 	ErrMissingReason     = errors.New("reason is required for rejection or suspension")
 	ErrNotFound          = errors.New("pharmacy not found")
+	// ErrLicenseTaken: another pharmacy is registered with this licence number.
+	ErrLicenseTaken = errors.New("a pharmacy with this licence number is already registered")
 )
 
 type GeoPoint struct {
@@ -60,13 +62,17 @@ type Pharmacy struct {
 	OwnerID       string
 	Name          string
 	LicenseNumber string
-	Dzongkhag     string
-	Location      GeoPoint
-	Hours         []OpeningHours
-	Status        Status
-	StatusReason  string
-	CreatedAt     time.Time
-	VerifiedAt    *time.Time
+	// Phone and Address are for the administrator who verifies the pharmacy
+	// (SCRUM-141). Both are optional.
+	Phone        string
+	Address      string
+	Dzongkhag    string
+	Location     GeoPoint
+	Hours        []OpeningHours
+	Status       Status
+	StatusReason string
+	CreatedAt    time.Time
+	VerifiedAt   *time.Time
 }
 
 func NewPharmacy(id, ownerID, name, licenseNumber, dzongkhag string, location GeoPoint, hours []OpeningHours, now time.Time) (Pharmacy, error) {

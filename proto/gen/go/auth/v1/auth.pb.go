@@ -635,6 +635,118 @@ func (*LogoutResponse) Descriptor() ([]byte, []int) {
 	return file_auth_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
+type LinkPharmacyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PharmacyId    string                 `protobuf:"bytes,2,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkPharmacyRequest) Reset() {
+	*x = LinkPharmacyRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkPharmacyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkPharmacyRequest) ProtoMessage() {}
+
+func (x *LinkPharmacyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkPharmacyRequest.ProtoReflect.Descriptor instead.
+func (*LinkPharmacyRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LinkPharmacyRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LinkPharmacyRequest) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+type LinkPharmacyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Role          Role                   `protobuf:"varint,2,opt,name=role,proto3,enum=swiftmed.auth.v1.Role" json:"role,omitempty"`
+	PharmacyId    string                 `protobuf:"bytes,3,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkPharmacyResponse) Reset() {
+	*x = LinkPharmacyResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkPharmacyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkPharmacyResponse) ProtoMessage() {}
+
+func (x *LinkPharmacyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkPharmacyResponse.ProtoReflect.Descriptor instead.
+func (*LinkPharmacyResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *LinkPharmacyResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LinkPharmacyResponse) GetRole() Role {
+	if x != nil {
+		return x.Role
+	}
+	return Role_ROLE_UNSPECIFIED
+}
+
+func (x *LinkPharmacyResponse) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
 var File_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_auth_v1_auth_proto_rawDesc = "" +
@@ -672,19 +784,29 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"4\n" +
 	"\rLogoutRequest\x12#\n" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\x10\n" +
-	"\x0eLogoutResponse*W\n" +
+	"\x0eLogoutResponse\"O\n" +
+	"\x13LinkPharmacyRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vpharmacy_id\x18\x02 \x01(\tR\n" +
+	"pharmacyId\"|\n" +
+	"\x14LinkPharmacyResponse\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12*\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x16.swiftmed.auth.v1.RoleR\x04role\x12\x1f\n" +
+	"\vpharmacy_id\x18\x03 \x01(\tR\n" +
+	"pharmacyId*W\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fROLE_PATIENT\x10\x01\x12\x17\n" +
 	"\x13ROLE_PHARMACY_STAFF\x10\x02\x12\x0e\n" +
 	"\n" +
-	"ROLE_ADMIN\x10\x032\xb8\x03\n" +
+	"ROLE_ADMIN\x10\x032\x97\x04\n" +
 	"\vAuthService\x12Q\n" +
 	"\bRegister\x12!.swiftmed.auth.v1.RegisterRequest\x1a\".swiftmed.auth.v1.RegisterResponse\x12H\n" +
 	"\x05Login\x12\x1e.swiftmed.auth.v1.LoginRequest\x1a\x1f.swiftmed.auth.v1.LoginResponse\x12]\n" +
 	"\fRefreshToken\x12%.swiftmed.auth.v1.RefreshTokenRequest\x1a&.swiftmed.auth.v1.RefreshTokenResponse\x12`\n" +
 	"\rValidateToken\x12&.swiftmed.auth.v1.ValidateTokenRequest\x1a'.swiftmed.auth.v1.ValidateTokenResponse\x12K\n" +
-	"\x06Logout\x12\x1f.swiftmed.auth.v1.LogoutRequest\x1a .swiftmed.auth.v1.LogoutResponseB@Z>github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1;authv1b\x06proto3"
+	"\x06Logout\x12\x1f.swiftmed.auth.v1.LogoutRequest\x1a .swiftmed.auth.v1.LogoutResponse\x12]\n" +
+	"\fLinkPharmacy\x12%.swiftmed.auth.v1.LinkPharmacyRequest\x1a&.swiftmed.auth.v1.LinkPharmacyResponseB@Z>github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -699,7 +821,7 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_auth_v1_auth_proto_goTypes = []any{
 	(Role)(0),                     // 0: swiftmed.auth.v1.Role
 	(*TokenPair)(nil),             // 1: swiftmed.auth.v1.TokenPair
@@ -713,31 +835,36 @@ var file_auth_v1_auth_proto_goTypes = []any{
 	(*ValidateTokenResponse)(nil), // 9: swiftmed.auth.v1.ValidateTokenResponse
 	(*LogoutRequest)(nil),         // 10: swiftmed.auth.v1.LogoutRequest
 	(*LogoutResponse)(nil),        // 11: swiftmed.auth.v1.LogoutResponse
-	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
+	(*LinkPharmacyRequest)(nil),   // 12: swiftmed.auth.v1.LinkPharmacyRequest
+	(*LinkPharmacyResponse)(nil),  // 13: swiftmed.auth.v1.LinkPharmacyResponse
+	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
-	12, // 0: swiftmed.auth.v1.TokenPair.access_token_expires_at:type_name -> google.protobuf.Timestamp
+	14, // 0: swiftmed.auth.v1.TokenPair.access_token_expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 1: swiftmed.auth.v1.RegisterRequest.role:type_name -> swiftmed.auth.v1.Role
 	0,  // 2: swiftmed.auth.v1.LoginResponse.role:type_name -> swiftmed.auth.v1.Role
 	1,  // 3: swiftmed.auth.v1.LoginResponse.tokens:type_name -> swiftmed.auth.v1.TokenPair
 	1,  // 4: swiftmed.auth.v1.RefreshTokenResponse.tokens:type_name -> swiftmed.auth.v1.TokenPair
 	0,  // 5: swiftmed.auth.v1.ValidateTokenResponse.role:type_name -> swiftmed.auth.v1.Role
-	12, // 6: swiftmed.auth.v1.ValidateTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 7: swiftmed.auth.v1.AuthService.Register:input_type -> swiftmed.auth.v1.RegisterRequest
-	4,  // 8: swiftmed.auth.v1.AuthService.Login:input_type -> swiftmed.auth.v1.LoginRequest
-	6,  // 9: swiftmed.auth.v1.AuthService.RefreshToken:input_type -> swiftmed.auth.v1.RefreshTokenRequest
-	8,  // 10: swiftmed.auth.v1.AuthService.ValidateToken:input_type -> swiftmed.auth.v1.ValidateTokenRequest
-	10, // 11: swiftmed.auth.v1.AuthService.Logout:input_type -> swiftmed.auth.v1.LogoutRequest
-	3,  // 12: swiftmed.auth.v1.AuthService.Register:output_type -> swiftmed.auth.v1.RegisterResponse
-	5,  // 13: swiftmed.auth.v1.AuthService.Login:output_type -> swiftmed.auth.v1.LoginResponse
-	7,  // 14: swiftmed.auth.v1.AuthService.RefreshToken:output_type -> swiftmed.auth.v1.RefreshTokenResponse
-	9,  // 15: swiftmed.auth.v1.AuthService.ValidateToken:output_type -> swiftmed.auth.v1.ValidateTokenResponse
-	11, // 16: swiftmed.auth.v1.AuthService.Logout:output_type -> swiftmed.auth.v1.LogoutResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	14, // 6: swiftmed.auth.v1.ValidateTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: swiftmed.auth.v1.LinkPharmacyResponse.role:type_name -> swiftmed.auth.v1.Role
+	2,  // 8: swiftmed.auth.v1.AuthService.Register:input_type -> swiftmed.auth.v1.RegisterRequest
+	4,  // 9: swiftmed.auth.v1.AuthService.Login:input_type -> swiftmed.auth.v1.LoginRequest
+	6,  // 10: swiftmed.auth.v1.AuthService.RefreshToken:input_type -> swiftmed.auth.v1.RefreshTokenRequest
+	8,  // 11: swiftmed.auth.v1.AuthService.ValidateToken:input_type -> swiftmed.auth.v1.ValidateTokenRequest
+	10, // 12: swiftmed.auth.v1.AuthService.Logout:input_type -> swiftmed.auth.v1.LogoutRequest
+	12, // 13: swiftmed.auth.v1.AuthService.LinkPharmacy:input_type -> swiftmed.auth.v1.LinkPharmacyRequest
+	3,  // 14: swiftmed.auth.v1.AuthService.Register:output_type -> swiftmed.auth.v1.RegisterResponse
+	5,  // 15: swiftmed.auth.v1.AuthService.Login:output_type -> swiftmed.auth.v1.LoginResponse
+	7,  // 16: swiftmed.auth.v1.AuthService.RefreshToken:output_type -> swiftmed.auth.v1.RefreshTokenResponse
+	9,  // 17: swiftmed.auth.v1.AuthService.ValidateToken:output_type -> swiftmed.auth.v1.ValidateTokenResponse
+	11, // 18: swiftmed.auth.v1.AuthService.Logout:output_type -> swiftmed.auth.v1.LogoutResponse
+	13, // 19: swiftmed.auth.v1.AuthService.LinkPharmacy:output_type -> swiftmed.auth.v1.LinkPharmacyResponse
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_auth_v1_auth_proto_init() }
@@ -751,7 +878,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

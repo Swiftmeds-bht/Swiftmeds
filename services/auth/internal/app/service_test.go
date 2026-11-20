@@ -33,6 +33,24 @@ func (r *fakeRepository) RevokeRefreshToken(_ context.Context, tokenHash string)
 	return nil
 }
 
+func (r *fakeRepository) LinkPharmacy(_ context.Context, userID, pharmacyID string) (domain.User, error) {
+	if r.failWith != nil {
+		return domain.User{}, r.failWith
+	}
+	u, ok := r.users[userID]
+	switch {
+	case !ok:
+		return domain.User{}, domain.ErrUserNotFound
+	case u.Role == domain.RoleAdmin:
+		return domain.User{}, domain.ErrAdminLink
+	case u.PharmacyID != "" && u.PharmacyID != pharmacyID:
+		return domain.User{}, domain.ErrAlreadyLinked
+	}
+	u.Role, u.PharmacyID = domain.RolePharmacist, pharmacyID
+	r.users[userID] = u
+	return u, nil
+}
+
 func (r *fakeRepository) CreateUser(_ context.Context, user domain.User) error {
 	if _, exists := r.byEmail[user.Email]; exists {
 		return domain.ErrUserExists

@@ -8,6 +8,7 @@ import (
 )
 
 var _ ports.PharmacyRegistryClient = (*PharmacyRegistryClient)(nil)
+var _ ports.PharmacyOnboarding = (*PharmacyRegistryClient)(nil)
 
 type PharmacyRegistryClient struct {
 	client pharmacyregistryv1.PharmacyRegistryServiceClient
@@ -22,4 +23,25 @@ func (c *PharmacyRegistryClient) GetPharmacy(
 	req *pharmacyregistryv1.GetPharmacyRequest,
 ) (*pharmacyregistryv1.GetPharmacyResponse, error) {
 	return c.client.GetPharmacy(ctx, req)
+}
+
+func (c *PharmacyRegistryClient) RegisterPharmacy(
+	ctx context.Context,
+	req *pharmacyregistryv1.RegisterPharmacyRequest,
+) (*pharmacyregistryv1.RegisterPharmacyResponse, error) {
+	return c.client.RegisterPharmacy(ctx, req)
+}
+
+func (c *PharmacyRegistryClient) ListPharmacies(
+	ctx context.Context,
+	req *pharmacyregistryv1.ListPharmaciesRequest,
+) (*pharmacyregistryv1.ListPharmaciesResponse, error) {
+	return c.client.ListPharmacies(ctx, req)
+}
+
+func (c *PharmacyRegistryClient) SetVerificationStatus(
+	ctx context.Context,
+	req *pharmacyregistryv1.SetVerificationStatusRequest,
+) (*pharmacyregistryv1.SetVerificationStatusResponse, error) {
+	return c.client.SetVerificationStatus(ctx, req)
 }

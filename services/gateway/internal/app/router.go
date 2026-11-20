@@ -30,6 +30,9 @@ type routes struct {
 	analytics        ports.AnalyticsClient
 	inventory        ports.InventoryClient
 	stockSync        ports.StockSyncClient
+	onboarding       ports.PharmacyOnboarding
+	linker           ports.PharmacyLinker
+	locations        ports.PharmacyLocations
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
@@ -108,6 +111,12 @@ func WithProfile(client ports.ProfileClient) RouterOption {
 	return func(r *routes) { r.profile = client }
 }
 
+// WithPharmacyOnboarding adds pharmacy sign-up and the admin review routes
+// (SCRUM-141): registerPharmacy, listPharmacies and setPharmacyVerification.
+func WithPharmacyOnboarding(registry ports.PharmacyOnboarding, linker ports.PharmacyLinker, locations ports.PharmacyLocations) RouterOption {
+	return func(r *routes) { r.onboarding, r.linker, r.locations = registry, linker, locations }
+}
+
 // WithProducts adds the public medicine lookup, getProduct (SCRUM-138).
 func WithProducts(client ports.ProductLookup) RouterOption {
 	return func(r *routes) { r.products = client }
@@ -181,6 +190,11 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	}
 	if wired.pharmacyRegistry != nil {
 		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}", pharmacyHandler(wired.pharmacyRegistry, logger))
+	}
+	if wired.onboarding != nil && wired.linker != nil && wired.locations != nil {
+		mux.Handle("POST /api/v1/pharmacies", registerPharmacyHandler(wired.onboarding, wired.linker, logger))
+		mux.Handle("GET /api/v1/pharmacies", listPharmaciesHandler(wired.onboarding, logger))
+		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/verification", verificationHandler(wired.onboarding, wired.locations, logger))
 	}
 	if wired.profile != nil {
 		mux.Handle("GET "+ProfilePath, profileHandler(wired.profile, logger))

@@ -11,6 +11,7 @@ import (
 
 var _ ports.Authenticator = (*AuthClient)(nil)
 var _ ports.AuthRoutes = (*AuthClient)(nil)
+var _ ports.PharmacyLinker = (*AuthClient)(nil)
 
 // AuthClient calls the Auth service.
 type AuthClient struct {
@@ -43,4 +44,7 @@ func (a *AuthClient) RefreshToken(ctx context.Context, req *authv1.RefreshTokenR
 }
 func (a *AuthClient) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
 	return a.client.Logout(ctx, req)
+}
+func (a *AuthClient) LinkPharmacy(ctx context.Context, req *authv1.LinkPharmacyRequest) (*authv1.LinkPharmacyResponse, error) {
+	return a.client.LinkPharmacy(ctx, req)
 }
