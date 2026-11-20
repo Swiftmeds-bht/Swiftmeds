@@ -120,7 +120,7 @@ function fallbackErrorMessage(status: number): string {
     case 400:
       return "The request was invalid. Check the values and try again.";
     case 401:
-      return "Your session has expired. Please sign in again.";
+      return "Your session has expired. Please log in again.";
     case 403:
       return "Your account cannot access this pharmacy action.";
     case 404:

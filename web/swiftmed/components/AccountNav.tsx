@@ -19,6 +19,7 @@ import type { Session } from "@/lib/types";
 
 import { AccountMenu } from "./AccountMenu";
 import { AlertListener } from "./AlertListener";
+import { LoginMenu } from "./LoginMenu";
 import { MainNav } from "./MainNav";
 import { NotificationBell } from "./NotificationBell";
 import { HoldsBell } from "./portal/HoldsBell";
@@ -67,8 +68,9 @@ async function StaffNav({ session }: { session: Session }) {
 /**
  * Header navigation (SCRUM-137, by role since SCRUM-139). Patients: the main
  * sections, the notification bell and the account menu. Pharmacy staff: the
- * portal's sections instead. Signed out: Search, For pharmacies, Sign in and
- * Create account. Reads the session cookie on the server, so tokens never
+ * portal's sections instead. Signed out: Search, For pharmacies, the Log in
+ * menu (patients or pharmacy staff, SCRUM-140) and Sign up. Reads the session
+ * cookie on the server, so tokens never
  * reach the browser.
  */
 export async function AccountNav() {
@@ -79,11 +81,9 @@ export async function AccountNav() {
         <MainNav audience="guest" />
         <span className="header-divider" aria-hidden="true" />
         <div className="header-actions">
-          <Link href="/login" className="nav-link">
-            Sign in
-          </Link>
+          <LoginMenu />
           <Link href="/register" className="button button-small header-cta">
-            Create account
+            Sign up
           </Link>
         </div>
       </div>

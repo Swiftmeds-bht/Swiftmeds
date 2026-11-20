@@ -50,8 +50,8 @@ export function formatClock(iso: string | undefined): string {
 
 const ERROR_MESSAGES: Record<HoldErrorKind, string> = {
   invalid_credentials: "That email and password do not match an account.",
-  email_taken: "An account with this email already exists. Sign in instead.",
-  unauthorized: "Please sign in again.",
+  email_taken: "An account with this email already exists. Log in instead.",
+  unauthorized: "Please log in again.",
   not_found: "We could not find that. It may belong to another account.",
   not_active: "This hold is no longer active, so it cannot be changed.",
   bad_request: "Please check what you entered and try again.",
