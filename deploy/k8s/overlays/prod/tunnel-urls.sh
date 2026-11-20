@@ -7,6 +7,8 @@
 #
 # A quick tunnel's URL changes when the public-tunnel pod restarts (for example
 # after the laptop restarts), so run it with --deploy-workers again then.
+# With the fixed API address (api-fixed, SCRUM-156) the workers are deployed
+# with that one instead, so once is enough.
 #
 # Deploying needs a Cloudflare API token with the "Edit Cloudflare Workers"
 # template (dash.cloudflare.com -> My Profile -> API Tokens), in
@@ -28,11 +30,18 @@ if [ -z "$patient" ] || [ -z "$api" ]; then
   echo "The tunnels have no URL yet: kubectl -n $NS get pods -l app.kubernetes.io/name=public-tunnel" >&2
   exit 1
 fi
+# The fixed API address, when its container is connected (SCRUM-156).
+fixed="$(kubectl -n "$NS" logs deploy/public-tunnel -c api-fixed 2>/dev/null \
+  | grep -oE 'url=https://[a-z0-9.-]+' | tail -n 1 | cut -d= -f2)"
 cat <<EOF
 SwiftMed            $patient
 Pharmacy portal     $patient/pharmacy-portal
 API gateway         $api
 EOF
+if [ -n "$fixed" ]; then
+  echo "API gateway, fixed  $fixed   (Workers and Vercel use this one)"
+  api="$fixed"
+fi
 
 deploy=0 set_secret=0
 for arg in "$@"; do
