@@ -79,6 +79,9 @@ var nonRetryableMethods = map[string]struct{}{
 	"/swiftmed.auth.v1.AuthService/Register": {},
 	// Rotates the refresh token: a retry would present a token already used.
 	"/swiftmed.auth.v1.AuthService/RefreshToken": {},
+	// Makes the account a pharmacy's staff account (SCRUM-141). Idempotent, but
+	// it changes state, so the gateway calls it once and reports any failure.
+	"/swiftmed.auth.v1.AuthService/LinkPharmacy": {},
 
 	"/swiftmed.catalog.v1.CatalogService/CreateProduct": {},
 
