@@ -12,7 +12,7 @@ services:
     environment:
       GATEWAY_HTTP_PORT: ${GATEWAY_HTTP_PORT:-8080}
       TRAEFIK_GRPC_TARGET: ${TRAEFIK_GRPC_TARGET:-traefik:50051}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     depends_on:
@@ -25,14 +25,16 @@ services:
       - traefik.http.services.gateway.loadbalancer.server.port=${GATEWAY_HTTP_PORT:-8080}
 
   # --- Web apps (SCRUM-117) ---------------------------------------------------
-  # Next.js standalone servers. Each is reached through its own Traefik
-  # entrypoint (deploy/traefik/traefik.yml), so the gateway's PathPrefix(`/`)
-  # rule on :8080 is untouched. They call the gateway inside the network, from
-  # the server side only; the browser never talks to the gateway directly.
+  # The SwiftMed web app (one Next.js app since SCRUM-139): patients at "/",
+  # pharmacy staff at /pharmacy-portal. It is reached through Traefik's
+  # "patient" entrypoint (deploy/traefik/traefik.yml; the name predates the
+  # merge), so the gateway's PathPrefix(`/`) rule on :8080 is untouched. It calls
+  # the gateway inside the network, from the server side only; the browser never
+  # talks to the gateway directly.
 
-  patient-app:
+  web:
     build:
-      context: ../web/patient-app
+      context: ../web/swiftmed
     restart: unless-stopped
     environment:
       GATEWAY_URL: http://gateway:${GATEWAY_HTTP_PORT:-8080}
@@ -43,24 +45,9 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.patient-app.rule=PathPrefix(`/`)
-      - traefik.http.routers.patient-app.entrypoints=patient
-      - traefik.http.services.patient-app.loadbalancer.server.port=3000
-
-  pharmacy-dashboard:
-    build:
-      context: ../web/pharmacy-dashboard
-    restart: unless-stopped
-    environment:
-      GATEWAY_URL: http://gateway:${GATEWAY_HTTP_PORT:-8080}
-    depends_on:
-      gateway:
-        condition: service_healthy
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.pharmacy-dashboard.rule=PathPrefix(`/`)
-      - traefik.http.routers.pharmacy-dashboard.entrypoints=dashboard
-      - traefik.http.services.pharmacy-dashboard.loadbalancer.server.port=3000
+      - traefik.http.routers.web.rule=PathPrefix(`/`)
+      - traefik.http.routers.web.entrypoints=patient
+      - traefik.http.services.web.loadbalancer.server.port=3000
 
   postgres:
     image: postgres:16-alpine

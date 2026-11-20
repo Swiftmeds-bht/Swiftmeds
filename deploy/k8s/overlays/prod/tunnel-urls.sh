@@ -23,14 +23,14 @@ url_of() {
     | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n 1
 }
 
-patient="$(url_of patient)"; pharmacy="$(url_of pharmacy)"; api="$(url_of api)"
-if [ -z "$patient" ] || [ -z "$pharmacy" ] || [ -z "$api" ]; then
+patient="$(url_of patient)"; api="$(url_of api)"
+if [ -z "$patient" ] || [ -z "$api" ]; then
   echo "The tunnels have no URL yet: kubectl -n $NS get pods -l app.kubernetes.io/name=public-tunnel" >&2
   exit 1
 fi
 cat <<EOF
-Patient app         $patient
-Pharmacy dashboard  $pharmacy
+SwiftMed            $patient
+Pharmacy portal     $patient/pharmacy-portal
 API gateway         $api
 EOF
 

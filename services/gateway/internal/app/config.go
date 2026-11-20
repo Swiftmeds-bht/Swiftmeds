@@ -17,7 +17,7 @@ const (
 	MinWorkerSecretLength = 32
 )
 
-var defaultCORSOrigins = []string{"http://localhost:3000", "http://localhost:3001"}
+var defaultCORSOrigins = []string{"http://localhost:3000"}
 
 type Config struct {
 	HTTPPort      int

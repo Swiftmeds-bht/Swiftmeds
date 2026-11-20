@@ -1,10 +1,6 @@
 # Local-only access to internal services for debugging. Keep this file out of
 # production deploy commands.
 services:
-  pharmacy-dashboard:
-    ports:
-      - "127.0.0.1:${DASHBOARD_HTTP_PORT:-3001}:3001"
-
   postgres:
     ports:
       - "127.0.0.1:5432:5432"

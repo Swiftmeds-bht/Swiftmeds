@@ -1,10 +1,10 @@
 # A development cluster (overlays/local): k3s in Docker, made with k3d.
 #   k3d cluster create --config deploy/k8s/overlays/local/cluster.yaml
 # Its own name and ports, so it can run beside the deployment (overlays/prod,
-# cluster "swiftmed" on 9000/9001/9080) and the Compose stack (3000/3001/8080):
-#   http://localhost:9100  patient app
-#   http://localhost:9101  pharmacy dashboard
-#   http://localhost:9180  API gateway
+# cluster "swiftmed" on 9000/9080) and the Compose stack (3000/8080):
+#   http://localhost:9100                  SwiftMed (patients)
+#   http://localhost:9100/pharmacy-portal  pharmacy portal
+#   http://localhost:9180                  API gateway
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
@@ -17,7 +17,6 @@ ports:
     nodeFilters: [loadbalancer]
   - port: 9100:3000
     nodeFilters: [loadbalancer]
-  - port: 9101:3001
     nodeFilters: [loadbalancer]
 options:
   k3s:

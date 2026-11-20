@@ -1,8 +1,8 @@
 # Public HTTPS access (SCRUM-75) through Cloudflare quick tunnels: no account,
 # no domain, no open port on the laptop. One tunnel per public entrypoint of
-# Traefik, because the apps live at "/" and cannot share one hostname by path:
-#   patient    -> traefik:3000  patient app
-#   pharmacy   -> traefik:3001  pharmacy dashboard
+# Traefik:
+#   patient    -> traefik:3000  the SwiftMed web app (patients at "/", pharmacy
+#                               staff at /pharmacy-portal; one app since SCRUM-139)
 #   api        -> traefik:8080  API gateway (also used by the Cloudflare Workers)
 # Each gets a random https://<words>.trycloudflare.com address, printed in its
 # log; it stays the same while the pod runs and changes when the pod restarts.
@@ -47,16 +47,6 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: {drop: [ALL]}
-        - name: pharmacy
-          image: cloudflare/cloudflared:2026.10.7
-          args: [tunnel, --no-autoupdate, --metrics, "0.0.0.0:2001", --url, "http://traefik:3001"]
-          ports:
-            - {name: metrics-d, containerPort: 2001}
-          readinessProbe:
-            httpGet: {path: /ready, port: metrics-d}
-            periodSeconds: 10
-          resources: *tunnel-resources
-          securityContext: *tunnel-security
         - name: api
           image: cloudflare/cloudflared:2026.10.7
           args: [tunnel, --no-autoupdate, --metrics, "0.0.0.0:2002", --url, "http://traefik:8080"]

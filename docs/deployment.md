@@ -9,8 +9,8 @@ and run the same commands).
 
 | What | Where |
 |---|---|
-| Patient app | http://localhost:9000 |
-| Pharmacy dashboard | http://localhost:9001 |
+| SwiftMed (patients) | http://localhost:9000 |
+| Pharmacy portal | http://localhost:9000/pharmacy-portal (same app; staff sign in at `/login`) |
 | API gateway | http://localhost:9080 (`/healthz`) |
 | Public HTTPS URLs | Cloudflare quick tunnels, see [Public access](#public-access); `deploy/k8s/overlays/prod/tunnel-urls.sh` prints them |
 
@@ -48,14 +48,14 @@ them to `ghcr.io/swiftmeds-bht` (workflow "Release images").
 ## What runs
 
 ```
-                 laptop :9000 :9001 :9080   (Cloudflare Tunnel, SCRUM-75)
+                 laptop :9000 :9080   (Cloudflare Tunnel, SCRUM-75)
                           |
               k3d load balancer -> Service traefik-public
                           |
-                 Traefik x2 (web/patient/dashboard entrypoints, grpc :50051)
-           /          |           \                      \
-   patient-app   pharmacy-     gateway x2+ --gRPC--> Traefik grpc :50051 --by :authority--> 19 gRPC services
-                 dashboard                                                 (search x2+, holds x2, inventory x2)
+                 Traefik x2 (web/patient entrypoints, grpc :50051)
+               /                   \
+        web (/ and              gateway x2+ --gRPC--> Traefik grpc :50051 --by :authority--> 19 gRPC services
+   /pharmacy-portal)                                                       (search x2+, holds x2, inventory x2)
                                                                                     |
                                                          Postgres (StatefulSet) + nightly backup to its own volume
                                                          RabbitMQ (StatefulSet)
@@ -82,7 +82,7 @@ them to `ghcr.io/swiftmeds-bht` (workflow "Release images").
   needs several nodes plus a load balancer in front of them (a cloud L4 load
   balancer, or MetalLB / keepalived for a floating IP): future work.
 - **NetworkPolicies** (`base/networkpolicies.yaml`): everything is denied unless
-  allowed. From outside, only Traefik's public ports (8080, 3000, 3001); inside,
+  allowed. From outside, only Traefik's public ports (8080, 3000); inside,
   any pod may use Traefik's gRPC port; only Traefik reaches the services, the
   gateway and the web apps (and the web apps reach the gateway); only pods
   labelled `swiftmed/postgres-client` / `swiftmed/rabbitmq-client` reach Postgres
@@ -141,7 +141,7 @@ volume); the prod sizes apply to new clusters.
 ## A development cluster
 
 ```bash
-deploy/k8s/overlays/local/up.sh    # cluster "swiftmed-dev" on 9100/9101/9180, images built here, seeded
+deploy/k8s/overlays/local/up.sh    # cluster "swiftmed-dev" on 9100/9180, images built here, seeded
 ```
 
 ## Secrets
@@ -218,17 +218,16 @@ backups volume exist), copy the file in with `kubectl cp`, then follow the same 
 
 ## Public access
 
-The prod overlay runs three **Cloudflare quick tunnels** (`overlays/prod/tunnel.yaml`,
-cloudflared 2026.10.7): one each for the patient app, the pharmacy dashboard and
-the API gateway, because the apps live at `/` and cannot share one hostname by
-path. Quick tunnels need no Cloudflare account and no domain, and open no port
+The prod overlay runs two **Cloudflare quick tunnels** (`overlays/prod/tunnel.yaml`,
+cloudflared 2026.10.7): one for the SwiftMed web app (patients at `/`, pharmacy
+staff at `/pharmacy-portal`; one app since SCRUM-139) and one for the API gateway. Quick tunnels need no Cloudflare account and no domain, and open no port
 on the laptop: cloudflared connects out to Cloudflare, which serves HTTPS on
 `https://<random-words>.trycloudflare.com` and forwards to Traefik's public
 entrypoints. Postgres, RabbitMQ, the gRPC port and Traefik's dashboard stay
 unreachable (NetworkPolicies), and the gateway's worker routes need the shared secret.
 
 ```bash
-deploy/k8s/overlays/prod/tunnel-urls.sh        # prints the three URLs
+deploy/k8s/overlays/prod/tunnel-urls.sh        # prints the site, portal and API URLs
 ```
 
 A URL stays the same while the `public-tunnel` pod runs and **changes when it
@@ -278,9 +277,9 @@ port inside WSL that Windows cannot reach), hence the token.
 
 **Moving to a named tunnel** once the team has a domain on Cloudflare (fixed
 URLs, SSE works): `cloudflared tunnel login` (authorises the domain),
-`cloudflared tunnel create swiftmed`, add one public hostname per app in the
-dashboard (for example `swiftmed.<domain>` -> `http://traefik:3000`,
-`pharmacy.<domain>` -> `http://traefik:3001`, `api.<domain>` -> `http://traefik:8080`),
+`cloudflared tunnel create swiftmed`, add the public hostnames in the
+dashboard (for example `swiftmed.<domain>` -> `http://traefik:3000` and
+`api.<domain>` -> `http://traefik:8080`),
 store the tunnel token as a sealed secret, and run cloudflared with
 `tunnel run --token` instead of `--url`. Then deploy the workers once with the
 fixed API URL.

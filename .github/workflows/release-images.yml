@@ -1,6 +1,6 @@
 name: Release images
 
-# On a version tag (v1.0.0, ...), build the 23 images the Kubernetes deployment
+# On a version tag (v1.0.0, ...), build the 22 images the Kubernetes deployment
 # uses and push them to ghcr.io/swiftmeds-bht/<name>:<tag> (SCRUM-108). The prod
 # overlay (deploy/k8s/overlays/prod) pins that tag. Can also be started by hand
 # for an existing tag.

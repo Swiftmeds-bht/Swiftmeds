@@ -97,7 +97,7 @@ info:
     ## CORS
 
     The gateway allows the origins in `CORS_ALLOWED_ORIGINS` (default
-    `http://localhost:3000` and `http://localhost:3001`), with credentials. Allowed
+    `http://localhost:3000`, the web app), with credentials. Allowed
     headers are `Authorization`, `Content-Type` and `X-Request-ID`. Allowed methods are
     `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`. A preflight from an allowed
     origin returns 204.

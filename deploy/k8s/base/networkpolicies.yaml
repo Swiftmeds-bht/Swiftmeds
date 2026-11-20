@@ -3,7 +3,7 @@
 # unless a policy below allows it. These are ingress rules; outbound traffic is
 # not restricted.
 #
-#   outside world  -> Traefik :8080 :3000 :3001 only (gateway and web apps)
+#   outside world  -> Traefik :8080 :3000 only (gateway and web app)
 #   any pod here   -> Traefik :50051 (service-to-service gRPC)
 #   Traefik        -> the services, the gateway and the web apps
 #   web apps       -> gateway (they call it directly, server side)
@@ -32,7 +32,6 @@ spec:
     - ports:
         - {port: 8080}
         - {port: 3000}
-        - {port: 3001}
     # gRPC routing and the admin port (ping, dashboard), from this namespace only.
     - from:
         - podSelector: {}
@@ -75,7 +74,7 @@ spec:
     - from:
         - podSelector:
             matchExpressions:
-              - {key: app.kubernetes.io/name, operator: In, values: [patient-app, pharmacy-dashboard]}
+              - {key: app.kubernetes.io/name, operator: In, values: [web]}
       ports:
         - {port: 8080}
 ---

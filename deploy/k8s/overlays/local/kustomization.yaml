@@ -13,7 +13,7 @@ configMapGenerator:
   - name: swiftmed-config
     behavior: merge
     literals:
-      - CORS_ALLOWED_ORIGINS=http://localhost:9100,http://localhost:9101
+      - CORS_ALLOWED_ORIGINS=http://localhost:9100
 
 secretGenerator:
   - name: swiftmed-secrets
@@ -51,6 +51,5 @@ images:
   - {name: ghcr.io/swiftmeds-bht/trust, newTag: dev}
   - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: dev}
   - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: dev}
-  - {name: ghcr.io/swiftmeds-bht/patient-app, newTag: dev}
-  - {name: ghcr.io/swiftmeds-bht/pharmacy-dashboard, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/web, newTag: dev}
   - {name: ghcr.io/swiftmeds-bht/seed, newTag: dev}

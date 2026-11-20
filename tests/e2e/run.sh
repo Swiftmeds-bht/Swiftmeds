@@ -51,8 +51,8 @@ network="$(docker inspect "$(container traefik)" \
 worker_secret="$(sed -n 's/^WORKER_SHARED_SECRET=//p' .env | tail -n 1)"
 
 echo "Running Cypress (${CYPRESS_IMAGE}) on network ${network}, holds last ${hold_seconds}s ..."
-# Inside the container, localhost:3000/3001/8080 are forwarded to Traefik
-# (scripts/forward.mjs): the apps' Secure cookies only work on localhost.
+# Inside the container, localhost:3000/8080 are forwarded to Traefik
+# (scripts/forward.mjs): the app's Secure cookie only works on localhost.
 # Runs as the calling user so screenshots are not owned by root.
 docker run --rm \
   --network "$network" \
@@ -62,7 +62,7 @@ docker run --rm \
   -e E2E_WORKER_SECRET="$worker_secret" \
   -v "$ROOT/tests/e2e:/e2e" -w /e2e \
   --entrypoint bash "$CYPRESS_IMAGE" -c '
-    node scripts/forward.mjs traefik 3000 3001 8080 &
+    node scripts/forward.mjs traefik 3000 8080 &
     sleep 1
     exec cypress run --browser electron "$@"
   ' cypress-run "$@"

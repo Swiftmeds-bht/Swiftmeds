@@ -32,11 +32,10 @@ describe("Reserve a medicine and collect it with a pickup code", () => {
       cy.holdId().then((holdId) =>
         cy.pickupCode().then((code) => cy.pharmacistEntersCode(holdId, code)),
       );
-      cy.origin(Cypress.expose("dashboardUrl"), () => {
-        cy.contains("[role=status]", "Hold collected.");
-      });
+      cy.contains("[role=status]", "Hold collected.");
 
       // The patient sees it collected, and the units left the shelf for good.
+      cy.backToPatient();
       cy.get("@holdPage").then((path) => cy.visit(path));
       cy.holdStatus("Collected");
       cy.contains("You collected this medicine. Thank you.");
@@ -53,10 +52,9 @@ describe("Reserve a medicine and collect it with a pickup code", () => {
     cy.holdStatus("Ready to collect");
     cy.location("pathname").as("holdPage");
     cy.holdId().then((holdId) => cy.pharmacistEntersCode(holdId, "ZZZZZZ"));
-    cy.origin(Cypress.expose("dashboardUrl"), () => {
-      cy.contains("[role=alert]", "Wrong pickup code");
-    });
+    cy.contains("[role=alert]", "Wrong pickup code");
 
+    cy.backToPatient();
     cy.get("@holdPage").then((path) => cy.visit(path));
     cy.holdStatus("Ready to collect");
     cy.stockLevel().its("available").should("eq", 8);
