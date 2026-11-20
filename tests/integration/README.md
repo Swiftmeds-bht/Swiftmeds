@@ -79,5 +79,5 @@ failure, and removes the stack and volumes.
 ### Versions
 
 `testcontainers-go` is pinned to **v0.44.0**, the newest release that supports
-Go 1.25 (v0.45 needs Go 1.26). This module has its own `go.mod`, so its test
+Go 1.26 (v0.45 needs Go 1.26). This module has its own `go.mod`, so its test
 dependencies do not reach any service.

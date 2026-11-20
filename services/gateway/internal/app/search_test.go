@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
+	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -24,6 +26,16 @@ type fakeSearcher struct {
 func (f *fakeSearcher) SearchMedicine(_ context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
 	f.request = req
 	return f.response, f.err
+}
+
+type degradedSearcher struct {
+	fakeSearcher
+	degraded string
+}
+
+func (f *degradedSearcher) SearchMedicine(ctx context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
+	ports.SetSearchDegraded(ctx, f.degraded)
+	return f.fakeSearcher.SearchMedicine(ctx, req)
 }
 
 // fakeSearchService answers both search and autocomplete, as the Search client does.
@@ -99,6 +111,17 @@ func TestSearchRoutesSuccess(t *testing.T) {
 	})
 }
 
+func TestSearchPassesDegradedHeaderToClient(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
+	fake := &degradedSearcher{fakeSearcher: fakeSearcher{response: &searchv1.SearchMedicineResponse{SearchId: "s-1"}}, degraded: "freshness,ranking"}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=napa&lat=27&lng=89", nil)
+	rec := httptest.NewRecorder()
+	searchHandler(fake, logger).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("x-search-degraded") != "freshness,ranking" {
+		t.Fatalf("status = %d, degraded header = %q", rec.Code, rec.Header().Get("x-search-degraded"))
+	}
+}
+
 func TestSearchRoutesMapGRPCErrors(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
 	for _, code := range []codes.Code{codes.NotFound, codes.InvalidArgument, codes.Unavailable} {
@@ -116,6 +139,17 @@ func TestSearchRoutesMapGRPCErrors(t *testing.T) {
 				t.Fatalf("got %d %s, want %d without internal detail", rec.Code, rec.Body.String(), want)
 			}
 		})
+	}
+}
+
+func TestFourXXDownstreamResponsesAreNotLoggedAtError(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	fake := &fakeSearcher{err: status.Error(codes.NotFound, "not found")}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=napa&lat=27&lng=89", nil)
+	searchHandler(fake, logger).ServeHTTP(httptest.NewRecorder(), req)
+	if strings.Contains(logs.String(), `"level":"ERROR"`) || !strings.Contains(logs.String(), `"level":"WARN"`) {
+		t.Fatalf("4xx downstream response log = %s, want WARN and no ERROR", logs.String())
 	}
 }
 

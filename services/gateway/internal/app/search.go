@@ -21,6 +21,8 @@ import (
 
 const downstreamTimeout = 2 * time.Second
 
+const SearchCallTimeout = downstreamTimeout
+
 func searchHandler(client ports.Searcher, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -31,12 +33,16 @@ func searchHandler(client ports.Searcher, logger *slog.Logger) http.HandlerFunc 
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), downstreamTimeout)
 		defer cancel()
+		ctx, degraded := ports.WithSearchMetadata(ctx)
 		resp, callErr := client.SearchMedicine(ctx, &searchv1.SearchMedicineRequest{
 			Query: q, Location: &commonv1.GeoPoint{Latitude: lat, Longitude: lng}, RadiusM: radius,
 		})
 		if callErr != nil {
 			writeDownstreamError(w, logger, r, callErr)
 			return
+		}
+		if value := degraded(); value != "" {
+			w.Header().Set("x-search-degraded", value)
 		}
 		writeProtoJSON(w, resp)
 	}
@@ -156,7 +162,17 @@ func writeProtoJSON(w http.ResponseWriter, message interface{ ProtoReflect() pro
 }
 
 func writeDownstreamError(w http.ResponseWriter, logger *slog.Logger, r *http.Request, err error) {
-	logger.Error("gRPC request failed", "request_id", httpx.RequestIDFromContext(r.Context()), "error", err.Error())
 	code := httpx.StatusCode(err)
+	logRPCError(logger, "gRPC request failed", httpx.RequestIDFromContext(r.Context()), err)
 	writeError(w, code, errorMessage(code))
+}
+
+func logRPCError(logger *slog.Logger, message, requestID string, err error) {
+	code := httpx.StatusCode(err)
+	attrs := []any{"request_id", requestID, "error", err.Error(), "status", code}
+	if code >= 500 {
+		logger.Error(message, attrs...)
+		return
+	}
+	logger.Warn(message, attrs...)
 }

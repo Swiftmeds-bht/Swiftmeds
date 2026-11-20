@@ -12,7 +12,7 @@ import (
 // DefaultPendingTimeout is how long a hold may stay PENDING before the sweep
 // rejects it. The saga normally answers within a second; this only catches
 // holds whose events were lost.
-const DefaultPendingTimeout = 10 * time.Minute
+func DefaultPendingTimeout() time.Duration { return 10 * time.Minute }
 
 // SweepBatchSize is the most holds one sweep looks at in each of its two steps.
 const SweepBatchSize = 100
@@ -64,7 +64,7 @@ func (s *Service) SweepStaleHolds(ctx context.Context) (SweepResult, error) {
 	now := s.now()
 	timeout := s.cfg.PendingTimeout
 	if timeout <= 0 {
-		timeout = DefaultPendingTimeout
+		timeout = DefaultPendingTimeout()
 	}
 
 	stale, err := s.repo.ListStalePending(ctx, now.Add(-timeout), SweepBatchSize)

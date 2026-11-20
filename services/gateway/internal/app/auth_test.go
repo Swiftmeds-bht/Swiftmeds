@@ -21,6 +21,9 @@ func (*fakeAuthRoutes) ValidateToken(context.Context, string) (ports.Identity, e
 	return ports.Identity{UserID: "u1", Role: authv1.Role_ROLE_PATIENT}, nil
 }
 func (*fakeAuthRoutes) Register(_ context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
+	if req.GetRole() == authv1.Role_ROLE_PHARMACY_STAFF {
+		return nil, status.Error(codes.InvalidArgument, "pharmacy staff accounts cannot self-register")
+	}
 	if req.GetEmail() == "taken@example.com" {
 		return nil, status.Error(codes.AlreadyExists, "duplicate")
 	}
@@ -74,7 +77,7 @@ func TestAuthRoutesRegisterRefreshAndLogout(t *testing.T) {
 		contains         string
 	}{
 		{"register patient", "/api/v1/auth/register", `{"email":"new@example.com","password":"password"}`, http.StatusCreated, `"userId":"u1"`},
-		{"register pharmacy staff", "/api/v1/auth/register", `{"email":"staff@example.com","password":"password","role":"ROLE_PHARMACY_STAFF"}`, http.StatusCreated, `"userId":"u1"`},
+		{"register pharmacy staff rejected by auth service", "/api/v1/auth/register", `{"email":"staff@example.com","password":"password","role":"ROLE_PHARMACY_STAFF"}`, http.StatusBadRequest, "bad request"},
 		{"refresh", "/api/v1/auth/refresh", `{"refreshToken":"refresh"}`, http.StatusOK, `"accessToken":"next"`},
 		{"logout", "/api/v1/auth/logout", `{"refreshToken":"refresh"}`, http.StatusNoContent, ""},
 	}

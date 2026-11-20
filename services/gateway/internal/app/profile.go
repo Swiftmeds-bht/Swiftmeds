@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	userprofilev1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
@@ -88,6 +89,7 @@ func profileHandler(client ports.ProfileClient, logger *slog.Logger) http.Handle
 
 		resp, err := client.UpdateProfile(ctx, &userprofilev1.UpdateProfileRequest{
 			UserId: identity.UserID, DisplayName: name, Phone: phone,
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"display_name", "phone"}},
 		})
 		if err != nil {
 			writeDownstreamError(w, logger, r, err)

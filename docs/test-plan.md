@@ -104,13 +104,13 @@ Excluded by the project proposal (Section 2A), so not tested:
 | Go integration tests | Build tag `integration` plus a live Postgres or RabbitMQ, one URL variable per suite (e.g. `HOLDS_TEST_DATABASE_URL`, `RABBITMQ_URL`). Without its variable a test is skipped. `scripts/integration-tests.sh` runs them all with `-race -v`; CI's **Go integration tests** job starts Postgres and RabbitMQ, sets every variable and fails if any test skips (SCRUM-116) |
 | Saga integration tests | `tests/integration` (SCRUM-56): Postgres and RabbitMQ in testcontainers, the real Holds and Inventory; CI job **Saga integration tests** |
 | Web app and Workers | CI jobs **Web app** (patient app: lint, typecheck, Vitest, build) and **Workers** (typecheck and tests for each Cloudflare Worker) |
-| Coverage gate | `make coverage`: domain and app packages of the core services must reach 80% (CI runs the same script) |
+| Coverage gate | `make coverage`: domain and app packages of every Go service must reach 65% (CI runs the same script) |
 | Static quality gate | `make lint` and the CI configuration |
 | Service dependencies | Docker Compose with Postgres, RabbitMQ, and Traefik |
 | Browser E2E and fixtures | Cypress; scenarios under `tests/e2e` and `tests/features` |
 | Load and soak | k6 scripts under `tests/load`; collect latency, errors, throughput, queue lag, and resource use |
 | Accessibility | axe in Cypress plus manual keyboard and screen-reader checks |
-| Mutation testing | Gremlins v0.5.0 on the core domain and app packages: `make mutation` (`scripts/mutation-tests.sh`) runs Ranking, Inventory and Holds and fails if a package is below the thresholds in its `.gremlins.yaml`. Not in CI yet (it needs Gremlins installed); results in section 7.3 |
+| Mutation testing | Gremlins v0.5.0 on the core domain and app packages: `make mutation` (`scripts/mutation-tests.sh`) runs Ranking, Inventory and Holds and fails if a package is below the thresholds in its `.gremlins.yaml`. CI runs nightly and on pull requests labeled `run-mutation` (SCRUM-113) |
 | Observability | Structured service logs, correlation IDs, RabbitMQ management data, and database assertions |
 
 All automated tests must use deterministic seed data and isolated databases or

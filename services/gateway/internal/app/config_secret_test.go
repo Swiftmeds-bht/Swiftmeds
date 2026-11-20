@@ -15,9 +15,10 @@ func TestLoadConfigWorkerSecret(t *testing.T) {
 		wantErr bool
 	}{
 		{"not set means the endpoint rejects every call", "", "", false},
-		{"15 characters is too short", strings.Repeat("a", MinWorkerSecretLength-1), "", true},
-		{"16 characters is the shortest allowed", strings.Repeat("a", MinWorkerSecretLength), strings.Repeat("a", MinWorkerSecretLength), false},
-		{"surrounding spaces are trimmed", "  " + strings.Repeat("b", 20) + "  ", strings.Repeat("b", 20), false},
+		{"31 bytes is too short", strings.Repeat("a", MinWorkerSecretLength-1), "", true},
+		{"32 bytes is the shortest allowed", strings.Repeat("a", MinWorkerSecretLength), strings.Repeat("a", MinWorkerSecretLength), false},
+		{"surrounding spaces are trimmed", "  " + strings.Repeat("b", 40) + "  ", strings.Repeat("b", 40), false},
+		{"placeholder is rejected", "replace-with-at-least-32-random-bytes", "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

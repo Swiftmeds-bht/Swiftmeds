@@ -9,10 +9,11 @@ changes, update these pages in the same PR.
 | [System context and containers](system-context.md) | The people and outside systems around SwiftMed, then every container: the gateway, Traefik, the 20 services, RabbitMQ, Postgres, the Workers and the web apps |
 | [Reservation saga](reservation-saga.md) | Sequence diagrams of the choreographed hold saga: the happy path, no stock, cancel, expiry, and the late-reservation compensation |
 | [Architecture decision records](../adr/README.md) | Why the main choices were made (ADR 0001 to 0005) |
+| [Security risk register](../security-risk-register.md) | SCRUM-99 privacy and security risk, controls, and sprint-review status log |
 
 ## Summary
 
-- **20 Go services** (Go 1.25, one module each in `go.work`). Each has a hexagonal
+- **20 Go services** (Go 1.26, one module each in `go.work`). Each has a hexagonal
   layout, `internal/{domain,ports,app,adapters}`; see
   [docs/new-service.md](../new-service.md).
 - **REST at the edge, gRPC inside.** Browsers and Workers call the REST gateway

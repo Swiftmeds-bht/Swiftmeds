@@ -54,10 +54,7 @@ func decayHandler(secret string, applier ports.DecayApplier, logger *slog.Logger
 
 		updated, err := applier.ApplyDecay(ctx, asOf)
 		if err != nil {
-			logger.Error("freshness decay failed",
-				"request_id", httpx.RequestIDFromContext(r.Context()),
-				"error", err.Error(),
-			)
+			logRPCError(logger, "freshness decay failed", httpx.RequestIDFromContext(r.Context()), err)
 			// The caller gets a status and a fixed message, never the internal error text.
 			status := httpx.StatusCode(err)
 			writeError(w, status, errorMessage(status))

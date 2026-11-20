@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  schedule:
+    - cron: "17 3 * * *"
   pull_request:
     branches:
       - develop
@@ -54,6 +56,17 @@ jobs:
           go-version-file: go.work
           cache: true
           cache-dependency-path: "**/go.sum"
+
+      - name: Install protobuf compiler and Go generators
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/protoc.zip" \
+            https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          mkdir -p "$RUNNER_TEMP/protoc"
+          unzip -q "$RUNNER_TEMP/protoc.zip" -d "$RUNNER_TEMP/protoc"
+          echo "$RUNNER_TEMP/protoc/bin" >> "$GITHUB_PATH"
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Install golangci-lint
         shell: bash
@@ -122,7 +135,10 @@ jobs:
             echo "::endgroup::"
           done < <(go list -m -f '{{.Dir}}')
 
-      - name: Enforce coverage gate on core services
+      - name: Check protobuf generated code drift (SCRUM-68)
+        run: bash ./scripts/check-proto-drift.sh
+
+      - name: Enforce coverage gate on every service (SCRUM-128)
         run: ./scripts/coverage-gate.sh
 
       - name: Upload coverage reports
@@ -176,10 +192,13 @@ jobs:
       EXPIRY_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/expiry_test?sslmode=disable"
       FEEDBACK_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/feedback_test?sslmode=disable"
       GEO_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/geo_test?sslmode=disable"
+      AUTH_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/auth_test?sslmode=disable"
       HOLDS_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/holds_test?sslmode=disable"
       INVENTORY_TEST_DB_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/inventory_test?sslmode=disable"
       PRICING_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/pricing_test?sslmode=disable"
+      PHARMACY_REGISTRY_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/pharmacy_registry_test?sslmode=disable"
       TRUST_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/trust_test?sslmode=disable"
+      USER_PROFILE_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/user_profile_test?sslmode=disable"
       WATCHLIST_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/watchlist_test?sslmode=disable"
 
     steps:
@@ -195,7 +214,7 @@ jobs:
 
       - name: Create the test databases
         run: |
-          for db in migrate_test messaging_test expiry_test feedback_test geo_test holds_test inventory_test pricing_test trust_test watchlist_test; do
+          for db in migrate_test messaging_test expiry_test feedback_test geo_test auth_test holds_test inventory_test pharmacy_registry_test pricing_test trust_test user_profile_test watchlist_test; do
             psql "${PG}/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db}"
           done
 
@@ -211,7 +230,7 @@ jobs:
     env:
       GATEWAY_URL: http://127.0.0.1:8080
       RABBITMQ_URL: amqp://swiftmed:change-me@127.0.0.1:5672/
-      WORKER_SHARED_SECRET: change-me-worker-secret
+      WORKER_SHARED_SECRET: ci-worker-shared-secret-32-bytes-minimum
       HOLDS_HOLD_DURATION: 5s
       EXPIRY_HOLD_DURATION: 5s
 
@@ -230,8 +249,11 @@ jobs:
         run: |
           set -euo pipefail
           cp .env.example .env
-          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env up -d --build --wait --wait-timeout 900
-          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml --env-file .env --profile seed run --rm seed
+          jwt_secret="$(openssl rand -hex 32)"
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/" .env
+          sed -i "s/^WORKER_SHARED_SECRET=.*/WORKER_SHARED_SECRET=${WORKER_SHARED_SECRET}/" .env
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env up -d --build --wait --wait-timeout 900
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env --profile seed run --rm seed
 
       - name: Run gateway cross-service suite
         working-directory: tests/integration
@@ -239,11 +261,11 @@ jobs:
 
       - name: Print Compose logs on failure
         if: failure()
-        run: docker compose -f deploy/docker-compose.yml --env-file .env logs --no-color
+        run: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env logs --no-color
 
       - name: Stop Compose stack
         if: always()
-        run: docker compose -f deploy/docker-compose.yml --env-file .env down -v
+        run: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env down -v
 
   web:
     name: Web app
@@ -266,10 +288,74 @@ jobs:
         working-directory: web/swiftmed
         run: |
           npm ci
+          npm audit --audit-level=high
           npm run lint
           npm run typecheck
           npm test
           npm run build
+
+      - name: OpenAPI lint (SCRUM-68)
+        run: npx --yes @redocly/cli@1.34.5 lint docs/api/openapi.yaml
+
+  docker-images:
+    name: Build all deployment images (SCRUM-67, SCRUM-72)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build every Kubernetes image
+        run: ./scripts/k8s-images.sh --tag ci
+
+  vulnerability-scan:
+    name: Go vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Scan all Go modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r module_dir; do
+            echo "==> ${module_dir}"
+            if (cd "${module_dir}" && GOWORK=off "$(go env GOPATH)/bin/govulncheck" ./...); then
+              echo "govulncheck passed for ${module_dir}"
+            else
+              status=$?
+              echo "govulncheck failed for ${module_dir} (exit ${status})"
+              failed=1
+            fi
+          done < <(go list -m -f '{{.Dir}}')
+          exit "${failed}"
+
+  mutation:
+    name: Mutation tests (SCRUM-113)
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+      - name: Install Gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0
+      - name: Run mutation tests
+        run: make mutation
 
   workers:
     name: Workers (${{ matrix.worker }})

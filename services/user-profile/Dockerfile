@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 ENV CGO_ENABLED=0 GOWORK=off
 WORKDIR /src
 COPY pkg/go.mod pkg/go.sum pkg/

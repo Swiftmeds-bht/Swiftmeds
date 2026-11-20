@@ -13,11 +13,11 @@ const (
 	DefaultHTTPPort      = 8080
 	DefaultTraefikTarget = "traefik:50051"
 
-	// MinWorkerSecretLength is the shortest WORKER_SHARED_SECRET the gateway accepts.
-	MinWorkerSecretLength = 16
+	// MinWorkerSecretLength is the shortest WORKER_SHARED_SECRET the gateway accepts, in bytes.
+	MinWorkerSecretLength = 32
 )
 
-var defaultCORSOrigins = []string{"http://localhost:3000", "http://localhost:3001"}
+var defaultCORSOrigins = []string{"http://localhost:3000"}
 
 type Config struct {
 	HTTPPort      int
@@ -50,13 +50,23 @@ func loadConfig(l *config.Loader) (Config, error) {
 	if cfg.HTTPPort < 1 || cfg.HTTPPort > 65535 {
 		return Config{}, fmt.Errorf("GATEWAY_HTTP_PORT must be a valid TCP port (1-65535): %d", cfg.HTTPPort)
 	}
-	if cfg.WorkerSecret != "" && len(cfg.WorkerSecret) < MinWorkerSecretLength {
+	if cfg.WorkerSecret != "" && len([]byte(cfg.WorkerSecret)) < MinWorkerSecretLength {
 		return Config{}, fmt.Errorf("WORKER_SHARED_SECRET must be at least %d characters", MinWorkerSecretLength)
+	}
+	if cfg.WorkerSecret != "" && isPlaceholderWorkerSecret(cfg.WorkerSecret) {
+		return Config{}, fmt.Errorf("WORKER_SHARED_SECRET must not be a placeholder")
 	}
 	if len(cfg.CORSOrigins) == 0 {
 		cfg.CORSOrigins = append([]string(nil), defaultCORSOrigins...)
 	}
 	return cfg, nil
+}
+
+func isPlaceholderWorkerSecret(secret string) bool {
+	value := strings.ToLower(secret)
+	return strings.Contains(value, "change-me") || strings.Contains(value, "changeme") ||
+		strings.Contains(value, "replace-with") || strings.Contains(value, "placeholder") ||
+		value == "secret" || value == "password"
 }
 
 func (c Config) HTTPAddress() string {

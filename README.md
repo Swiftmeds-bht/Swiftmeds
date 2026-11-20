@@ -48,13 +48,14 @@ docs/       ADRs, architecture diagrams, API spec (docs/api/openapi.yaml), test 
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Docker with Compose v2
 - `make`
 - `protoc` and the Go plugins:
   ```bash
-  go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+  # Install protoc 3.21.12 from https://github.com/protocolbuffers/protobuf/releases/tag/v21.12
   ```
 - `golangci-lint` (for `make lint`)
 - Node.js 20+ (for `web/` and `workers/`)
@@ -96,8 +97,27 @@ cannot collect holds; use a seeded pharmacist for that.
 | SwiftMed (patients) | `http://localhost:3000` (`PATIENT_APP_HTTP_PORT`) |
 | Pharmacy portal | `http://localhost:3000/pharmacy-portal` (same app; staff sign in at `/login`) |
 | API gateway | `http://localhost:8080`, health check at `/healthz` |
-| Traefik dashboard | `http://localhost:8081/dashboard/` |
-| RabbitMQ management UI | `http://localhost:15672` |
+
+The default Compose stack publishes only the patient app and gateway. gRPC,
+PostgreSQL, RabbitMQ, the pharmacy dashboard and the Traefik dashboard are not
+published on the host. For local debugging, add `-f deploy/docker-compose.dev.yml`
+to Compose commands; that override publishes the internal ports on `127.0.0.1`
+only. For example:
+
+```powershell
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env up -d
+```
+
+Set `JWT_SECRET` and `WORKER_SHARED_SECRET` in `.env` to independently generated
+secrets of at least 32 bytes (for example, `openssl rand -hex 32`). Auth refuses
+to start with a short or placeholder JWT secret, and the gateway refuses to start
+with a short or placeholder worker secret. The worker secret must match the
+value configured in both Workers. Copying `.env.example` alone will not start the
+stack until both secrets are replaced.
+
+Logout revokes the refresh token immediately. Existing access tokens are
+stateless and remain usable until their configured `JWT_TTL` expires; the default
+window is 15 minutes after logout.
 
 If a port is already taken on your machine, change it in `.env` (for example
 `PATIENT_APP_HTTP_PORT=3071`). Traefik serves the web app on its own
@@ -142,8 +162,9 @@ docker compose -f deploy/docker-compose.yml --env-file .env up -d --scale search
 docker compose -f deploy/docker-compose.yml --env-file .env logs -f search inventory traefik
 ```
 
-The active backends are visible in the Traefik dashboard at
-`http://localhost:8081/dashboard/`. Stopping one replica removes it from
+For local debugging, start the stack with `deploy/docker-compose.dev.yml` to
+see active backends in the Traefik dashboard at `http://localhost:8081/dashboard/`.
+Stopping one replica removes it from
 Traefik's backend list while the remaining replica continues serving requests.
 `docker compose stop` takes service names (it would stop every `search`
 replica), so stop one replica container by name. The Compose project is called
@@ -175,9 +196,11 @@ the measured self-healing, autoscaling and rolling-update demos, is
 ### Tests
 
 ```bash
-make test               # unit tests in every Go module
+make test               # race-enabled unit tests in every Go module
 make lint               # golangci-lint in every Go module
-make coverage           # core services must keep >= 80% on domain + app (CI enforces this)
+make coverage           # every service must keep >= 65% on domain + app (CI enforces this)
+make proto-check        # fail if generated protobuf code differs from proto/
+make openapi-lint       # lint docs/api/openapi.yaml
 ./scripts/integration-tests.sh   # Postgres/RabbitMQ integration tests (see below)
 ```
 

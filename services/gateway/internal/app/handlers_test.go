@@ -80,6 +80,12 @@ func TestHoldHandlersMapAuthenticatedIdentity(t *testing.T) {
 	if fake.collect == nil || fake.collect.GetPharmacyId() != "pharmacy-1" || fake.collect.GetPickupCode() != "482913" {
 		t.Fatalf("collect request did not use token pharmacy: %v", fake.collect)
 	}
+
+	list := withIdentity(httptest.NewRequest(http.MethodGet, "/api/v1/holds", nil), ports.Identity{UserID: "staff-1", PharmacyID: "pharmacy-1", Role: authv1.Role_ROLE_PHARMACY_STAFF})
+	handler(httptest.NewRecorder(), list)
+	if fake.list == nil || fake.list.GetPharmacyId() != "pharmacy-1" || fake.list.GetUserId() != "" {
+		t.Fatalf("staff list request was not restricted to token pharmacy: %v", fake.list)
+	}
 }
 
 func TestHoldHandlersCreateAndList(t *testing.T) {
@@ -272,6 +278,8 @@ func TestFeedbackHandlerRejectsInvalidRequests(t *testing.T) {
 	handler := feedbackHandler(&fakeFeedbackClient{}, nil)
 	tests := []string{
 		`{`,
+		`{"rating":5}`,
+		`{"wasInStock":true,"rating":5,"unexpected":true}`,
 		`{"rating":6}`,
 		`{"rating":1,"comment":"` + strings.Repeat("x", 501) + `"}`,
 	}
