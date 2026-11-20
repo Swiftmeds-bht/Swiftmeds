@@ -10,11 +10,15 @@ the verified-only filter is used.
 
 | RPC | What it does |
 |---|---|
-| `RegisterPharmacy` | Creates a pending pharmacy with owner, licence, GeoPoint and weekly hours. |
+| `RegisterPharmacy` | Creates a pending pharmacy with owner, licence, phone, address, GeoPoint and weekly hours. Idempotent per owner: a repeat returns the owner's pharmacy. A licence number used by another pharmacy is `ALREADY_EXISTS`. |
 | `GetPharmacy` | Returns a pharmacy by ID, including pending and rejected records. |
 | `BatchGetPharmacies` | Returns known records for requested IDs. |
 | `ListPharmacies` | Lists all statuses or verified-only records. |
 | `SetVerificationStatus` | Admin transition to verified, rejected or suspended. |
+
+The gateway's admin route (`PUT /api/v1/pharmacies/{id}/verification`, SCRUM-141)
+keeps Geo in step: verifying a pharmacy adds its location to Geo, so search finds
+it; rejecting or suspending removes it.
 
 ## Configuration
 

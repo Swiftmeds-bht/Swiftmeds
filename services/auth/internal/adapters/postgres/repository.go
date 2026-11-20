@@ -48,6 +48,33 @@ func (r *Repository) FindUserByID(ctx context.Context, id string) (domain.User, 
 		FROM users WHERE id = $1`, id)
 }
 
+// LinkPharmacy sets the role and pharmacy in one statement, so two calls
+// cannot link one account to two pharmacies.
+func (r *Repository) LinkPharmacy(ctx context.Context, userID, pharmacyID string) (domain.User, error) {
+	var user domain.User
+	err := r.db.QueryRow(ctx, `UPDATE users SET role = 'PHARMACIST', pharmacy_id = $2
+		WHERE id = $1 AND role <> 'ADMIN' AND (pharmacy_id IS NULL OR pharmacy_id = '' OR pharmacy_id = $2)
+		RETURNING id, email, password_hash, role, COALESCE(pharmacy_id, ''), created_at`, userID, pharmacyID).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Role, &user.PharmacyID, &user.CreatedAt,
+	)
+	if err == nil {
+		return user, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return domain.User{}, fmt.Errorf("link pharmacy: %w", err)
+	}
+	// Nothing updated: say why.
+	existing, findErr := r.FindUserByID(ctx, userID)
+	switch {
+	case findErr != nil:
+		return domain.User{}, findErr
+	case existing.Role == domain.RoleAdmin:
+		return domain.User{}, domain.ErrAdminLink
+	default:
+		return domain.User{}, domain.ErrAlreadyLinked
+	}
+}
+
 func (r *Repository) findUser(ctx context.Context, query, value string) (domain.User, error) {
 	var user domain.User
 	err := r.db.QueryRow(ctx, query, value).Scan(

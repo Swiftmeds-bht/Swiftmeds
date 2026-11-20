@@ -53,6 +53,37 @@ func Run(t *testing.T, factory Factory) {
 			t.Fatalf("duplicate email error=%v", err)
 		}
 	})
+	t.Run("link pharmacy makes a pharmacist, is idempotent and refuses a second pharmacy or an admin", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		at := time.Now().UTC().Truncate(time.Microsecond)
+		if err := r.CreateUser(ctx, domain.User{ID: "u1", Email: "owner@example.com", PasswordHash: "h", Role: domain.RolePatient, CreatedAt: at}); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.CreateUser(ctx, domain.User{ID: "a1", Email: "admin@example.com", PasswordHash: "h", Role: domain.RoleAdmin, CreatedAt: at}); err != nil {
+			t.Fatal(err)
+		}
+		got, err := r.LinkPharmacy(ctx, "u1", "ph-1")
+		if err != nil || got.Role != domain.RolePharmacist || got.PharmacyID != "ph-1" {
+			t.Fatalf("link=%+v err=%v", got, err)
+		}
+		stored, err := r.FindUserByID(ctx, "u1")
+		if err != nil || stored.Role != domain.RolePharmacist || stored.PharmacyID != "ph-1" {
+			t.Fatalf("stored=%+v err=%v", stored, err)
+		}
+		if _, err := r.LinkPharmacy(ctx, "u1", "ph-1"); err != nil {
+			t.Fatalf("same pharmacy again=%v", err)
+		}
+		if _, err := r.LinkPharmacy(ctx, "u1", "ph-2"); !errors.Is(err, domain.ErrAlreadyLinked) {
+			t.Fatalf("second pharmacy=%v", err)
+		}
+		if _, err := r.LinkPharmacy(ctx, "a1", "ph-1"); !errors.Is(err, domain.ErrAdminLink) {
+			t.Fatalf("admin=%v", err)
+		}
+		if _, err := r.LinkPharmacy(ctx, "missing", "ph-1"); !errors.Is(err, domain.ErrUserNotFound) {
+			t.Fatalf("missing=%v", err)
+		}
+	})
 	t.Run("missing user maps to not found", func(t *testing.T) {
 		r := factory(t)
 		if _, err := r.FindUserByID(context.Background(), "missing"); !errors.Is(err, domain.ErrUserNotFound) {

@@ -688,12 +688,20 @@ paths:
       operationId: registerPharmacy
       summary: Register a pharmacy
       description: |
-        The signed-in pharmacy-staff user becomes the owner. The pharmacy starts as
-        `VERIFICATION_STATUS_PENDING`, does not appear in search and cannot take holds
-        until an administrator verifies it.
-      x-status: planned
+        Any signed-in account that does not belong to a pharmacy yet may register
+        one (admins may not). The account becomes the pharmacy's owner and its staff
+        account (`AuthService/LinkPharmacy`); the next `POST /api/v1/auth/refresh`
+        returns a token with `ROLE_PHARMACY_STAFF` and the `pharmacy_id`. Public
+        sign-up itself still only makes patients (SCRUM-123).
+
+        The pharmacy starts as `VERIFICATION_STATUS_PENDING`, does not appear in
+        search and cannot take holds until an administrator verifies it.
+
+        Sending the same request again is safe: the owner's existing pharmacy is
+        returned (SCRUM-141).
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/RegisterPharmacy
-      x-roles: [ROLE_PHARMACY_STAFF]
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
       requestBody:
         required: true
         content:
@@ -714,7 +722,9 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: A pharmacy with this licence number is already registered.
+          description: |
+            A pharmacy with this licence number is already registered, or the
+            account already belongs to a pharmacy.
           content:
             application/json:
               schema:
@@ -726,7 +736,7 @@ paths:
       operationId: listPharmacies
       summary: List pharmacies by verification status
       description: Used by administrators to review pending pharmacies.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/ListPharmacies
       x-roles: [ROLE_ADMIN]
       parameters:
@@ -784,10 +794,17 @@ paths:
       operationId: setPharmacyVerification
       summary: Approve, reject or suspend a pharmacy
       description: |
-        Approving a pharmacy puts it on the map and into search. Suspending removes it.
-        A reason is required for `VERIFICATION_STATUS_REJECTED` and
-        `VERIFICATION_STATUS_SUSPENDED`.
-      x-status: planned
+        Approving a pharmacy puts it on the map and into search
+        (`GeoService/UpsertPharmacyLocation`). Rejecting or suspending takes it off
+        (`GeoService/RemovePharmacyLocation`). A reason is required for
+        `VERIFICATION_STATUS_REJECTED` and `VERIFICATION_STATUS_SUSPENDED`.
+
+        Sending the status the pharmacy already has changes nothing in the registry
+        and only updates the map again, so a 502 can be retried as is (SCRUM-141).
+
+        Allowed changes: pending to verified or rejected, verified to suspended.
+        Any other change is a 400.
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus
       x-roles: [ROLE_ADMIN]
       parameters:
@@ -813,6 +830,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          description: |
+            The status was saved, but the map could not be updated. Send the same
+            request again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/pharmacies/{pharmacyId}/stats:

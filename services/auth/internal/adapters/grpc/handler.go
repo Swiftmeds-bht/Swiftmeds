@@ -70,6 +70,14 @@ func (h *Handler) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv
 	return &authv1.LogoutResponse{}, nil
 }
 
+func (h *Handler) LinkPharmacy(ctx context.Context, req *authv1.LinkPharmacyRequest) (*authv1.LinkPharmacyResponse, error) {
+	user, err := h.svc.LinkPharmacy(ctx, req.GetUserId(), req.GetPharmacyId())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &authv1.LinkPharmacyResponse{UserId: user.ID, Role: toProtoRole(user.Role), PharmacyId: user.PharmacyID}, nil
+}
+
 func fromProtoRole(role authv1.Role) (domain.Role, bool) {
 	switch role {
 	case authv1.Role_ROLE_PATIENT:
@@ -107,8 +115,12 @@ func toStatus(err error) error {
 	switch {
 	case errors.Is(err, domain.ErrInvalidEmail), errors.Is(err, domain.ErrInvalidPassword),
 		errors.Is(err, domain.ErrInvalidRole), errors.Is(err, domain.ErrAdminRegistration),
-		errors.Is(err, domain.ErrStaffRegistration):
+		errors.Is(err, domain.ErrStaffRegistration), errors.Is(err, domain.ErrMissingLink):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrUserNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, domain.ErrAlreadyLinked), errors.Is(err, domain.ErrAdminLink):
+		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, domain.ErrUserExists):
 		return status.Error(codes.AlreadyExists, err.Error())
 	case errors.Is(err, domain.ErrInvalidCredentials), errors.Is(err, domain.ErrInvalidToken),

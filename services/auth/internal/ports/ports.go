@@ -16,4 +16,8 @@ type UserRepository interface {
 	// RevokeRefreshToken marks the token revoked. Revoking an unknown or
 	// already revoked token is not an error.
 	RevokeRefreshToken(context.Context, string) error
+	// LinkPharmacy makes the user a pharmacist of pharmacyID and returns the
+	// updated user. It must be atomic and idempotent for the same pharmacy, and
+	// return domain.ErrUserNotFound, ErrAdminLink or ErrAlreadyLinked.
+	LinkPharmacy(ctx context.Context, userID, pharmacyID string) (domain.User, error)
 }

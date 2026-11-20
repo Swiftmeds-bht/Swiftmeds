@@ -97,6 +97,22 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Use
 	return user, tokens, nil
 }
 
+// LinkPharmacy makes the account the staff account of a pharmacy it has just
+// registered (SCRUM-141). Public sign-up still only makes patients (SCRUM-123):
+// the staff role comes only from here, and only the gateway calls it, after
+// Pharmacy Registry recorded the user as the pharmacy's owner. The pharmacy
+// starts pending, so the account can do nothing visible until an admin approves.
+func (s *Service) LinkPharmacy(ctx context.Context, userID, pharmacyID string) (domain.User, error) {
+	if userID == "" || pharmacyID == "" {
+		return domain.User{}, domain.ErrMissingLink
+	}
+	user, err := s.repo.LinkPharmacy(ctx, userID, pharmacyID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return user, nil
+}
+
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, error) {
 	claims, err := s.parseToken(refreshToken, "refresh")
 	if err != nil {
