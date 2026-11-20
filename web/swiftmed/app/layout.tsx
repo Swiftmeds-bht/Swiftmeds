@@ -59,8 +59,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="footer-col" aria-labelledby="footer-pharmacies">
               <h2 id="footer-pharmacies">For pharmacies</h2>
               <ul>
+                <li><Link href="/register/pharmacy">Register your pharmacy</Link></li>
                 <li><Link href="/pharmacy-portal">Pharmacy portal</Link></li>
-                <li><Link href="/pharmacy-portal/upload">Upload stock</Link></li>
               </ul>
             </nav>
             <p className="footer-legal">SwiftMed shows availability only. It does not give medical advice.</p>

@@ -753,3 +753,127 @@ input::placeholder { color: var(--muted); opacity: 1; }
 /* ---------- Not found ---------- */
 .not-found { text-align: center; padding-top: clamp(3rem, 10vw, 6rem); }
 .not-found p { margin: 0.5rem auto 1.75rem; max-width: 40ch; }
+
+/* ---------- Sign-up menu and pharmacy sign-up (SCRUM-142) ---------- */
+.signup-button { gap: 0.3rem; padding-right: 0.85rem; }
+.signup-button svg { transition: transform 0.16s var(--ease-out); }
+.signup-button[aria-expanded="true"] svg { transform: rotate(180deg); }
+.notice-success { background: var(--high-bg); color: var(--high-text); }
+.mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 0.9375rem; letter-spacing: 0.01em; }
+
+.pharmacy-signup.narrow { max-width: 40rem; }
+.signup-steps {
+  list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: 0.6rem;
+}
+@media (min-width: 40rem) { .signup-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; } }
+.signup-steps li {
+  display: flex; gap: 0.65rem; align-items: flex-start; padding: 0.75rem 0.85rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-control);
+  font-size: 0.9375rem; color: var(--muted); line-height: 1.45;
+}
+.signup-steps strong { display: block; color: var(--text); }
+.signup-step-number {
+  flex-shrink: 0; display: inline-grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 999px;
+  background: var(--primary-soft); color: var(--primary-hover); font-weight: 700; font-size: 0.875rem;
+}
+
+.pharmacy-form { gap: 1.5rem; }
+.form-section { display: grid; gap: 1rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.form-section + .form-section { padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.form-section > legend { padding: 0; margin-bottom: 0.25rem; font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; }
+.form-section > legend + .hint { margin-top: -0.6rem; }
+.form-row { display: grid; gap: 1rem; }
+@media (min-width: 36rem) { .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.location-box {
+  display: grid; gap: 0.75rem; justify-items: start; margin: 0; padding: 0.9rem 1rem;
+  background: var(--canvas); border: 1px dashed var(--input-border); border-radius: var(--r-control);
+  font-size: 0.9375rem; color: var(--muted);
+}
+.location-box > span { color: var(--text); font-weight: 600; }
+.location-box .button svg { margin-right: 0.1rem; }
+
+.for-pharmacies-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+/* ---------- The portal before approval (SCRUM-142) ---------- */
+.status-panel {
+  display: grid; gap: 1rem; padding: clamp(1.5rem, 4vw, 2.25rem);
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow);
+}
+.status-panel h1 { margin: 0; }
+.status-panel-icon {
+  display: inline-grid; place-items: center; width: 3rem; height: 3rem; border-radius: 999px;
+  background: var(--info-bg); color: var(--info-text);
+}
+.status-panel-problem .status-panel-icon { background: var(--low-bg); color: var(--low-text); }
+.status-reason { padding: 0.9rem 1rem; background: var(--low-bg); border-radius: var(--r-control); color: var(--low-text); }
+.status-reason h2 { font-size: 0.9375rem; color: inherit; margin-bottom: 0.2rem; }
+.review-steps { list-style: none; margin: 0.25rem 0; padding: 0; display: grid; gap: 0; }
+.review-step {
+  position: relative; display: flex; gap: 0.75rem; align-items: flex-start; padding: 0 0 1.1rem 0;
+  color: var(--muted); font-size: 0.9875rem;
+}
+.review-step:not(:last-child)::before {
+  content: ""; position: absolute; left: 0.6rem; top: 1.45rem; bottom: 0.15rem; width: 2px; background: var(--border);
+}
+.review-step svg, .review-dot { flex-shrink: 0; width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; }
+.review-step.done svg { color: var(--high-text); }
+.review-dot { display: inline-block; border-radius: 999px; border: 2px solid var(--input-border); background: var(--bg); }
+.review-step.current { color: var(--text); }
+.review-step.current .review-dot { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-soft); }
+.review-step strong { color: var(--text); }
+.status-details { display: grid; gap: 0.6rem; margin: 0; padding: 1rem; background: var(--canvas); border-radius: var(--r-control); }
+@media (min-width: 36rem) { .status-details { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.status-details dt { font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.status-details dd { margin: 0; overflow-wrap: anywhere; }
+
+/* ---------- Admin: pharmacies to review (SCRUM-142) ---------- */
+.admin-page { max-width: 60rem; }
+.admin-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 2rem; margin-bottom: 1.25rem; }
+.admin-waiting {
+  padding: 0.45rem 0.85rem; border-radius: 999px; background: var(--medium-bg); color: var(--medium-text); font-size: 0.9375rem;
+}
+.admin-tabs { margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.admin-tabs::-webkit-scrollbar { display: none; }
+.admin-tabs ul { display: flex; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.admin-tabs a {
+  display: inline-flex; align-items: center; gap: 0.45rem; min-height: 2.75rem; padding: 0 0.9rem;
+  color: var(--muted); font-weight: 600; font-size: 0.9875rem; text-decoration: none; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.admin-tabs a:hover { color: var(--text); text-decoration: none; }
+.admin-tabs a[aria-current="page"] { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-count {
+  min-width: 1.35rem; padding: 0 0.4rem; border-radius: 999px; background: var(--primary); color: var(--primary-text);
+  font-size: 0.75rem; font-weight: 700; line-height: 1.35rem; text-align: center;
+}
+.review-list { display: grid; gap: 1rem; }
+.review-card { display: grid; gap: 1rem; padding: clamp(1.1rem, 3vw, 1.5rem); }
+.review-card-head h2 { margin: 0; }
+.review-facts { display: grid; gap: 0.75rem 1.5rem; margin: 0; }
+@media (min-width: 40rem) { .review-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.review-facts dt { font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.review-facts dd { margin: 0; overflow-wrap: anywhere; }
+.review-reason-shown { grid-column: 1 / -1; }
+.map-link { display: inline-flex; align-items: center; gap: 0.3rem; }
+.review-actions {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.75rem;
+  padding-top: 1rem; border-top: 1px solid var(--border);
+}
+.review-actions > form { margin: 0; }
+.review-actions .form-error { flex-basis: 100%; }
+.review-more { flex: 1 1 16rem; }
+.review-more > summary {
+  display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1rem; cursor: pointer;
+  color: var(--low-text); font-weight: 600; border-radius: var(--r-control); list-style: none;
+}
+.review-more > summary::-webkit-details-marker { display: none; }
+.review-more > summary:hover { background: var(--low-bg); }
+.review-more[open] > summary { background: var(--low-bg); }
+.review-reason { display: grid; gap: 0.5rem; margin-top: 0.6rem; max-width: 32rem; }
+.review-reason label { font-weight: 600; font-size: 0.9375rem; }
+.review-reason textarea {
+  width: 100%; padding: 0.65rem 0.8rem; font: inherit; font-size: 1rem; color: var(--text);
+  background: var(--bg); border: 1px solid var(--input-border); border-radius: var(--r-control); resize: vertical;
+}
+.review-reason textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+.review-reason .button { justify-self: start; }

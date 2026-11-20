@@ -8,11 +8,15 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { clearSession, getSession, saveSession, withFreshToken } from "@/lib/auth";
+import { gatewayUrl } from "@/lib/data-source";
 import { errorMessage } from "@/lib/hold-format";
 import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
 import { NOTIFICATIONS_SEEN_COOKIE, parseSeenAt } from "@/lib/notifications";
+import { PharmacyApiError, registerPharmacy } from "@/lib/pharmacies";
+import { checkPharmacyForm, readPharmacyForm, type PharmacyFormValues } from "@/lib/pharmacy-form";
 import { checkProfile, profileBackend } from "@/lib/profile";
-import { homeAfterSignIn } from "@/lib/roles";
+import { refreshOnce } from "@/lib/refresh";
+import { PHARMACY_SIGNUP, PORTAL_PATH, homeAfterSignIn, isAdmin, isPharmacyStaff } from "@/lib/roles";
 import { safeNext } from "@/lib/session";
 import type { Session } from "@/lib/types";
 import { watchlistBackend } from "@/lib/watchlist";
@@ -64,6 +68,67 @@ export async function registerAction(_prev: FormState, form: FormData): Promise<
     return { ...failure(err), email };
   }
   redirect(safeNext(text(form, "next")));
+}
+
+export interface PharmacySignupState extends FormState {
+  /** Typed back into the form after an error. */
+  values?: PharmacyFormValues;
+}
+
+/**
+ * Registers a pharmacy (SCRUM-142). Signed out: creates the login first (a
+ * patient account, as all public sign-ups are, SCRUM-123), then registers the
+ * pharmacy, which makes the account the pharmacy's staff account (SCRUM-141).
+ * Signed in as a patient (for example after a sign-up that stopped half way):
+ * only registers the pharmacy. Either way the pharmacy starts pending, and the
+ * portal says so until an administrator approves it.
+ */
+export async function registerPharmacyAction(_prev: PharmacySignupState, form: FormData): Promise<PharmacySignupState> {
+  const values = readPharmacyForm(form);
+  const existing = await getSession();
+  if (existing && (isAdmin(existing) || isPharmacyStaff(existing))) redirect(homeAfterSignIn(existing, PORTAL_PATH));
+
+  const email = existing ? existing.email : text(form, "email");
+  const password = form.get("password");
+  if (!existing) {
+    const confirm = form.get("confirm");
+    if (!email || typeof password !== "string" || !password) return { error: "Enter an email and a password for your login.", email, values };
+    if (password.length < 8) return { error: "Use a password of at least 8 characters.", email, values };
+    if (password !== confirm) return { error: "The two passwords are not the same.", email, values };
+  }
+  const checked = checkPharmacyForm(values);
+  if ("error" in checked) return { error: checked.error, email, values };
+
+  let session: Session;
+  if (existing) {
+    session = existing;
+  } else {
+    try {
+      const backend = holdsBackend();
+      await backend.register(email, password as string);
+      session = await backend.login(email, password as string);
+      await saveSession(session);
+    } catch (err) {
+      return { ...failure(err), email, values };
+    }
+  }
+
+  try {
+    await registerPharmacy(session, checked.details);
+  } catch (err) {
+    if (err instanceof PharmacyApiError && err.status === 401) return signInAgain(PHARMACY_SIGNUP);
+    if (err instanceof PharmacyApiError) return { error: err.message, email, values };
+    return { ...failure(err), email, values };
+  }
+
+  // The account is now the pharmacy's staff account; a new token says so.
+  const outcome = await refreshOnce(session, { gatewayUrl: gatewayUrl() });
+  if (outcome.kind !== "refreshed") {
+    await clearSession();
+    redirect(`/login?next=${encodeURIComponent(PORTAL_PATH)}&registered=1`);
+  }
+  await saveSession(outcome.session);
+  redirect(PORTAL_PATH);
 }
 
 export async function logoutAction(): Promise<void> {

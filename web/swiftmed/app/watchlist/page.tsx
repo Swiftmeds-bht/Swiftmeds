@@ -31,7 +31,7 @@ export default async function WatchlistPage() {
     <div className="page narrow watchlist-page">
       <h1>Watchlist</h1>
       <p className="muted">
-        Medicines you asked us to watch. When a pharmacy nearby gets one, an alert appears on any SwiftMed page while you are signed in.
+        Medicines you asked us to watch. When a pharmacy nearby gets one, an alert appears on any SwiftMed page.
       </p>
 
       {failed ? (

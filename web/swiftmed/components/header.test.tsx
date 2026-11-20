@@ -34,7 +34,8 @@ describe("MainNav", () => {
     nav.path = "/";
     render(<MainNav audience="guest" />);
     expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Search", "For pharmacies"]);
-    expect(screen.getByRole("link", { name: "For pharmacies" }).getAttribute("href")).toBe("/pharmacy-portal");
+    // Pharmacies register there; registered ones find the login on the same page (SCRUM-142).
+    expect(screen.getByRole("link", { name: "For pharmacies" }).getAttribute("href")).toBe("/register/pharmacy");
     expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
   });
 

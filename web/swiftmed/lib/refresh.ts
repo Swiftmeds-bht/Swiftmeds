@@ -9,6 +9,7 @@
 // requests with the same cookie share one gateway call instead of racing to use
 // a refresh token that only works once.
 import { HoldError } from "./holds-core";
+import { claimsFromToken } from "./roles";
 import { DEFAULT_SESSION_SECONDS } from "./session";
 import type { Session } from "./types";
 
@@ -79,6 +80,11 @@ export async function refreshSession(session: Session, options: RefreshOptions):
   // one is spent, so the patient signs in again when this access token expires.
   const next: Session = { ...session, ...tokens };
   if (!tokens.refreshToken) delete next.refreshToken;
+  // Registering a pharmacy turns a patient account into a staff account
+  // (SCRUM-141): the new token says so, and the session follows it.
+  const claims = claimsFromToken(tokens.accessToken);
+  if (claims.role) next.role = claims.role;
+  if (claims.pharmacyId) next.pharmacyId = claims.pharmacyId;
   return { kind: "refreshed", session: next };
 }
 

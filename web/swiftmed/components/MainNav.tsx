@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { PORTAL_PATH } from "@/lib/roles";
+import { ADMIN_PATH, PHARMACY_SIGNUP, PORTAL_PATH } from "@/lib/roles";
 
-/** Who is looking: the header shows different sections to each (SCRUM-139). */
-export type NavAudience = "guest" | "patient" | "staff";
+/** Who is looking: the header shows different sections to each (SCRUM-139, admin SCRUM-142). */
+export type NavAudience = "guest" | "patient" | "staff" | "admin";
 
 interface NavItem {
   href: string;
@@ -25,7 +25,8 @@ const SEARCH: NavItem = {
 };
 
 export const NAV_ITEMS: Record<NavAudience, NavItem[]> = {
-  guest: [SEARCH, { href: PORTAL_PATH, label: "For pharmacies", matches: under(PORTAL_PATH) }],
+  // "For pharmacies" leads to sign-up, where registered pharmacies find the login too (SCRUM-142).
+  guest: [SEARCH, { href: PHARMACY_SIGNUP, label: "For pharmacies", matches: under(PHARMACY_SIGNUP) }],
   patient: [
     SEARCH,
     { href: "/holds", label: "My holds", matches: under("/holds") },
@@ -38,6 +39,8 @@ export const NAV_ITEMS: Record<NavAudience, NavItem[]> = {
     { href: `${PORTAL_PATH}/stock`, label: "Stock", matches: under(`${PORTAL_PATH}/stock`) },
     { href: `${PORTAL_PATH}/upload`, label: "Upload CSV", matches: under(`${PORTAL_PATH}/upload`) },
   ],
+  // SwiftMed administrators (SCRUM-142).
+  admin: [{ href: ADMIN_PATH, label: "Pharmacies", matches: under(ADMIN_PATH) }],
 };
 
 /** The main sections for this audience, with the current one marked for everyone, screen readers included. */

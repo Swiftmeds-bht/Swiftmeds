@@ -33,7 +33,6 @@ export default async function HoldsPage() {
   return (
     <div className="page narrow holds-page">
       <h1>My holds</h1>
-      <p className="muted">Signed in as {session.email}</p>
 
       {failed ? (
         <div className="problem" role="alert">
