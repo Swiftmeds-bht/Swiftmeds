@@ -28,7 +28,7 @@ export default async function ProfilePage() {
     <div className="page narrow profile-page">
       <h1>Your profile</h1>
       <p className="muted">
-        Signed in as <strong>{session.email}</strong>.
+        Email: <strong>{session.email}</strong>
       </p>
 
       {failed ? (

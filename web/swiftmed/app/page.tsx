@@ -99,11 +99,16 @@ export default function HomePage() {
       <section className="for-pharmacies wrap" aria-labelledby="pharmacies-heading">
         <div>
           <h2 id="pharmacies-heading">Run a pharmacy?</h2>
-          <p className="muted">Keep your stock up to date and hand over reserved medicine with a code, from the pharmacy portal.</p>
+          <p className="muted">Show patients what you have in stock, and hand over reserved medicine with a code. Every pharmacy is checked before patients can find it.</p>
         </div>
-        <Link href="/pharmacy-portal" className="button button-outline">
-          Open the pharmacy portal
-        </Link>
+        <div className="for-pharmacies-actions">
+          <Link href="/register/pharmacy" className="button">
+            Register your pharmacy
+          </Link>
+          <Link href="/login?next=%2Fpharmacy-portal" className="button button-outline">
+            Log in
+          </Link>
+        </div>
       </section>
     </>
   );

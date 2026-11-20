@@ -14,10 +14,12 @@ export interface AccountMenuProps {
   initial: string;
   /** For pharmacy staff: the pharmacy they work at (SCRUM-139). */
   pharmacy?: string;
+  /** Any other line about the account, e.g. "SwiftMed administrator" (SCRUM-142). */
+  note?: string;
 }
 
 /** The account button (SCRUM-137): who is signed in, the profile, and signing out. */
-export function AccountMenu({ email, name, initial, pharmacy }: AccountMenuProps) {
+export function AccountMenu({ email, name, initial, pharmacy, note }: AccountMenuProps) {
   const { open, close, toggle, rootRef, buttonRef, panelId } = usePopover();
   return (
     <div className="popover" ref={rootRef}>
@@ -40,6 +42,7 @@ export function AccountMenu({ email, name, initial, pharmacy }: AccountMenuProps
           {name ? <p className="account-name">{name}</p> : null}
           <p className="account-email">{email}</p>
           {pharmacy ? <p className="account-email">Pharmacy staff · {pharmacy}</p> : null}
+          {note ? <p className="account-email">{note}</p> : null}
         </div>
         <ul className="account-links">
           <li>
