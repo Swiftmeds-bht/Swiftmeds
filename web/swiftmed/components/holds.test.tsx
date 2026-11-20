@@ -112,16 +112,22 @@ describe("AuthForm", () => {
     expect(screen.getByLabelText("Email")).toBeTruthy();
     expect(screen.getByLabelText("Password")).toBeTruthy();
     expect(screen.getByLabelText("Repeat password")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/login?next=%2Freserve%3Fproduct%3Dp");
+    expect(screen.getByRole("link", { name: "Log in" }).getAttribute("href")).toBe("/login?next=%2Freserve%3Fproduct%3Dp");
     await expectNoSeriousViolations(container);
   });
 
-  it("asks only for email and password to sign in", async () => {
+  it("asks only for email and password to log in", async () => {
     const { container } = render(<AuthForm mode="login" action={noop} />);
     expect(screen.queryByLabelText("Repeat password")).toBeNull();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Create an account" }).getAttribute("href")).toBe("/register");
+    expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign up" }).getAttribute("href")).toBe("/register");
     await expectNoSeriousViolations(container);
+  });
+
+  it("offers no sign-up to pharmacy staff, whose accounts are made for them", () => {
+    render(<AuthForm mode="login" action={noop} next="/pharmacy-portal" signUp={false} />);
+    expect(screen.getByRole("button", { name: "Log in" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Sign up" })).toBeNull();
   });
 });
 

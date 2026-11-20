@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NotificationView } from "@/lib/notifications";
 
 import { AccountMenu } from "./AccountMenu";
+import { LoginMenu } from "./LoginMenu";
 import { MainNav } from "./MainNav";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileForm } from "./ProfileForm";
@@ -152,6 +153,45 @@ describe("AccountMenu", () => {
   it("has no serious accessibility violations, open", async () => {
     const { container } = render(<AccountMenu email="patient@demo.swiftmeds.test" name="Karma" initial="K" />);
     fireEvent.click(screen.getByRole("button", { name: "Account: Karma" }));
+    await expectNoSeriousViolations(container);
+  });
+});
+
+describe("LoginMenu", () => {
+  it("is closed until clicked, then offers a login for patients and one for pharmacy staff", () => {
+    render(<LoginMenu />);
+    const button = screen.getByRole("button", { name: "Log in" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("region", { name: "Log in" })).toBeNull();
+
+    fireEvent.click(button);
+    const panel = screen.getByRole("region", { name: "Log in" });
+    expect(screen.getAllByRole("heading").map((h) => h.textContent)).toEqual(["Patients", "Pharmacy staff"]);
+    // The same login page for both; staff go on to the portal.
+    expect(screen.getByRole("link", { name: "Log in as a patient" }).getAttribute("href")).toBe("/login");
+    expect(screen.getByRole("link", { name: "Log in as pharmacy staff" }).getAttribute("href")).toBe("/login?next=%2Fpharmacy-portal");
+    expect(panel.textContent).not.toContain("Sign up");
+  });
+
+  it("closes on Escape and gives focus back to the button", () => {
+    render(<LoginMenu />);
+    const button = screen.getByRole("button", { name: "Log in" });
+    fireEvent.click(button);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Log in" })).toBeNull();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("closes after choosing an entry", () => {
+    render(<LoginMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
+    fireEvent.click(screen.getByRole("link", { name: "Log in as pharmacy staff" }));
+    expect(screen.queryByRole("region", { name: "Log in" })).toBeNull();
+  });
+
+  it("has no serious accessibility violations, open", async () => {
+    const { container } = render(<LoginMenu />);
+    fireEvent.click(screen.getByRole("button", { name: "Log in" }));
     await expectNoSeriousViolations(container);
   });
 });

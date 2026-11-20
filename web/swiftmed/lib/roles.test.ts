@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { homeAfterSignIn, isPharmacyStaff, pharmacyIdFromToken } from "./roles";
+import { STAFF_LOGIN, homeAfterSignIn, isPharmacyStaff, isPortalPath, pharmacyIdFromToken } from "./roles";
 import { decodeSession, encodeSession } from "./session";
 
 const staff = { role: "ROLE_PHARMACY_STAFF", pharmacyId: "ph-1" };
@@ -27,6 +27,22 @@ describe("homeAfterSignIn", () => {
     expect(homeAfterSignIn(patient, "/holds")).toBe("/holds");
     expect(homeAfterSignIn(patient, "/pharmacy-portal")).toBe("/");
     expect(homeAfterSignIn(patient, "/pharmacy/p1")).toBe("/pharmacy/p1"); // a patient page, not the portal
+  });
+});
+
+describe("isPortalPath", () => {
+  it("is true for the portal and its pages only", () => {
+    expect(isPortalPath("/pharmacy-portal")).toBe(true);
+    expect(isPortalPath("/pharmacy-portal/holds")).toBe(true);
+    expect(isPortalPath("/pharmacy-portal?tab=1")).toBe(true);
+    expect(isPortalPath("/pharmacy/p1")).toBe(false);
+    expect(isPortalPath("/pharmacy-portals")).toBe(false);
+    expect(isPortalPath("/")).toBe(false);
+  });
+
+  it("is what the staff login link goes on to", () => {
+    expect(STAFF_LOGIN).toBe("/login?next=%2Fpharmacy-portal");
+    expect(isPortalPath(decodeURIComponent(STAFF_LOGIN.split("next=")[1]))).toBe(true);
   });
 });
 

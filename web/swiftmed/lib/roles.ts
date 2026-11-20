@@ -7,6 +7,10 @@ import type { Session } from "./types";
 /** Where the pharmacy portal lives in the app. */
 export const PORTAL_PATH = "/pharmacy-portal";
 
+/** The login page for each audience: the same page and the same sign-in (SCRUM-140). */
+export const PATIENT_LOGIN = "/login";
+export const STAFF_LOGIN = `/login?next=${encodeURIComponent(PORTAL_PATH)}`;
+
 export const STAFF_ROLE = "ROLE_PHARMACY_STAFF";
 export const ADMIN_ROLE = "ROLE_ADMIN";
 
@@ -28,9 +32,14 @@ export function pharmacyIdFromToken(accessToken: string): string | undefined {
   }
 }
 
+/** True for the portal and its pages (a same-site path, without the query). */
+export function isPortalPath(path: string): boolean {
+  return path === PORTAL_PATH || path.startsWith(`${PORTAL_PATH}/`) || path.startsWith(`${PORTAL_PATH}?`);
+}
+
 /** Where to go after signing in: staff to the portal, patients to `next` (outside the portal). */
 export function homeAfterSignIn(session: Pick<Session, "role" | "pharmacyId">, next: string): string {
-  const inPortal = next === PORTAL_PATH || next.startsWith(`${PORTAL_PATH}/`);
+  const inPortal = isPortalPath(next);
   if (isPharmacyStaff(session)) return inPortal ? next : PORTAL_PATH;
   return inPortal ? "/" : next;
 }

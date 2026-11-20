@@ -144,7 +144,7 @@ Cypress.Commands.add("signInAsPharmacist", () =>
       cy.visit(`/login?next=${encodeURIComponent(PORTAL_HOLDS)}`);
       cy.get("input[name=email]").type(setting("pharmacistEmail"));
       cy.get("input[name=password]").type(pharmacistPassword, { log: false });
-      cy.contains("form button", "Sign in").click();
+      cy.contains("form button", "Log in").click();
       cy.location("pathname").should("eq", PORTAL_HOLDS);
       cy.contains("h1", "Holds");
     });

@@ -120,7 +120,7 @@ export class DemoHolds implements HoldsBackend {
 
   private async user(session: Session): Promise<string> {
     const userId = this.tokens.get(session.accessToken);
-    if (!userId || userId !== session.userId) throw holdError("unauthorized", "Please sign in again");
+    if (!userId || userId !== session.userId) throw holdError("unauthorized", "Please log in again");
     return userId;
   }
 

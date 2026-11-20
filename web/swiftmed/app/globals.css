@@ -118,7 +118,7 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
 /* ---------- Header navigation (SCRUM-137, laid out in SCRUM-139) ----------
    The mark on the left; everything else grouped on the right, as booking sites
    commonly do: the sections, a thin divider, then the account actions (bell and
-   account menu, or Sign in and Create account). On a phone the sections move
+   account menu, or the Log in menu and Sign up). On a phone the sections move
    to their own row, scrolling sideways if needed. */
 .header-nav { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; flex: 1; min-width: 0; }
 .main-nav ul { display: flex; align-items: center; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
@@ -136,7 +136,7 @@ a:hover { color: var(--primary-hover); text-decoration-thickness: 2px; }
   .main-nav ul { gap: 0.1rem; }
   /* Tight enough for the portal's four sections on a 360 px phone. */
   .main-nav .nav-link { min-height: 2.5rem; padding: 0 0.6rem; font-size: 0.9375rem; }
-  /* Signed out: the mark, Sign in and Create account share the first row. */
+  /* Signed out: the mark, Log in and Sign up share the first row. */
   .header-actions > .nav-link { padding: 0 0.55rem; }
   .header-cta { margin-left: 0; padding: 0.4rem 0.8rem; font-size: 0.9375rem; }
 }
@@ -206,6 +206,38 @@ a.bell-item:hover { color: var(--text); background: var(--surface); text-decorat
 .account-signout { margin: 0.35rem 0 0; padding: 0.3rem 0.6rem 0.1rem; border-top: 1px solid var(--border); }
 .account-signout .link-button { min-height: 2.25rem; color: var(--muted); font-size: 0.9375rem; }
 .account-signout .link-button:hover { color: var(--text); }
+
+/* Signed out: "Log in" opens one entry for patients and one for pharmacy staff
+   (SCRUM-140). Both go to the same login page. */
+.login-button {
+  display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2.75rem; padding: 0 0.7rem 0 0.95rem;
+  font: inherit; font-size: 0.9875rem; font-weight: 600; color: var(--text);
+  background: none; border: 1px solid transparent; border-radius: var(--r-control); cursor: pointer;
+}
+.login-button:hover { color: var(--primary-hover); background: var(--surface); }
+.login-button[aria-expanded="true"] { background: var(--surface); border-color: var(--border); }
+.login-button svg { transition: transform 0.16s var(--ease-out); }
+.login-button[aria-expanded="true"] svg { transform: rotate(180deg); }
+.login-panel { width: min(16rem, calc(100vw - 2rem)); padding: 0.4rem; }
+.login-group { padding: 0.35rem 0 0.25rem; }
+.login-group + .login-group { margin-top: 0.3rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
+.login-group-title { margin: 0.2rem 0.6rem 0.1rem; color: var(--muted); font-size: 0.8125rem; font-weight: 650; letter-spacing: 0.02em; }
+@media (max-width: 47.99rem) {
+  .login-button { padding: 0 0.45rem 0 0.6rem; font-size: 0.9375rem; }
+}
+
+/* On the login page: who is logging in. Two links that look like a segmented
+   control; the page is the same for both. */
+.login-switch {
+  display: inline-flex; gap: 0.2rem; margin: 0 0 1.25rem; padding: 0.2rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+}
+.login-switch a {
+  display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0 1rem; border-radius: 999px;
+  color: var(--muted); font-size: 0.9375rem; font-weight: 600; text-decoration: none;
+}
+.login-switch a:hover { color: var(--text); text-decoration: none; }
+.login-switch a[aria-current="page"] { color: var(--text); background: var(--bg); box-shadow: var(--shadow-sm); }
 
 /* ---------- Profile (SCRUM-137) ---------- */
 .profile-form { display: grid; gap: 1.1rem; margin-top: 1.5rem; padding: 1.4rem; }

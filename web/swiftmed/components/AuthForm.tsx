@@ -8,13 +8,15 @@ import type { FormState } from "@/app/actions";
 interface Props {
   mode: "login" | "register";
   action: (state: FormState, form: FormData) => Promise<FormState>;
-  /** Where to go after signing in (a same-site path). */
+  /** Where to go after logging in (a same-site path). */
   next?: string;
+  /** Offer "Sign up" under the login form. Off for pharmacy staff, whose accounts are made for them (SCRUM-140). */
+  signUp?: boolean;
 }
 
-// Sign in and create account. A plain form posting to a server action, so it
-// also works before JavaScript loads; the error comes back as form state.
-export function AuthForm({ mode, action, next = "" }: Props) {
+// Log in and sign up. A plain form posting to a server action, so it also
+// works before JavaScript loads; the error comes back as form state.
+export function AuthForm({ mode, action, next = "", signUp = true }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
   const id = useId();
   const errorId = `${id}-error`;
@@ -58,12 +60,14 @@ export function AuthForm({ mode, action, next = "" }: Props) {
         </p>
       )}
       <button type="submit" className="button button-block" disabled={pending}>
-        {pending ? (login ? "Signing in…" : "Creating account…") : login ? "Sign in" : "Create account"}
+        {pending ? (login ? "Logging in…" : "Creating account…") : login ? "Log in" : "Create account"}
       </button>
-      <p className="auth-switch">
-        {login ? "New to SwiftMed? " : "Already have an account? "}
-        <Link href={otherHref}>{login ? "Create an account" : "Sign in"}</Link>
-      </p>
+      {(!login || signUp) && (
+        <p className="auth-switch">
+          {login ? "New to SwiftMed? " : "Already have an account? "}
+          <Link href={otherHref}>{login ? "Sign up" : "Log in"}</Link>
+        </p>
+      )}
     </form>
   );
 }
