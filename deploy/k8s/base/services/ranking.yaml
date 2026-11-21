@@ -1,0 +1,111 @@
+# ranking: gRPC service. Generated from deploy/docker-compose.yml (SCRUM-108), then reviewed.
+# Other services reach it through Traefik (traefik:50051) with :authority "ranking",
+# as in Compose; the Ingress below is that route.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ranking
+  labels:
+    app.kubernetes.io/name: ranking
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ranking
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ranking
+        app.kubernetes.io/part-of: swiftmed
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: ranking
+          image: ghcr.io/swiftmeds-bht/ranking
+          ports:
+            - {name: grpc, containerPort: 50061}
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: LOG_LEVEL}
+            - name: RANKING_GRPC_PORT
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: RANKING_GRPC_PORT}
+            - name: RANKING_WEIGHT_DISTANCE
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: RANKING_WEIGHT_DISTANCE}
+            - name: RANKING_WEIGHT_FRESHNESS
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: RANKING_WEIGHT_FRESHNESS}
+            - name: RANKING_WEIGHT_PRICE
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: RANKING_WEIGHT_PRICE}
+            - name: RANKING_WEIGHT_TRUST
+              valueFrom:
+                configMapKeyRef: {name: swiftmed-config, key: RANKING_WEIGHT_TRUST}
+          # The server reports SERVING on grpc.health.v1 only once migrations ran and it listens.
+          startupProbe:
+            grpc: {port: 50061}
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            grpc: {port: 50061}
+            periodSeconds: 5
+          livenessProbe:
+            grpc: {port: 50061}
+            periodSeconds: 10
+            failureThreshold: 3
+          # Keep serving a few seconds after a delete, until Traefik has dropped this
+          # pod from its endpoints; otherwise calls in that gap fail (zero-downtime
+          # updates and self-healing).
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ranking
+  labels:
+    app.kubernetes.io/name: ranking
+    app.kubernetes.io/part-of: swiftmed
+  annotations:
+    # The services speak plaintext HTTP/2 (gRPC without TLS).
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
+spec:
+  selector:
+    app.kubernetes.io/name: ranking
+  ports:
+    - {name: grpc, port: 50061, targetPort: grpc}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ranking-grpc
+  labels:
+    app.kubernetes.io/name: ranking
+    app.kubernetes.io/part-of: swiftmed
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: grpc
+spec:
+  ingressClassName: swiftmed
+  rules:
+    - host: ranking
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ranking
+                port: {name: grpc}

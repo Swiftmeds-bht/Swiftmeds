@@ -90,6 +90,9 @@ func (s *Service) HandleStockUnavailable(ctx context.Context, holdID string) (Ou
 		}
 		return OutcomeRejected, nil
 	case domain.Rejected:
+		if err := s.events.HoldRejected(ctx, h); err != nil {
+			return "", fmt.Errorf("publish hold.rejected: %w", err)
+		}
 		return OutcomeAlreadyRejected, nil
 	default:
 		return OutcomeIgnored, nil
@@ -99,11 +102,14 @@ func (s *Service) HandleStockUnavailable(ctx context.Context, holdID string) (Ou
 // noInventory is used when no Inventory client is set: no stock is touched.
 type noInventory struct{}
 
-func (noInventory) Release(context.Context, string) error { return nil }
-func (noInventory) Commit(context.Context, string) error  { return nil }
+func (noInventory) CheckStocked(context.Context, string, string) error { return nil }
+func (noInventory) Release(context.Context, string) error              { return nil }
+func (noInventory) Commit(context.Context, string) error               { return nil }
 
 // noEvents is used when no publisher is set: no event is sent.
 type noEvents struct{}
 
 func (noEvents) HoldRequested(context.Context, domain.Hold) error { return nil }
 func (noEvents) HoldConfirmed(context.Context, domain.Hold) error { return nil }
+func (noEvents) HoldExpired(context.Context, domain.Hold) error   { return nil }
+func (noEvents) HoldRejected(context.Context, domain.Hold) error  { return nil }

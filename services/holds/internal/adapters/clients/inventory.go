@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	inventoryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/inventory/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/holds/internal/domain"
@@ -22,6 +24,17 @@ type Inventory struct {
 
 func NewInventory(cc grpc.ClientConnInterface) Inventory {
 	return Inventory{c: inventoryv1.NewInventoryServiceClient(cc)}
+}
+
+// CheckStocked asks Inventory for the pharmacy's stock row of the product.
+// NOT_FOUND means one of the IDs is unknown or the pharmacy does not sell the
+// medicine; any other failure means Inventory could not answer.
+func (i Inventory) CheckStocked(ctx context.Context, pharmacyID, productID string) error {
+	_, err := i.c.GetStock(ctx, &inventoryv1.GetStockRequest{PharmacyId: pharmacyID, ProductId: productID})
+	if status.Code(err) == codes.NotFound {
+		return domain.ErrNotStocked
+	}
+	return unavailable("get stock", err)
 }
 
 // Release gives the hold's reserved units back to available stock.

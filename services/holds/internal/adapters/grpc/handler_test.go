@@ -317,6 +317,8 @@ func TestToStatus(t *testing.T) {
 		{domain.ErrNotFound, codes.NotFound},
 		{domain.ErrAlreadyExists, codes.AlreadyExists},
 		{domain.ErrLimitReached, codes.ResourceExhausted},
+		{domain.ErrPickupLocked, codes.ResourceExhausted},
+		{domain.ErrNotStocked, codes.NotFound},
 		{domain.ErrWrongPickupCode, codes.PermissionDenied},
 		{domain.ErrWrongPharmacy, codes.PermissionDenied},
 		{domain.ErrNotHoldOwner, codes.PermissionDenied},

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/pharmacy-registry/internal/domain"
@@ -26,14 +27,27 @@ func (r *Repository) Create(ctx context.Context, p domain.Pharmacy) error {
 		return fmt.Errorf("encode hours: %w", err)
 	}
 	_, err = r.db.Exec(ctx, `INSERT INTO pharmacies
-		(pharmacy_id, owner_user_id, name, license_number, latitude, longitude, hours, status, status_reason, created_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-		p.ID, p.OwnerID, p.Name, p.LicenseNumber, p.Location.Latitude, p.Location.Longitude,
-		hours, string(p.Status), p.StatusReason, p.CreatedAt)
+		(pharmacy_id, owner_user_id, name, license_number, phone, address, dzongkhag, latitude, longitude, hours, status, status_reason, created_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		p.ID, p.OwnerID, p.Name, p.LicenseNumber, p.Phone, p.Address, p.Dzongkhag, p.Location.Latitude,
+		p.Location.Longitude, hours, string(p.Status), p.StatusReason, p.CreatedAt)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation && pgErr.ConstraintName == licenseConstraint {
+		return domain.ErrLicenseTaken
+	}
 	if err != nil {
 		return fmt.Errorf("insert pharmacy: %w", err)
 	}
 	return nil
+}
+
+const (
+	uniqueViolation   = "23505"
+	licenseConstraint = "pharmacies_license_number_key"
+)
+
+func (r *Repository) FindByOwner(ctx context.Context, ownerID string) (domain.Pharmacy, error) {
+	return r.scanOne(r.db.QueryRow(ctx, pharmacySelect+` WHERE owner_user_id = $1 ORDER BY created_at, pharmacy_id LIMIT 1`, ownerID))
 }
 
 func (r *Repository) Get(ctx context.Context, id string) (domain.Pharmacy, error) {
@@ -89,7 +103,7 @@ func (r *Repository) SetStatus(ctx context.Context, id string, status domain.Sta
 	return next, nil
 }
 
-const pharmacySelect = `SELECT pharmacy_id, owner_user_id, name, license_number, latitude, longitude, hours, status, status_reason, created_at, verified_at FROM pharmacies`
+const pharmacySelect = `SELECT pharmacy_id, owner_user_id, name, license_number, phone, address, dzongkhag, latitude, longitude, hours, status, status_reason, created_at, verified_at FROM pharmacies`
 
 type rowScanner interface{ Scan(...any) error }
 
@@ -112,7 +126,7 @@ func scanPharmacy(row rowScanner) (domain.Pharmacy, error) {
 func scanRow(row rowScanner, p *domain.Pharmacy) error {
 	var hours []byte
 	var status string
-	if err := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.LicenseNumber, &p.Location.Latitude,
+	if err := row.Scan(&p.ID, &p.OwnerID, &p.Name, &p.LicenseNumber, &p.Phone, &p.Address, &p.Dzongkhag, &p.Location.Latitude,
 		&p.Location.Longitude, &hours, &status, &p.StatusReason, &p.CreatedAt, &p.VerifiedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrNotFound

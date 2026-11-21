@@ -1,0 +1,44 @@
+# Mutation testing for the Holds domain and app packages (SCRUM-113).
+# Run from services/holds:
+#   GOWORK=off gremlins unleash ./internal/domain
+#   GOWORK=off gremlins unleash ./internal/app
+# or from the repository root: make mutation (scripts/mutation-tests.sh).
+# Gremlins: https://gremlins.dev (go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0)
+unleash:
+  integration: false
+  timeout-coefficient: 10
+  # Fail the run if fewer than 90% of covered mutants are killed, or fewer than
+  # 60% of all mutants are on tested code. SCRUM-113 asks for at least 70% efficacy.
+  # Write input checks as plain if statements, not tagless switch cases: Go's
+  # coverage profile does not record switch cases, so their mutants show as NOT
+  # COVERED although the tests run them (SCRUM-125 rewrote NewHold and Collect
+  # this way). The one mutant that lives, pickup.go `stored == "" || given == ""`
+  # -> `&&`, is equivalent: the constant-time compare refuses those codes anyway.
+  threshold:
+    efficacy: 90
+    mutant-coverage: 60
+
+mutants:
+  # Every mutator Gremlins has, not only the default ones.
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: true
+  invert-bitwise:
+    enabled: true
+  invert-bwassign:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: true
+  invert-negatives:
+    enabled: true
+  remove-self-assignments:
+    enabled: true

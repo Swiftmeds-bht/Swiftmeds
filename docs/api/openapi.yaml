@@ -89,14 +89,15 @@ info:
 
     ## Request ID
 
-    Send `X-Request-ID` to name a request. If you do not, the gateway makes one. Every
+    Send an `X-Request-ID` of at most 128 characters to name a request. If you do not
+    send one or it is longer than 128 characters, the gateway makes one. Every
     response carries the same header, and it appears in the gateway's logs, so quote it
     when reporting a problem.
 
     ## CORS
 
     The gateway allows the origins in `CORS_ALLOWED_ORIGINS` (default
-    `http://localhost:3000` and `http://localhost:3001`), with credentials. Allowed
+    `http://localhost:3000`, the web app), with credentials. Allowed
     headers are `Authorization`, `Content-Type` and `X-Request-ID`. Allowed methods are
     `GET`, `POST`, `PUT`, `PATCH`, `DELETE` and `OPTIONS`. A preflight from an allowed
     origin returns 204.
@@ -110,7 +111,7 @@ info:
     `Inventory.CommitReservation`, `Inventory.ReleaseReservation`,
     `Notification.SendNotification`, `PharmacyRegistry.BatchGetPharmacies`,
     `Pricing.BatchGetPrices`, `Ranking.RankOffers` and
-    `Trust.GetTrustScores`. Substitutes reach the patient inside the search response.
+    `Trust.GetTrust`, `Trust.BatchGetTrust`. Substitutes reach the patient inside the search response.
 servers:
   - url: http://{host}:{port}
     description: Local development (`make up`, or `docker compose -f deploy/docker-compose.yml up -d`)
@@ -225,7 +226,7 @@ paths:
       operationId: login
       summary: Sign in with email and password
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Login
       x-roles: []
       requestBody:
@@ -258,7 +259,7 @@ paths:
       summary: Exchange a refresh token for a new token pair
       description: The old refresh token stops working as soon as the new pair is issued.
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/RefreshToken
       x-roles: []
       requestBody:
@@ -290,8 +291,9 @@ paths:
       operationId: logout
       summary: Revoke a refresh token
       description: Safe to call more than once with the same token.
-      security: []
-      x-status: planned
+      security:
+        - bearerAuth: []
+      x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Logout
       x-roles: []
       requestBody:
@@ -380,7 +382,7 @@ paths:
       operationId: getProduct
       summary: Get one medicine
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.catalog.v1.CatalogService/GetProduct
       x-roles: []
       parameters:
@@ -507,6 +509,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "503":
           description: A required service (Catalog, Geo or Inventory) is unavailable.
           content:
@@ -521,13 +527,127 @@ paths:
                 $ref: "#/components/schemas/Error"
         default:
           $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/nearby:
+    get:
+      tags: [Search, Pharmacies]
+      operationId: findNearbyPharmacies
+      summary: Find pharmacies near a location
+      description: Returns verified pharmacies within the requested radius.
+      security: []
+      x-status: implemented
+      x-grpc: swiftmed.geo.v1.GeoService/FindNearbyPharmacies
+      x-roles: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - name: radius_m
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 50000
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+      responses:
+        "200":
+          description: Nearby pharmacies.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pharmacies:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pharmacyId: { type: string }
+                        distanceM: { type: integer }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/medicines/{id}/alternatives:
+    get:
+      tags: [Search, Catalog]
+      operationId: getMedicineAlternatives
+      summary: Find alternatives for a medicine
+      description: Returns products with the same active ingredient and strength.
+      security: []
+      x-status: implemented
+      x-grpc: swiftmed.substitution.v1.SubstitutionService/GetSubstitutes
+      x-roles: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 5
+      responses:
+        "200":
+          description: Matching alternatives.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  moleculeId: { type: string }
+                  substitutes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        productId: { type: string }
+                        brandName: { type: string }
+                        genericName: { type: string }
+                        strength: { type: string }
+                        matchType:
+                          type: string
+                          enum: [SUBSTITUTE_MATCH_TYPE_UNSPECIFIED, SUBSTITUTE_MATCH_TYPE_EXACT, SUBSTITUTE_MATCH_TYPE_NEEDS_PHARMACIST_CHECK]
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
   /api/v1/search/autocomplete:
     get:
       tags: [Search]
       operationId: autocomplete
       summary: Suggest medicine names while the patient types
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.search.v1.SearchService/Autocomplete
       x-roles: []
       parameters:
@@ -541,10 +661,11 @@ paths:
             maxLength: 100
         - name: limit
           in: query
-          description: Most suggestions to return.
+          description: Most suggestions to return, 1 to 20.
           schema:
             type: integer
             minimum: 1
+            maximum: 20
             default: 8
       responses:
         "200":
@@ -567,12 +688,20 @@ paths:
       operationId: registerPharmacy
       summary: Register a pharmacy
       description: |
-        The signed-in pharmacy-staff user becomes the owner. The pharmacy starts as
-        `VERIFICATION_STATUS_PENDING`, does not appear in search and cannot take holds
-        until an administrator verifies it.
-      x-status: planned
+        Any signed-in account that does not belong to a pharmacy yet may register
+        one (admins may not). The account becomes the pharmacy's owner and its staff
+        account (`AuthService/LinkPharmacy`); the next `POST /api/v1/auth/refresh`
+        returns a token with `ROLE_PHARMACY_STAFF` and the `pharmacy_id`. Public
+        sign-up itself still only makes patients (SCRUM-123).
+
+        The pharmacy starts as `VERIFICATION_STATUS_PENDING`, does not appear in
+        search and cannot take holds until an administrator verifies it.
+
+        Sending the same request again is safe: the owner's existing pharmacy is
+        returned (SCRUM-141).
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/RegisterPharmacy
-      x-roles: [ROLE_PHARMACY_STAFF]
+      x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
       requestBody:
         required: true
         content:
@@ -593,7 +722,9 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
         "409":
-          description: A pharmacy with this licence number is already registered.
+          description: |
+            A pharmacy with this licence number is already registered, or the
+            account already belongs to a pharmacy.
           content:
             application/json:
               schema:
@@ -605,7 +736,7 @@ paths:
       operationId: listPharmacies
       summary: List pharmacies by verification status
       description: Used by administrators to review pending pharmacies.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/ListPharmacies
       x-roles: [ROLE_ADMIN]
       parameters:
@@ -639,8 +770,9 @@ paths:
       description: |
         Public, so the patient app can show a pharmacy's details. `ownerUserId` and
         `licenseNumber` are returned only to the pharmacy's own staff and to administrators.
+        The gateway reads no token on this route, so it never returns either (SCRUM-138).
       security: []
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/GetPharmacy
       x-roles: []
       parameters:
@@ -662,10 +794,17 @@ paths:
       operationId: setPharmacyVerification
       summary: Approve, reject or suspend a pharmacy
       description: |
-        Approving a pharmacy puts it on the map and into search. Suspending removes it.
-        A reason is required for `VERIFICATION_STATUS_REJECTED` and
-        `VERIFICATION_STATUS_SUSPENDED`.
-      x-status: planned
+        Approving a pharmacy puts it on the map and into search
+        (`GeoService/UpsertPharmacyLocation`). Rejecting or suspending takes it off
+        (`GeoService/RemovePharmacyLocation`). A reason is required for
+        `VERIFICATION_STATUS_REJECTED` and `VERIFICATION_STATUS_SUSPENDED`.
+
+        Sending the status the pharmacy already has changes nothing in the registry
+        and only updates the map again, so a 502 can be retried as is (SCRUM-141).
+
+        Allowed changes: pending to verified or rejected, verified to suspended.
+        Any other change is a 400.
+      x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus
       x-roles: [ROLE_ADMIN]
       parameters:
@@ -691,6 +830,14 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          description: |
+            The status was saved, but the map could not be updated. Send the same
+            request again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/pharmacies/{pharmacyId}/stats:
@@ -753,7 +900,7 @@ paths:
       operationId: listPharmacyStock
       summary: List all stock of a pharmacy
       description: The pharmacy dashboard's stock table.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.inventory.v1.InventoryService/ListPharmacyStock
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:
@@ -809,7 +956,7 @@ paths:
         Sending the same quantity again still counts as a confirmation and refreshes the
         stock's freshness. To remove a medicine from sale, set the quantity to 0.
         Raising the quantity tells the watchlist service, which may alert waiting patients.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.inventory.v1.InventoryService/SetStock
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
@@ -889,7 +1036,7 @@ paths:
         The file is UTF-8, at most 1 MB, with the header `product_id,quantity,price_chhertum`.
         `price_chhertum` is optional. Valid rows are applied and bad rows are reported in
         the job's `rowErrors`, so a job can finish as `SYNC_JOB_STATUS_PARTIAL`.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/UploadStockCsv
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
@@ -929,7 +1076,7 @@ paths:
       tags: [Stock]
       operationId: listSyncJobs
       summary: List the CSV upload jobs of a pharmacy
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/ListSyncJobs
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:
@@ -957,7 +1104,7 @@ paths:
       operationId: getSyncJob
       summary: Get one CSV upload job
       description: A job that belongs to a different pharmacy than the one in the path returns 404.
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.stocksync.v1.StockSyncService/GetSyncJob
       x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       parameters:
@@ -976,6 +1123,38 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/ServerError"
+  /api/v1/pharmacies/me/analytics/unmet-demand:
+    get:
+      tags: [Analytics]
+      operationId: getPharmacyUnmetDemand
+      summary: Get unavailable medicine demand for the pharmacy's area
+      description: |
+        Returns up to 10 medicines searched for but unavailable in the
+        authenticated pharmacy's dzongkhag during the previous 7 days.
+        The dzongkhag is resolved from Pharmacy Registry using the pharmacy
+        ID in the authenticated identity.
+      x-status: implemented
+      x-grpc: swiftmed.analytics.v1.AnalyticsService/GetUnmetDemand
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      responses:
+        "200":
+          description: Unmet-demand report for the pharmacy's area.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnmetDemandResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: The pharmacy has no dzongkhag configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/holds:
@@ -1146,8 +1325,10 @@ paths:
       summary: Hand over the medicine against the pickup code
       description: |
         Pharmacy staff enter the code the patient shows. A wrong code is rejected and the
-        hold stays `HOLD_STATUS_ACTIVE`. A hold can be collected only once. The hold must
-        belong to the signed-in staff member's pharmacy.
+        hold stays `HOLD_STATUS_ACTIVE`. After 5 wrong codes the hold is locked: every
+        later try is refused with 429, even with the right code, so a code cannot be found
+        by guessing. A hold can be collected only once. The hold must belong to the
+        signed-in staff member's pharmacy.
       x-status: implemented
       x-grpc: swiftmed.holds.v1.HoldsService/CollectHold
       x-roles: [ROLE_PHARMACY_STAFF]
@@ -1186,6 +1367,14 @@ paths:
           description: |
             The hold is not `HOLD_STATUS_ACTIVE`: it was already collected, or it expired or
             was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: |
+            Too many wrong pickup codes: the hold is locked and can no longer be collected.
+            It stays `HOLD_STATUS_ACTIVE` until it expires or the patient cancels it.
           content:
             application/json:
               schema:
@@ -1236,6 +1425,12 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Feedback was already given for this hold.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "412":
+          description: The hold is not collected, so feedback cannot be submitted.
           content:
             application/json:
               schema:
@@ -1310,7 +1505,13 @@ paths:
         `StockAlert` as JSON. The stream stays open until the client closes it, so it is not
         cut off by a write timeout. A browser `EventSource` cannot send an `Authorization`
         header, so web clients read this stream with `fetch`.
-      x-status: planned
+
+        Each alert is one event: `id:` is the subscription ID, `event: alert`, and `data:`
+        the `StockAlert` JSON. An idle stream sends a `: ping` comment every 15 seconds so
+        proxies keep it open. If Watchlist fails, the stream ends with an `event: error`
+        whose `data` is `{"error": "..."}`. Alerts that arrive while the client is away are
+        kept and sent on the next connection, each once.
+      x-status: implemented
       x-grpc: swiftmed.watchlist.v1.WatchlistService/StreamAlerts
       x-roles: [ROLE_PATIENT]
       responses:
@@ -1381,7 +1582,7 @@ paths:
       tags: [Profile]
       operationId: getMyProfile
       summary: Get the signed-in user's profile
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.userprofile.v1.UserProfileService/GetProfile
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       responses:
@@ -1405,8 +1606,13 @@ paths:
       tags: [Profile]
       operationId: updateMyProfile
       summary: Save the signed-in user's profile
-      description: Creates the profile if it does not exist yet.
-      x-status: planned
+      description: >-
+        Creates the profile if it does not exist yet. The user is always the
+        caller (from the token). Both fields are required: `displayName` (1 to 80
+        characters) and `phone` (8 to 15 digits with an optional leading `+`;
+        spaces, dashes, dots and brackets are removed before checking). A failed
+        check answers 400 with a sentence the app can show.
+      x-status: implemented
       x-grpc: swiftmed.userprofile.v1.UserProfileService/UpdateProfile
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF, ROLE_ADMIN]
       requestBody:
@@ -1795,6 +2001,7 @@ components:
     RegisterRequest:
       type: object
       required: [email, password, role]
+      description: Public registration creates patient accounts only. Pharmacy staff accounts are provisioned through the development seed data.
       properties:
         email:
           type: string
@@ -1806,7 +2013,7 @@ components:
           description: 8 to 72 bytes. The limit is in bytes, so multi-byte characters count more than once.
         role:
           type: string
-          enum: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
+          enum: [ROLE_PATIENT]
     RegisterResponse:
       type: object
       required: [userId]
@@ -2308,6 +2515,7 @@ components:
           format: int32
           minimum: 1
           maximum: 5
+
     HoldList:
       type: object
       properties:
@@ -2504,6 +2712,10 @@ components:
         displayName:
           type: string
         phone:
+          type: string
+        homeLocation:
+          type: string
+        preferredLanguage:
           type: string
         createdAt:
           type: string

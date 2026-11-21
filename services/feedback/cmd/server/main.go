@@ -16,13 +16,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/messaging"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/migrate"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/resilience"
 	feedbackv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1"
@@ -101,7 +101,7 @@ func run() error {
 	}
 	defer func() { _ = holdsConn.Close() }()
 
-	rabbitConn, err := amqp.Dial(rabbitURL)
+	rabbitConn, err := messaging.Dial(context.Background(), rabbitURL, log)
 	if err != nil {
 		return fmt.Errorf("RabbitMQ connection: %w", err)
 	}

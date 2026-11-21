@@ -1,0 +1,86 @@
+# Nightly Postgres backup (SCRUM-108): pg_dumpall of every database, gzipped,
+# onto its own volume, so losing the Postgres volume does not lose the backups.
+# The newest 7 are kept. Restore steps: docs/deployment.md, "Back up and restore".
+# A backup now: kubectl -n swiftmed create job backup-now --from=cronjob/postgres-backup
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backups
+  labels:
+    app.kubernetes.io/name: postgres-backup
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 5Gi}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  schedule: "30 2 * * *"
+  timeZone: Asia/Thimphu
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgres-backup
+            swiftmed/postgres-client: "true"
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+            seccompProfile: {type: RuntimeDefault}
+          containers:
+            - name: backup
+              image: ghcr.io/swiftmeds-bht/seed
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  # Without pipefail a failed pg_dumpall would still leave a tiny,
+                  # "successful" gzip file (seen in testing).
+                  set -o pipefail
+                  # A new pod can wait a few seconds before the network policies
+                  # let it reach Postgres.
+                  for i in $(seq 1 30); do pg_isready -q && break; sleep 2; done
+                  file="/backups/swiftmed-$(date +%Y-%m-%d-%H%M).sql.gz"
+                  # --clean --if-exists: the dump drops and re-creates each database,
+                  # so it restores over a running server (see docs/deployment.md).
+                  pg_dumpall --clean --if-exists | gzip > "$file.tmp"
+                  size="$(gunzip -c "$file.tmp" | wc -c)"
+                  if [ "$size" -lt 10000 ]; then
+                    echo "backup: refusing a ${size}-byte dump" >&2; rm -f "$file.tmp"; exit 1
+                  fi
+                  mv "$file.tmp" "$file"
+                  echo "backup: $file ($(du -h "$file" | cut -f1))"
+                  ls -1t /backups/swiftmed-*.sql.gz | tail -n +8 | xargs -r rm -v
+              env:
+                - {name: PGHOST, value: postgres}
+                - name: PGUSER
+                  valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_USER}}
+                - name: PGPASSWORD
+                  valueFrom: {secretKeyRef: {name: swiftmed-secrets, key: POSTGRES_PASSWORD}}
+              resources:
+                requests: {cpu: 20m, memory: 32Mi}
+                limits: {cpu: "1", memory: 256Mi}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: {drop: [ALL]}
+              volumeMounts:
+                - {name: backups, mountPath: /backups}
+          volumes:
+            - name: backups
+              persistentVolumeClaim: {claimName: postgres-backups}

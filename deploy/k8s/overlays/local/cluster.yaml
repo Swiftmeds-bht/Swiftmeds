@@ -1,0 +1,29 @@
+# A development cluster (overlays/local): k3s in Docker, made with k3d.
+#   k3d cluster create --config deploy/k8s/overlays/local/cluster.yaml
+# Its own name and ports, so it can run beside the deployment (overlays/prod,
+# cluster "swiftmed" on 9000/9080) and the Compose stack (3000/8080):
+#   http://localhost:9100                  SwiftMed (patients)
+#   http://localhost:9100/pharmacy-portal  pharmacy portal
+#   http://localhost:9180                  API gateway
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: swiftmed-dev
+servers: 1
+agents: 0
+image: rancher/k3s:v1.36.6-k3s1
+ports:
+  - port: 9180:8080
+    nodeFilters: [loadbalancer]
+  - port: 9100:3000
+    nodeFilters: [loadbalancer]
+    nodeFilters: [loadbalancer]
+options:
+  k3s:
+    extraArgs:
+      # SwiftMed runs its own Traefik (base/traefik.yaml); k3s's would compete for the ports.
+      - arg: --disable=traefik
+        nodeFilters: [server:*]
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true

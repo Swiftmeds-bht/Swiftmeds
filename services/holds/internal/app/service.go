@@ -16,7 +16,7 @@ import (
 const DefaultMaxActivePerUser = 3
 
 // DefaultHoldDuration is how long an ACTIVE hold lasts before it expires.
-const DefaultHoldDuration = 2 * time.Hour
+func DefaultHoldDuration() time.Duration { return 2 * time.Hour }
 
 // DefaultPageSize is the page size of ListHolds when the caller does not ask for one.
 const DefaultPageSize = 20
@@ -41,6 +41,10 @@ type Config struct {
 
 	// HoldDuration is how long an ACTIVE hold lasts before it expires.
 	HoldDuration time.Duration
+
+	// PendingTimeout is how long a hold may stay PENDING before the sweep
+	// rejects it (sweep.go). Zero means DefaultPendingTimeout.
+	PendingTimeout time.Duration
 }
 
 // Service implements the Holds use cases.
@@ -74,7 +78,7 @@ func WithInventory(inv ports.Inventory) Option {
 	return func(s *Service) { s.inventory = inv }
 }
 
-// WithEvents sets the publisher for hold.requested and hold.confirmed. Without
+// WithEvents sets the publisher for hold lifecycle events. Without
 // it no events are sent (unit tests of the hold rules); the server always sets it.
 func WithEvents(events ports.Events) Option {
 	return func(s *Service) { s.events = events }
@@ -106,6 +110,11 @@ func (s *Service) CreateHold(ctx context.Context, userID, pharmacyID, productID 
 	h, err := domain.NewHold(id, userID, pharmacyID, productID, quantity, s.now())
 	if err != nil {
 		return domain.Hold{}, err
+	}
+	// An unknown pharmacy or product gets a clear answer now, instead of a hold
+	// that Inventory rejects a moment later.
+	if err := s.inventory.CheckStocked(ctx, h.PharmacyID, h.ProductID); err != nil {
+		return domain.Hold{}, fmt.Errorf("check stock: %w", err)
 	}
 	if err := s.repo.Create(ctx, h, s.cfg.MaxActivePerUser); err != nil {
 		return domain.Hold{}, fmt.Errorf("create hold: %w", err)
@@ -223,9 +232,16 @@ func (s *Service) ReserveHold(ctx context.Context, id string) (domain.Hold, erro
 // RejectHold is the stock.unavailable event: PENDING -> REJECTED. Nothing was
 // reserved, so there is nothing to give back to Inventory.
 func (s *Service) RejectHold(ctx context.Context, id, reason string) (domain.Hold, error) {
-	return s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
+	rejected, err := s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
 		return h.Reject(s.now(), reason)
 	}, nil)
+	if err != nil {
+		return domain.Hold{}, err
+	}
+	if err := s.events.HoldRejected(ctx, rejected); err != nil {
+		return rejected, fmt.Errorf("publish hold.rejected: %w", err)
+	}
+	return rejected, nil
 }
 
 // CancelHold lets the patient who made the hold cancel it. An ACTIVE hold has
@@ -258,12 +274,23 @@ func (s *Service) CancelHold(ctx context.Context, id, userID, reason string) (do
 //
 // Only a hold that passed every check reaches Inventory, which then makes the
 // reserved units leave stock for good. If that call fails the hold stays ACTIVE.
+//
+// Every wrong code is counted. After domain.MaxPickupAttempts of them the hold
+// is locked (domain.ErrPickupLocked), even for the right code.
 func (s *Service) CollectHold(ctx context.Context, id, pharmacyID, pickupCode string) (domain.Hold, error) {
-	return s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
+	collected, err := s.change(ctx, id, func(h domain.Hold) (domain.Hold, error) {
 		return h.Collect(s.now(), pharmacyID, pickupCode)
 	}, func(ctx context.Context, h domain.Hold) error {
 		return s.inventory.Commit(ctx, h.ID)
 	})
+	if errors.Is(err, domain.ErrWrongPickupCode) {
+		// ErrConflict: the hold stopped being ACTIVE meanwhile, so there is nothing left to guess.
+		if _, recordErr := s.repo.RecordWrongPickupCode(ctx, id); recordErr != nil && !errors.Is(recordErr, domain.ErrConflict) {
+			// Fail closed: a wrong code that could not be counted is not answered as "wrong".
+			return domain.Hold{}, fmt.Errorf("record wrong pickup code: %w", recordErr)
+		}
+	}
+	return collected, err
 }
 
 // ExpireHold is called by Expiry once expires_at has passed. It does nothing
@@ -275,6 +302,11 @@ func (s *Service) ExpireHold(ctx context.Context, id string) (domain.Hold, error
 		return domain.Hold{}, err
 	}
 	if h.Status != domain.Active {
+		if h.Status == domain.Expired {
+			if err := s.events.HoldExpired(ctx, h); err != nil {
+				return h, fmt.Errorf("publish hold.expired: %w", err)
+			}
+		}
 		return h, nil
 	}
 	now := s.now()
@@ -296,6 +328,9 @@ func (s *Service) ExpireHold(ctx context.Context, id string) (domain.Hold, error
 			return s.GetHold(ctx, id)
 		}
 		return domain.Hold{}, fmt.Errorf("expire hold: %w", err)
+	}
+	if err := s.events.HoldExpired(ctx, expired); err != nil {
+		return expired, fmt.Errorf("publish hold.expired: %w", err)
 	}
 	return expired, nil
 }

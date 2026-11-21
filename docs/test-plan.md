@@ -100,15 +100,17 @@ Excluded by the project proposal (Section 2A), so not tested:
 
 | Concern | Tool/process |
 |---|---|
-| Go unit tests | `go test ./...` per Go module; repository `make test` (CI runs every module with `GOWORK=off`) |
-| Go integration tests | Build tag `integration` and a live dependency from `make up`, e.g. `POSTGRES_URL=... go test -tags integration ./migrate/` (pkg/migrate) and `RABBITMQ_URL=amqp://swiftmed:change-me@localhost:5672/ go test -run Integration ./messaging/` (pkg/messaging). Without the variable the test is skipped, not failed |
-| Coverage gate | `make coverage`: domain and app packages of the core services must reach 80% (CI runs the same script) |
+| Go unit tests | `go test ./...` per Go module; repository `make test` (CI runs every module with `GOWORK=off` and `-race`) |
+| Go integration tests | Build tag `integration` plus a live Postgres or RabbitMQ, one URL variable per suite (e.g. `HOLDS_TEST_DATABASE_URL`, `RABBITMQ_URL`). Without its variable a test is skipped. `scripts/integration-tests.sh` runs them all with `-race -v`; CI's **Go integration tests** job starts Postgres and RabbitMQ, sets every variable and fails if any test skips (SCRUM-116) |
+| Saga integration tests | `tests/integration` (SCRUM-56): Postgres and RabbitMQ in testcontainers, the real Holds and Inventory; CI job **Saga integration tests** |
+| Web app and Workers | CI jobs **Web app** (patient app: lint, typecheck, Vitest, build) and **Workers** (typecheck and tests for each Cloudflare Worker) |
+| Coverage gate | `make coverage`: domain and app packages of every Go service must reach 65% (CI runs the same script) |
 | Static quality gate | `make lint` and the CI configuration |
 | Service dependencies | Docker Compose with Postgres, RabbitMQ, and Traefik |
 | Browser E2E and fixtures | Cypress; scenarios under `tests/e2e` and `tests/features` |
 | Load and soak | k6 scripts under `tests/load`; collect latency, errors, throughput, queue lag, and resource use |
 | Accessibility | axe in Cypress plus manual keyboard and screen-reader checks |
-| Mutation testing | Gremlins, scoped first to core domain packages |
+| Mutation testing | Gremlins v0.5.0 on the core domain and app packages: `make mutation` (`scripts/mutation-tests.sh`) runs Ranking, Inventory and Holds and fails if a package is below the thresholds in its `.gremlins.yaml`. CI runs nightly and on pull requests labeled `run-mutation` (SCRUM-113) |
 | Observability | Structured service logs, correlation IDs, RabbitMQ management data, and database assertions |
 
 All automated tests must use deterministic seed data and isolated databases or
@@ -273,15 +275,78 @@ and `make coverage` comes from SCRUM-89.
 ### 7.3 Mutation testing results
 
 Run with [Gremlins](https://gremlins.dev) v0.5.0, all mutators enabled
-(`services/<name>/.gremlins.yaml`), from the service folder:
-`GOWORK=off gremlins unleash ./internal/domain`. *Efficacy* = killed ÷ (killed +
-lived); *mutant coverage* = mutants on tested code ÷ all mutants.
+(`services/<name>/.gremlins.yaml`). From the repository root, `make mutation`
+(`scripts/mutation-tests.sh`) runs every package below and prints this table;
+`MUTATION_TARGETS="holds/internal/app" ./scripts/mutation-tests.sh` runs one. From a
+service folder: `GOWORK=off gremlins unleash ./internal/domain` (or `./internal/app`).
+Install Gremlins with `go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0`.
+*Efficacy* (the mutation score) = killed ÷ (killed + lived); *mutant coverage* =
+mutants on tested code ÷ all mutants. Each `.gremlins.yaml` sets the gate:
+Ranking and Inventory fail below 95% for either, Holds below 90% efficacy or 60%
+mutant coverage (see the Holds domain note below). SCRUM-113 asks for at least 70%
+efficacy on Inventory and Holds.
 
 | Package | Date | Killed | Lived | Not covered | Efficacy | Mutant coverage | Statement coverage |
 |---|---|---|---|---|---|---|---|
 | `services/ranking/internal/domain` (SCRUM-51) | 2026-10-30 | 55 | 0 | 0 | **100%** | **100%** | 100% |
+| `services/inventory/internal/domain` (SCRUM-113) | 2026-11-12 | 36 | 0 | 0 | **100%** | **100%** | 100% |
+| `services/inventory/internal/app` (SCRUM-113) | 2026-11-12 | 21 | 0 | 0 | **100%** | **100%** | 100% |
+| `services/holds/internal/domain` (SCRUM-113) | 2026-11-12 | 20 | 1 | 13 | **95.2%** | 61.8% | 100% |
+| `services/holds/internal/app` (SCRUM-113) | 2026-11-12 | 57 | 1 | 1 | **98.3%** | 98.3% | 97.5% |
 
-How the first run (46 killed, 1 lived, 8 not covered; 97.9% efficacy) was brought to 100%:
+Per service (domain and app together): **Inventory 100%** (57 of 57 killed) and
+**Holds 97.5%** (77 killed, 2 lived), both above the 70% SCRUM-113 asks for.
+
+**SCRUM-113: Inventory and Holds.** The first run gave:
+
+| Package | Killed | Lived | Not covered | Efficacy | Mutant coverage |
+|---|---|---|---|---|---|
+| `inventory/internal/domain` | 28 | 8 | 0 | 77.8% | 100% |
+| `inventory/internal/app` | 19 | 2 | 0 | 90.5% | 100% |
+| `holds/internal/domain` | 20 | 1 | 13 | 95.2% | 61.8% |
+| `holds/internal/app` | 55 | 3 | 1 | 94.8% | 98.3% |
+
+How it was improved (tests only, no production code changed):
+
+- **Inventory stock rules: 8 lived, all `<` → `<=` or `>` → `>=`.** No test sat
+  exactly on a limit. `stock_boundary_test.go` now does: an empty shelf (0 on hand,
+  0 reserved), everything reserved (reserved = on hand), setting on-hand to exactly
+  the reserved quantity, reserving the last unit (available = 1) and one more than
+  that, reserving with nothing available (available = 0), reserving exactly what is
+  available and one more, and committing or releasing exactly the reserved quantity
+  and one more. A lifecycle test checks that stock is never oversold.
+- **Inventory bulk update: 2 lived.** `newAvailable <= previous` → `<` and `continue`
+  → `break`. The test had no unchanged row and no row after a skipped one.
+  `TestBulkSetSkipsUnchangedRowsAndKeepsGoing` has an unchanged row and a decreased
+  row before two increased ones, and checks the exact `stock.increased` events.
+- **Holds app: `newUUID` (2 lived).** Flipping a bit mask (`&` ↔ `|`) in the UUID
+  version/variant bits was not caught. `TestNewUUIDMakesDistinctVersion4UUIDs`
+  checks 200 IDs against the version 4 UUID pattern.
+
+What is left, and why it is accepted:
+
+- **Holds domain, 13 not covered: the checks in `NewHold` and `Collect`
+  (`hold.go`).** They are `case` expressions in a tagless `switch`, which Go's
+  coverage profile does not record, so Gremlins skips them although the table
+  tests (`TestNewHoldValidates`, `TestCollect`, the state-transition table) run
+  every case. Rewriting them as `if` statements (as Ranking did in SCRUM-51) made
+  all 13 visible and killed, but it is a production change with no behaviour
+  change, so it was left out of this test-only ticket. This is why the Holds gate
+  for mutant coverage is 60%.
+- **Lived, equivalent: `stored == "" || given == ""` → `&&` in
+  `PickupCodeMatches` (`pickup.go:50`).** With `&&`, a pair where only one code
+  is empty goes on to `subtle.ConstantTimeCompare`, which returns 0 for strings
+  of different length, so the result is still "no match". No input can tell
+  the two apart.
+- **Lived, equivalent: `size > MaxPageSize` → `>=` in `ListHolds`
+  (`service.go:168`).** When the size is exactly 100 it is set to 100, so nothing
+  changes.
+- **Not covered: `DefaultHoldDuration = 2 * time.Hour` (`service.go:19`).** A
+  constant declaration is not a statement, so no coverage profile can include it.
+  `TestDefaultsMatchTheRules` checks the value, so a change still fails a test.
+
+**SCRUM-51: Ranking.** How the first run (46 killed, 1 lived, 8 not covered; 97.9%
+efficacy) was brought to 100%:
 
 - **Lived: `>` → `>=` in the weight-sum check.** No test sat exactly on the
   tolerance, and with a decimal tolerance (1e-6) no float sum can. The tolerance is
@@ -295,40 +360,74 @@ How the first run (46 killed, 1 lived, 8 not covered; 97.9% efficacy) was brough
   `1.0 / (1 << 20)`, which no coverage profile can include. It is now the literal
   `0x1p-20` (the same value).
 
-Gate: `.gremlins.yaml` fails the run below 95% efficacy or 95% mutant coverage.
-
 ### 7.4 Automation status at the end of Sprint 4
+
+UAT results and participant sign-off dispositions are recorded in
+[docs/uat.md](uat.md); any formal SRS changes require Product Owner approval.
 
 Sprint 4 built the reservation path: the Holds saga (SCRUM-61), Inventory's saga
 events (SCRUM-57), Expiry (SCRUM-62), Feedback (SCRUM-64), Watchlist (SCRUM-59), the
 gateway reservation routes (SCRUM-54) and the patient reserve screens (SCRUM-60).
 This table adds to 7.2; rows there still hold.
 
-CI runs two jobs on every PR: **Go checks** (vet, golangci-lint, unit tests and the
-coverage gate for every module) and **Saga integration tests** (SCRUM-56:
-`tests/integration`, Postgres and RabbitMQ in testcontainers, the real Holds and
-Inventory built with `-race`).
+At the end of Sprint 4, CI ran two jobs on every PR: **Go checks** (vet,
+golangci-lint, unit tests and the coverage gate for every module) and **Saga
+integration tests** (SCRUM-56: `tests/integration`, Postgres and RabbitMQ in
+testcontainers, the real Holds and Inventory built with `-race`). Sprint 5 adds
+`-race` to the unit tests and three more jobs (SCRUM-116, see section 4).
 
 | Test case / area | Automated now | Where |
 |---|---|---|
-| TC-010 Create hold | Yes (UT: quantity 0 and 6 rejected at the gateway; IT: `PENDING` → `ACTIVE` with a pickup code, stock reserved, `hold.confirmed` sent) | `services/gateway/internal/app` (`TestHoldHandlerCreateRejectsOutOfRangeQuantity`), `tests/integration/saga` |
-| TC-011 Hold boundary duration | Yes (UT: a hold expiring exactly now is expired, injected clock; IT: an early `ExpireHold` is refused and keeps the stock) | `services/expiry/internal/app` (`TestAHoldExpiringExactlyNowIsExpired`, `TestHoldBoundaryWithAnInjectedClock`), `tests/integration/saga` |
+| TC-001 / TC-003 Search and availability | Yes (Compose: seeded product and available pharmacy offer are returned through the gateway) | `tests/integration/compose` |
+| TC-010 Create hold | Yes (UT: quantity 0 and 6 rejected at the gateway; IT: `PENDING` → `ACTIVE` with a pickup code, stock reserved, `hold.confirmed` sent; Compose: gateway reservation) | `services/gateway/internal/app` (`TestHoldHandlerCreateRejectsOutOfRangeQuantity`), `tests/integration/saga`, `tests/integration/compose` |
+| TC-011 Hold boundary duration | Yes (UT: a hold expiring exactly now is expired, injected clock; IT: an early `ExpireHold` is refused and keeps the stock; Compose: gateway-triggered expiry sweep) | `services/expiry/internal/app` (`TestAHoldExpiringExactlyNowIsExpired`, `TestHoldBoundaryWithAnInjectedClock`), `tests/integration/saga`, `tests/integration/compose` |
 | TC-012 Concurrent holds | Yes (IT: exactly one winner for the last unit; stock never negative under reserve and release) | `services/inventory/internal/adapters/postgres` (integration, SCRUM-37) |
 | TC-013 Idempotent hold retry | Yes (UT: the same event twice, and the same answer under a new event ID, change nothing; IT: replayed `hold.requested` and `stock.reserved` leave one reservation) | `services/holds/internal/adapters/rabbitmq`, `services/inventory/internal/adapters/rabbitmq` (`TestDuplicateHoldRequestedDeliveryReservesOnce`), `tests/integration/saga` |
 | TC-014 Collect with code | Yes (UT: wrong code refused, collecting twice fails, stock committed before the hold changes) | `services/holds/internal/{domain,app}` |
 | TC-015 Expire hold | Yes (UT: a sweep run twice expires each hold once; IT: expiry releases the stock, a second call changes nothing) | `services/expiry/internal/app`, `tests/integration/saga` |
 | TC-016 Cancel hold | Yes (UT: cancelling twice releases once, another patient never reaches Inventory; IT: cancel releases the stock) | `services/holds/internal/app`, `tests/integration/saga` |
 | TC-023 Watchlist lifecycle | Yes (UT: subscribe, duplicate returns the first, unsubscribe; IT: the same contract against Postgres) | `services/watchlist/internal/{domain,app,adapters}` |
-| TC-024 Return-stock notification | Partly (UT: `stock.increased` alerts only nearby subscribers, each once). Delivery to the app is SCRUM-71 (Sprint 5) | `services/watchlist/internal/app` |
+| TC-024 Return-stock notification | Yes (UT: `stock.increased` alerts only nearby subscribers, each once; Compose: gateway subscription and SSE alert after the real RabbitMQ event) | `services/watchlist/internal/app`, `tests/integration/compose` |
 | TC-028 Role authorization | Partly (UT: missing token 401, wrong role 403, identity added to the request) | `services/gateway/internal/httpx` |
 | TC-031 Saga failure/retry | Yes (UT: each event path, duplicates, retries; IT: rejected and duplicate paths end to end) | `services/holds/internal/adapters/rabbitmq`, `tests/integration/saga` |
 | TC-032 RabbitMQ contract | Yes (IT: the saga's routing keys and payloads observed on `swiftmed.events`) | `tests/integration/saga` |
-| TC-033 Feedback/accuracy | Partly (UT: only a collected hold, once per hold, one `feedback.submitted`). The Trust side is SCRUM-73 (Sprint 5) | `services/feedback/internal/app` |
+| TC-033 Feedback/accuracy | Yes (UT: only a collected hold, once per hold, one `feedback.submitted`; Compose: collected hold, gateway feedback, and trust score observed in search) | `services/feedback/internal/app`, `tests/integration/compose` |
 | TC-035 / TC-036 Load profiles | Scripts only (k6 search and reservation burst with thresholds in the scripts). Results are not recorded yet | `tests/load` (SCRUM-77) |
-| TC-037 Patient accessibility | Partly (UT: axe on the search, results, hold, sign-in and reserve components) | `web/patient-app/components` |
+| TC-037 Patient accessibility | Partly (UT: axe on the search, results, hold, sign-in and reserve components) | `web/swiftmed/components` |
 
 Not yet covered in Sprint 4: TC-026 and TC-038 (pharmacy dashboard: SCRUM-58 and
 SCRUM-70 carried over to Sprint 5).
+
+### 7.5 Unit test coverage of Catalog, Stock Sync and User Profile (SCRUM-113)
+
+These three services had one or two test files each. SCRUM-113 added behaviour tests
+for their domain rules, use cases and gRPC adapters (Stock Sync's gRPC clients too).
+Statement coverage before (`develop` at `71c5e0d`) and after, measured with
+`GOWORK=off go test -race -count=1 -cover ./...` per package and
+`./scripts/coverage-gate.sh` for the gate column:
+
+| Service | Test files | Gate (domain + app) | `internal/...` | Whole module |
+|---|---|---|---|---|
+| Catalog | 1 → 4 | 80.6% → **100%** | 21.7% → **57.8%** | 18.6% → **49.7%** |
+| Stock Sync | 2 → 6 | 77.6% → **98.3%** | 41.5% → **77.2%** | 35.8% → **66.6%** |
+| User Profile | 2 → 5 | 93.2% → **97.7%** | 49.4% → **73.5%** | 33.3% → **49.6%** |
+
+| Package | Before | After | What the new tests check |
+|---|---|---|---|
+| `catalog/internal/domain` | 0% | 100% | Every required field, blank input, pack size 0/1, every dosage form and unknown ones, strength normalization (`" 2.5 MG / 5 mL "` → `2.5mg/5ml`) |
+| `catalog/internal/app` | 86.0% | 100% | Search limit −5/0/1/99/100/101, blank IDs never reach the repository, duplicate IDs removed in first-seen order, repository errors wrapped |
+| `catalog/internal/adapters/grpc` | 0% | 98.7% | Every field mapped, NOT_FOUND / INVALID_ARGUMENT / INTERNAL (without leaking the cause), nil requests, dosage forms both ways |
+| `stock-sync/internal/domain` | 92.8% | 98.6% | BOM, spaces and blank lines, price 0/1/blank/decimal/overflow, quantity 0 to 2³¹−1 and overflow, column count, header variants, malformed CSV, the 1 MB limit exactly and one byte over |
+| `stock-sync/internal/app` | 67.6% | 98.1% | A mixed file (unknown, unparsable, Inventory-rejected and applied rows, errors sorted by row), Catalog, Inventory or Pricing down, page size 0/1/100/101, trimmed input, UTC times |
+| `stock-sync/internal/adapters/grpc` | 0% | 100% | Job and row-error mapping, status codes (upstream gRPC status kept, internal causes hidden), default page |
+| `stock-sync/internal/adapters/clients` | 0% | 91.7% | Requests sent to Catalog, Inventory and Pricing, nil entries skipped, call errors keep their gRPC status |
+| `user-profile/internal/domain` | 100% | 100% | Phone length 7/8/15/16 digits, leading zero, `+`, spaces; `Validate` agrees with `NewProfile` |
+| `user-profile/internal/app` | 88.9% | 96.3% | `UpdateProfile` keeps `created_at` and moves `updated_at`, unknown user, invalid input changes nothing, duplicate create |
+| `user-profile/internal/adapters/grpc` | 0% | 100% | Create-or-update, NOT_FOUND, INVALID_ARGUMENT, ALREADY_EXISTS on a create race, INTERNAL without the cause |
+
+Still at 0%: `adapters/postgres` (needs a database; these services have no
+integration tests yet) and `cmd/server` (wiring only). The coverage gate passes;
+these three services are still report-only in it.
 
 ## 8. Risk-based integration order
 

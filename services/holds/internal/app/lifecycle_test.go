@@ -131,7 +131,7 @@ func TestReserveHoldReportsAnUpdateError(t *testing.T) {
 
 func TestRejectHold(t *testing.T) {
 	ctx := context.Background()
-	svc, _, _ := newTestService(t)
+	svc, _, ev, _ := sagaService(t)
 	pending, _ := svc.CreateHold(ctx, "u-1", "ph-1", "med-1", 1)
 
 	rejected, err := svc.RejectHold(ctx, pending.ID, "no stock")
@@ -141,6 +141,9 @@ func TestRejectHold(t *testing.T) {
 	}
 	if rejected.Status != domain.Rejected || rejected.StatusReason != "no stock" {
 		t.Errorf("status = %s, reason = %q, want REJECTED with the reason", rejected.Status, rejected.StatusReason)
+	}
+	if len(ev.rejected) != 1 || ev.rejected[0].ID != pending.ID {
+		t.Errorf("rejected events = %+v, want the rejected hold published once", ev.rejected)
 	}
 	if _, err := svc.RejectHold(ctx, pending.ID, "again"); !errors.Is(err, domain.ErrInvalidTransition) {
 		t.Errorf("rejecting twice: err = %v, want ErrInvalidTransition", err)
@@ -350,7 +353,7 @@ func TestCancelHoldAlsoWorksOnAPendingHold(t *testing.T) {
 
 func TestExpireHold(t *testing.T) {
 	ctx := context.Background()
-	svc, _, clk := newTestService(t)
+	svc, _, ev, clk := sagaService(t)
 	active := activeHold(t, svc)
 
 	if _, err := svc.ExpireHold(ctx, active.ID); !errors.Is(err, domain.ErrNotYetExpired) {
@@ -366,9 +369,15 @@ func TestExpireHold(t *testing.T) {
 	if err != nil || expired.Status != domain.Expired {
 		t.Fatalf("at expires_at: got (%+v, %v), want an EXPIRED hold", expired, err)
 	}
+	if len(ev.expired) != 1 || ev.expired[0].ID != active.ID {
+		t.Errorf("expired events = %+v, want the expired hold published once", ev.expired)
+	}
 	again, err := svc.ExpireHold(ctx, active.ID)
 	if err != nil || again.Status != domain.Expired {
 		t.Errorf("expiring twice: got (%+v, %v), want the EXPIRED hold and no error", again, err)
+	}
+	if len(ev.expired) != 2 {
+		t.Errorf("expired events after retry = %d, want a deterministic republish for delivery retry", len(ev.expired))
 	}
 }
 

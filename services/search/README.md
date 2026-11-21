@@ -40,7 +40,7 @@ query ────┤                        ├──► Inventory.BatchGetStoc
 | Catalog, Geo, Inventory | **Required** | Search returns `UNAVAILABLE` (`DEADLINE_EXCEEDED` if out of time) |
 | Freshness | Optional | Freshness 0 for every offer |
 | Pricing | Optional | Price 0 ("not listed") |
-| Trust | Optional | Neutral trust 0.5 |
+| Trust | Optional | Neutral trust 0.5 (also used for a pharmacy Trust has no score for) |
 | Pharmacy Registry | Optional | No name, address or map location |
 | Ranking | Optional | Nearest first |
 | Substitution | Optional | No substitutes |

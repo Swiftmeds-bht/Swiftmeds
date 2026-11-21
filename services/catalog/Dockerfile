@@ -2,7 +2,7 @@
 # Build from the repository root:
 # docker build -f services/catalog/Dockerfile -t swiftmed/catalog .
 
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 ENV CGO_ENABLED=0 GOWORK=off
 WORKDIR /src
 

@@ -1,0 +1,261 @@
+"use server";
+
+// Form actions for accounts and holds. They run on the server, so the access
+// token stays in the httpOnly cookie. Each returns { error } for the form to
+// show, or redirects on success. redirect() throws, so it is never inside try.
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { clearSession, getSession, saveSession, withFreshToken } from "@/lib/auth";
+import { gatewayUrl } from "@/lib/data-source";
+import { errorMessage } from "@/lib/hold-format";
+import { HoldError, MAX_HOLD_QUANTITY, holdsBackend } from "@/lib/holds";
+import { NOTIFICATIONS_SEEN_COOKIE, parseSeenAt } from "@/lib/notifications";
+import { PharmacyApiError, registerPharmacy } from "@/lib/pharmacies";
+import { checkPharmacyForm, readPharmacyForm, type PharmacyFormValues } from "@/lib/pharmacy-form";
+import { checkProfile, profileBackend } from "@/lib/profile";
+import { refreshOnce } from "@/lib/refresh";
+import { PHARMACY_SIGNUP, PORTAL_PATH, homeAfterSignIn, isAdmin, isPharmacyStaff } from "@/lib/roles";
+import { safeNext } from "@/lib/session";
+import type { Session } from "@/lib/types";
+import { watchlistBackend } from "@/lib/watchlist";
+
+export interface FormState {
+  error?: string;
+  /** Typed back into the form after an error, since React resets forms after an action. */
+  email?: string;
+}
+
+const text = (form: FormData, name: string) => {
+  const value = form.get(name);
+  return typeof value === "string" ? value.trim() : "";
+};
+
+function failure(err: unknown): FormState {
+  if (err instanceof HoldError) return { error: errorMessage(err.kind, err.message) };
+  console.error(err);
+  return { error: errorMessage("server") };
+}
+
+export async function loginAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const email = text(form, "email");
+  const password = form.get("password");
+  if (!email || typeof password !== "string" || !password) return { error: "Enter your email and password.", email };
+  let session: Session;
+  try {
+    session = await holdsBackend().login(email, password);
+    await saveSession(session);
+  } catch (err) {
+    return { ...failure(err), email };
+  }
+  // One sign-in for everyone (SCRUM-139): staff go to the pharmacy portal.
+  redirect(homeAfterSignIn(session, safeNext(text(form, "next"))));
+}
+
+export async function registerAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const email = text(form, "email");
+  const password = form.get("password");
+  const confirm = form.get("confirm");
+  if (!email || typeof password !== "string" || !password) return { error: "Enter an email and a password.", email };
+  if (password.length < 8) return { error: "Use a password of at least 8 characters.", email };
+  if (password !== confirm) return { error: "The two passwords are not the same.", email };
+  try {
+    const backend = holdsBackend();
+    await backend.register(email, password);
+    await saveSession(await backend.login(email, password));
+  } catch (err) {
+    return { ...failure(err), email };
+  }
+  redirect(safeNext(text(form, "next")));
+}
+
+export interface PharmacySignupState extends FormState {
+  /** Typed back into the form after an error. */
+  values?: PharmacyFormValues;
+}
+
+/**
+ * Registers a pharmacy (SCRUM-142). Signed out: creates the login first (a
+ * patient account, as all public sign-ups are, SCRUM-123), then registers the
+ * pharmacy, which makes the account the pharmacy's staff account (SCRUM-141).
+ * Signed in as a patient (for example after a sign-up that stopped half way):
+ * only registers the pharmacy. Either way the pharmacy starts pending, and the
+ * portal says so until an administrator approves it.
+ */
+export async function registerPharmacyAction(_prev: PharmacySignupState, form: FormData): Promise<PharmacySignupState> {
+  const values = readPharmacyForm(form);
+  const existing = await getSession();
+  if (existing && (isAdmin(existing) || isPharmacyStaff(existing))) redirect(homeAfterSignIn(existing, PORTAL_PATH));
+
+  const email = existing ? existing.email : text(form, "email");
+  const password = form.get("password");
+  if (!existing) {
+    const confirm = form.get("confirm");
+    if (!email || typeof password !== "string" || !password) return { error: "Enter an email and a password for your login.", email, values };
+    if (password.length < 8) return { error: "Use a password of at least 8 characters.", email, values };
+    if (password !== confirm) return { error: "The two passwords are not the same.", email, values };
+  }
+  const checked = checkPharmacyForm(values);
+  if ("error" in checked) return { error: checked.error, email, values };
+
+  let session: Session;
+  if (existing) {
+    session = existing;
+  } else {
+    try {
+      const backend = holdsBackend();
+      await backend.register(email, password as string);
+      session = await backend.login(email, password as string);
+      await saveSession(session);
+    } catch (err) {
+      return { ...failure(err), email, values };
+    }
+  }
+
+  try {
+    await registerPharmacy(session, checked.details);
+  } catch (err) {
+    if (err instanceof PharmacyApiError && err.status === 401) return signInAgain(PHARMACY_SIGNUP);
+    if (err instanceof PharmacyApiError) return { error: err.message, email, values };
+    return { ...failure(err), email, values };
+  }
+
+  // The account is now the pharmacy's staff account; a new token says so.
+  const outcome = await refreshOnce(session, { gatewayUrl: gatewayUrl() });
+  if (outcome.kind !== "refreshed") {
+    await clearSession();
+    redirect(`/login?next=${encodeURIComponent(PORTAL_PATH)}&registered=1`);
+  }
+  await saveSession(outcome.session);
+  redirect(PORTAL_PATH);
+}
+
+export async function logoutAction(): Promise<void> {
+  await clearSession();
+  redirect("/");
+}
+
+/** The session, or (after clearing a stale one) a redirect to sign in. */
+async function sessionOrSignIn(returnTo: string): Promise<Session> {
+  const session = await getSession();
+  if (!session) redirect(`/login?next=${encodeURIComponent(safeNext(returnTo, "/"))}`);
+  return session;
+}
+
+async function signInAgain(returnTo: string): Promise<never> {
+  await clearSession();
+  redirect(`/login?next=${encodeURIComponent(safeNext(returnTo, "/"))}&expired=1`);
+}
+
+export async function createHoldAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const returnTo = text(form, "returnTo");
+  const session = await sessionOrSignIn(returnTo);
+  const quantity = Number(text(form, "quantity"));
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_HOLD_QUANTITY) {
+    return { error: `Choose 1 to ${MAX_HOLD_QUANTITY} units.` };
+  }
+
+  let holdId: string;
+  try {
+    const input = { pharmacyId: text(form, "pharmacyId"), productId: text(form, "productId"), quantity };
+    const hold = await withFreshToken(session, (s) => holdsBackend().createHold(s, input));
+    holdId = hold.holdId;
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
+    return failure(err);
+  }
+  redirect(`/holds/${encodeURIComponent(holdId)}`);
+}
+
+export interface WatchState extends FormState {
+  /** Set once the medicine is on the watchlist. */
+  watching?: boolean;
+}
+
+/** "Notify me when it is back": watches one medicine around the searched place. */
+export async function watchAction(_prev: WatchState, form: FormData): Promise<WatchState> {
+  const returnTo = text(form, "returnTo");
+  const session = await sessionOrSignIn(returnTo);
+  const latitude = Number(text(form, "lat"));
+  const longitude = Number(text(form, "lng"));
+  const radiusM = Number(text(form, "radius"));
+  const productId = text(form, "productId");
+  if (!productId || !Number.isFinite(latitude) || !Number.isFinite(longitude) || !(radiusM > 0)) {
+    return { error: "Search again, then press Notify me." };
+  }
+  try {
+    await withFreshToken(session, (s) => watchlistBackend().subscribe(s, { productId, location: { latitude, longitude }, radiusM }));
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
+    return failure(err);
+  }
+  return { watching: true };
+}
+
+export async function unwatchAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const session = await sessionOrSignIn("/watchlist");
+  try {
+    const subscriptionId = text(form, "subscriptionId");
+    await withFreshToken(session, (s) => watchlistBackend().unsubscribe(s, subscriptionId));
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain("/watchlist");
+    // Already gone is what the patient wanted.
+    if (!(err instanceof HoldError && err.kind === "not_found")) return failure(err);
+  }
+  redirect("/watchlist");
+}
+
+export interface ProfileState extends FormState {
+  /** Set after a successful save. */
+  saved?: boolean;
+  /** Typed back into the form after an error. */
+  displayName?: string;
+  phone?: string;
+}
+
+/** Saves the patient's name and phone (SCRUM-137). */
+export async function saveProfileAction(_prev: ProfileState, form: FormData): Promise<ProfileState> {
+  const session = await sessionOrSignIn("/profile");
+  const typed = { displayName: text(form, "displayName"), phone: text(form, "phone") };
+  const checked = checkProfile(typed);
+  if ("error" in checked) return { error: checked.error, ...typed };
+  try {
+    const saved = await withFreshToken(session, (s) => profileBackend().save(s, checked.profile));
+    // The header shows the name: refresh every page's layout.
+    revalidatePath("/", "layout");
+    return { saved: true, ...saved };
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain("/profile");
+    return { ...failure(err), ...typed };
+  }
+}
+
+/**
+ * Remembers the newest notification the patient has seen, so the bell stops
+ * counting it as unread (there is no read API). Called when the bell opens.
+ */
+export async function markNotificationsSeenAction(newestCreatedAt: string): Promise<void> {
+  const seenAt = parseSeenAt(newestCreatedAt);
+  if (!seenAt || !(await getSession())) return;
+  (await cookies()).set(NOTIFICATIONS_SEEN_COOKIE, seenAt, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+}
+
+export async function cancelHoldAction(_prev: FormState, form: FormData): Promise<FormState> {
+  const holdId = text(form, "holdId");
+  const returnTo = safeNext(text(form, "returnTo"), `/holds/${encodeURIComponent(holdId)}`);
+  const session = await sessionOrSignIn(returnTo);
+  try {
+    await withFreshToken(session, (s) => holdsBackend().cancelHold(s, holdId));
+  } catch (err) {
+    if (err instanceof HoldError && err.kind === "unauthorized") return signInAgain(returnTo);
+    return failure(err);
+  }
+  redirect(returnTo);
+}

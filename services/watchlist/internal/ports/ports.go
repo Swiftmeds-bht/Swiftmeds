@@ -4,6 +4,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/services/watchlist/internal/domain"
 )
@@ -26,9 +27,18 @@ type SubscriptionRepository interface {
 	// both or neither. It returns false (and saves nothing) if the subscription is
 	// gone or was already notified, so a redelivered event cannot alert twice.
 	Notify(ctx context.Context, alert domain.Alert) (bool, error)
+	// PendingAlerts returns the user's alerts that have not been delivered yet, oldest first.
+	PendingAlerts(ctx context.Context, userID string) ([]domain.Alert, error)
+	// MarkDelivered records that an alert reached the user. Marking it again changes nothing.
+	MarkDelivered(ctx context.Context, alertID string, at time.Time) error
 }
 
 // PharmacyLocator answers "is this pharmacy within radiusM of center?" (Geo).
 type PharmacyLocator interface {
 	WithinRadius(ctx context.Context, pharmacyID string, center domain.Point, radiusM int32) (bool, error)
+}
+
+// AlertEvents publishes newly created watchlist alerts for downstream services.
+type AlertEvents interface {
+	AlertCreated(context.Context, domain.Alert) error
 }

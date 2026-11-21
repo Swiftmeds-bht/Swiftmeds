@@ -49,7 +49,7 @@ func TestRabbitMQIntegration_PublishConsumed(t *testing.T) {
 			RoutingKeys: []string{"hold.requested"},
 			MaxAttempts: 3,
 		},
-		&memoryDeduper{},
+		NewMemoryDeduper(),
 		func(context.Context, amqp.Delivery) error {
 			handled <- struct{}{}
 			return nil

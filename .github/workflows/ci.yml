@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  schedule:
+    - cron: "17 3 * * *"
   pull_request:
     branches:
       - develop
@@ -31,6 +33,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3.13-management
+        env:
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out repository
@@ -42,6 +56,17 @@ jobs:
           go-version-file: go.work
           cache: true
           cache-dependency-path: "**/go.sum"
+
+      - name: Install protobuf compiler and Go generators
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/protoc.zip" \
+            https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+          mkdir -p "$RUNNER_TEMP/protoc"
+          unzip -q "$RUNNER_TEMP/protoc.zip" -d "$RUNNER_TEMP/protoc"
+          echo "$RUNNER_TEMP/protoc/bin" >> "$GITHUB_PATH"
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Install golangci-lint
         shell: bash
@@ -100,7 +125,7 @@ jobs:
             pushd "${module_dir}" >/dev/null
 
             if packages="$(GOWORK=off go list ./...)" && [[ -n "${packages}" ]]; then
-              GOWORK=off go test ./... -covermode=atomic -coverprofile="${coverage_file}"
+              GOWORK=off go test -race ./... -covermode=atomic -coverprofile="${coverage_file}"
             else
               echo "No Go packages found in ${module_name}; writing an empty coverage profile."
               printf 'mode: atomic\n' > "${coverage_file}"
@@ -110,7 +135,10 @@ jobs:
             echo "::endgroup::"
           done < <(go list -m -f '{{.Dir}}')
 
-      - name: Enforce coverage gate on core services
+      - name: Check protobuf generated code drift (SCRUM-68)
+        run: bash ./scripts/check-proto-drift.sh
+
+      - name: Enforce coverage gate on every service (SCRUM-128)
         run: ./scripts/coverage-gate.sh
 
       - name: Upload coverage reports
@@ -120,6 +148,271 @@ jobs:
           name: coverage-reports
           path: coverage/
           if-no-files-found: ignore
+
+  integration:
+    name: Go integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: swiftmed
+          POSTGRES_PASSWORD: change-me
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U swiftmed -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      rabbitmq:
+        image: rabbitmq:3.13-management
+        env:
+          RABBITMQ_DEFAULT_USER: swiftmed
+          RABBITMQ_DEFAULT_PASS: change-me
+        ports:
+          - 5672:5672
+        # `ping` passes before the AMQP listener accepts connections; this waits for it.
+        options: >-
+          --health-cmd "test -f /var/lib/rabbitmq/.erlang.cookie && rabbitmq-diagnostics -q check_port_connectivity"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    # One database per test suite: the suites empty their own tables, so sharing
+    # one database would let them interfere when modules run in a different order.
+    env:
+      PG: "postgres://swiftmed:change-me@127.0.0.1:5432"
+      RABBITMQ_URL: "amqp://swiftmed:change-me@127.0.0.1:5672/"
+      POSTGRES_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/migrate_test?sslmode=disable"
+      MESSAGING_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/messaging_test?sslmode=disable"
+      EXPIRY_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/expiry_test?sslmode=disable"
+      FEEDBACK_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/feedback_test?sslmode=disable"
+      GEO_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/geo_test?sslmode=disable"
+      AUTH_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/auth_test?sslmode=disable"
+      HOLDS_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/holds_test?sslmode=disable"
+      INVENTORY_TEST_DB_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/inventory_test?sslmode=disable"
+      PRICING_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/pricing_test?sslmode=disable"
+      PHARMACY_REGISTRY_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/pharmacy_registry_test?sslmode=disable"
+      TRUST_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/trust_test?sslmode=disable"
+      USER_PROFILE_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/user_profile_test?sslmode=disable"
+      WATCHLIST_TEST_DATABASE_URL: "postgres://swiftmed:change-me@127.0.0.1:5432/watchlist_test?sslmode=disable"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Create the test databases
+        run: |
+          for db in migrate_test messaging_test expiry_test feedback_test geo_test auth_test holds_test inventory_test pharmacy_registry_test pricing_test trust_test user_profile_test watchlist_test; do
+            psql "${PG}/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${db}"
+          done
+
+      # Every //go:build integration package plus pkg/messaging, with -race and -v.
+      # Fails if any of them skips because a URL above is missing.
+      - name: Run Go integration tests
+        run: ./scripts/integration-tests.sh
+
+  compose-integration:
+    name: Compose gateway integration suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GATEWAY_URL: http://127.0.0.1:8080
+      RABBITMQ_URL: amqp://swiftmed:change-me@127.0.0.1:5672/
+      WORKER_SHARED_SECRET: ci-worker-shared-secret-32-bytes-minimum
+      HOLDS_HOLD_DURATION: 5s
+      EXPIRY_HOLD_DURATION: 5s
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+
+      - name: Start full Compose stack and seed demo data
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          jwt_secret="$(openssl rand -hex 32)"
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${jwt_secret}/" .env
+          sed -i "s/^WORKER_SHARED_SECRET=.*/WORKER_SHARED_SECRET=${WORKER_SHARED_SECRET}/" .env
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env up -d --build --wait --wait-timeout 900
+          env -u RABBITMQ_URL docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env --profile seed run --rm seed
+
+      - name: Run gateway cross-service suite
+        working-directory: tests/integration
+        run: GOWORK=off go test -tags integration -count=1 -v ./compose
+
+      - name: Print Compose logs on failure
+        if: failure()
+        run: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env logs --no-color
+
+      - name: Stop Compose stack
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml --env-file .env down -v
+
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/swiftmed/package-lock.json
+
+      # The one SwiftMed web app: patient pages and the pharmacy portal (SCRUM-139).
+      - name: Web app checks
+        working-directory: web/swiftmed
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: OpenAPI lint (SCRUM-68)
+        run: npx --yes @redocly/cli@1.34.5 lint docs/api/openapi.yaml
+
+  docker-images:
+    name: Build all deployment images (SCRUM-67, SCRUM-72)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Build every Kubernetes image
+        run: ./scripts/k8s-images.sh --tag ci
+
+  vulnerability-scan:
+    name: Go vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Scan all Go modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r module_dir; do
+            echo "==> ${module_dir}"
+            if (cd "${module_dir}" && GOWORK=off "$(go env GOPATH)/bin/govulncheck" ./...); then
+              echo "govulncheck passed for ${module_dir}"
+            else
+              status=$?
+              echo "govulncheck failed for ${module_dir} (exit ${status})"
+              failed=1
+            fi
+          done < <(go list -m -f '{{.Dir}}')
+          exit "${failed}"
+
+  mutation:
+    name: Mutation tests (SCRUM-113)
+    if: github.event_name == 'schedule' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+          cache-dependency-path: "**/go.sum"
+      - name: Install Gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.0
+      - name: Run mutation tests
+        run: make mutation
+
+  workers:
+    name: Workers (${{ matrix.worker }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [freshness-decay, hold-expiry]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/${{ matrix.worker }}/package-lock.json
+
+      - name: Typecheck and test
+        working-directory: workers/${{ matrix.worker }}
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+  k8s-manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSLO https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/CHECKSUMS \
+            | grep ' kubeconform-linux-amd64.tar.gz$' | sha256sum -c -
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
+          sudo install -m 755 kubeconform /usr/local/bin/kubeconform
+
+      # Every overlay must render and every object must match its schema, so a
+      # broken YAML file fails the PR. The local overlay reads a gitignored
+      # secrets.env; the example has the same keys.
+      - name: Build and validate base and overlays
+        run: |
+          cp deploy/k8s/base/secrets.env.example deploy/k8s/overlays/local/secrets.env
+          for dir in base overlays/local overlays/prod monitoring; do
+            echo "==> deploy/k8s/$dir"
+            kubectl kustomize "deploy/k8s/$dir" | kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          done
 
   saga-integration:
     name: Saga integration tests

@@ -1,0 +1,236 @@
+# Traefik inside the cluster (SCRUM-108), configured like the Compose one
+# (deploy/traefik/traefik.yml):
+#   - "grpc" :50051 routes every service-to-service gRPC call by :authority
+#     (Host(`search`), ...) straight to the pods. Kubernetes Services alone would
+#     not spread gRPC: HTTP/2 keeps one connection, so extra pods from the
+#     autoscaler would get no calls.
+#   - "web" :8080 and "patient" :3000 serve the gateway and the SwiftMed web app
+#     (Ingresses in gateway.yaml and web.yaml; one app since SCRUM-139).
+# It reads standard Ingress objects of the class "swiftmed", so no CRDs are
+# needed. k3s's own Traefik is switched off (overlays/*/cluster.yaml).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traefik
+---
+# Least privilege: Traefik reads only this namespace (the provider's
+# `namespaces: [swiftmed]` below), so its rights are a namespaced Role, not a
+# ClusterRole. A cluster-wide Secret read would include the Sealed Secrets
+# controller's key in kube-system and the Grafana password in monitoring.
+# Secrets stay in the list because the Ingress provider always watches them
+# (for TLS; none is used here, Cloudflare serves HTTPS). Traefik builds no
+# routes until every watch works, so a missing right here means 404 everywhere.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: swiftmed-traefik
+rules:
+  - apiGroups: [""]
+    resources: [services, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: swiftmed-traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: swiftmed-traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: swiftmed
+---
+# The cluster-wide objects the provider watches: IngressClasses and Nodes
+# (read-only, no credentials in either). That is all this ClusterRole allows.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: swiftmed-traefik
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingressclasses]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: swiftmed-traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: swiftmed-traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: swiftmed
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: swiftmed
+spec:
+  controller: traefik.io/ingress-controller
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config
+data:
+  traefik.yml: |
+    entryPoints:
+      web:
+        address: ":8080"
+      patient:
+        address: ":3000"
+      grpc:
+        address: ":50051"
+      traefik:
+        address: ":8081"
+    api:
+      dashboard: true
+      # Dashboard on the "traefik" entrypoint, reachable only with kubectl port-forward.
+      insecure: true
+    ping: {}
+    # Request count and latency per entrypoint, router and service, at
+    # :8081/metrics, scraped by Prometheus (deploy/k8s/monitoring). Every gRPC call
+    # between services passes through here, so this covers all 20 services.
+    metrics:
+      prometheus:
+        entryPoint: traefik
+        addEntryPointsLabels: true
+        addRoutersLabels: true
+        addServicesLabels: true
+        buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]
+    providers:
+      kubernetesIngress:
+        ingressClass: swiftmed
+        namespaces: [swiftmed]
+    log:
+      level: INFO
+    # One line per request, as JSON, so Loki can query it by field.
+    accessLog:
+      format: json
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  # Active-active (SCRUM-108, SCRUM-135): two replicas, both serving. Each builds
+  # its routes from the Kubernetes API on its own (Traefik keeps no state), and
+  # the Services spread connections over both. One pod restarting, being
+  # updated or evicted never stops this path; pdb.yaml keeps one up during a
+  # node drain.
+  replicas: 2
+  # Start the new pod before stopping an old one, so an update never drops to one.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traefik
+        app.kubernetes.io/part-of: swiftmed
+      annotations:
+        # Restart Traefik when its static configuration changes.
+        swiftmed/config-version: "3"
+    spec:
+      # Put the replicas on different nodes when there is more than one, so
+      # losing a node keeps one Traefik. "Preferred", so both still run on the
+      # single-node laptop cluster.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {app.kubernetes.io/name: traefik}
+      serviceAccountName: traefik
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: traefik
+          image: traefik:v3.6
+          args: ["--configFile=/etc/traefik/traefik.yml"]
+          ports:
+            - {name: web, containerPort: 8080}
+            - {name: patient, containerPort: 3000}
+            - {name: grpc, containerPort: 50051}
+            - {name: admin, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /ping, port: admin}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /ping, port: admin}
+            periodSeconds: 10
+          # Keep serving while the pod is taken out of the Services' endpoints;
+          # then Traefik's graceful shutdown sends HTTP/2 GOAWAY, so the gateway's
+          # long-lived gRPC connection moves to the other Traefik at once. Without
+          # this, deleting one of two Traefik pods failed calls for ~20 s (tested).
+          lifecycle:
+            preStop:
+              sleep: {seconds: 10}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "1", memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/traefik}
+      volumes:
+        - name: config
+          configMap:
+            name: traefik-config
+---
+# In-cluster address of Traefik: the services' *_UPSTREAM=traefik:50051.
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+spec:
+  selector:
+    app.kubernetes.io/name: traefik
+  ports:
+    - {name: grpc, port: 50051, targetPort: grpc}
+    - {name: web, port: 8080, targetPort: web}
+    - {name: patient, port: 3000, targetPort: patient}
+    - {name: admin, port: 8081, targetPort: admin}
+---
+# The ports opened to the laptop (and to the Cloudflare Tunnel, SCRUM-75). gRPC
+# and the Traefik dashboard stay inside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-public
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: traefik
+  ports:
+    - {name: web, port: 8080, targetPort: web}
+    - {name: patient, port: 3000, targetPort: patient}

@@ -48,10 +48,7 @@ func sweepHandler(secret string, sweeper ports.HoldExpirySweeper, logger *slog.L
 
 		expired, err := sweeper.RunSweep(ctx, asOf)
 		if err != nil {
-			logger.Error("hold expiry sweep failed",
-				"request_id", httpx.RequestIDFromContext(r.Context()),
-				"error", err.Error(),
-			)
+			logRPCError(logger, "hold expiry sweep failed", httpx.RequestIDFromContext(r.Context()), err)
 			// The caller gets a status and a fixed message, never the internal error text.
 			status := httpx.StatusCode(err)
 			writeError(w, status, errorMessage(status))

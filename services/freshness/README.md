@@ -43,6 +43,7 @@ migrations/                  SQL files, embedded in the binary and run at start
 |---|---|---|
 | `FRESHNESS_GRPC_PORT` | `50069` | gRPC listen port |
 | `FRESHNESS_DATABASE_URL` | required | Postgres connection string for `freshness_db` |
+| `RABBITMQ_URL` | required | RabbitMQ connection used to consume `stock.increased` confirmations |
 | `FRESHNESS_HIGH_WITHIN` | `6h` | Younger than this is HIGH |
 | `FRESHNESS_MEDIUM_WITHIN` | `24h` | Younger than this is MEDIUM, older is LOW. Must be longer than `FRESHNESS_HIGH_WITHIN`. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
@@ -53,6 +54,12 @@ migrations/                  SQL files, embedded in the binary and run at start
 The service runs every `migrations/*.up.sql` file when it starts, so each file
 must be safe to run more than once (`CREATE TABLE IF NOT EXISTS`). The
 `*.down.sql` files are only for running by hand.
+
+Inventory publishes `stock.increased` after a manual stock update or CSV stock
+sync. Freshness consumes that event through its own durable queue,
+`freshness.stock-increased`, records the event's `occurred_at` timestamp, and
+deduplicates deliveries with the shared PostgreSQL event schema. Failed
+deliveries are retried and then sent to the queue's dead-letter queue.
 
 ## Run
 

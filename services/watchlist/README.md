@@ -14,7 +14,25 @@ each of them, and marks their subscription notified so it does not fire again.
 | `Subscribe` | Creates a subscription. Subscribing again to the same product while still waiting returns the existing one. `radius_m` 0 means 5 km; the maximum is 50 km. |
 | `Unsubscribe` | Removes one of the user's subscriptions and its alerts. Someone else's ID answers `NOT_FOUND`. |
 | `ListSubscriptions` | The user's subscriptions, newest first. `notified_at` is set once the alert fired. |
-| `StreamAlerts` | Not built yet (SCRUM-71). Answers `UNIMPLEMENTED`. It will deliver the rows in the `alerts` table. |
+| `StreamAlerts` | Server stream of the user's alerts (SCRUM-71). First sends every alert not yet delivered, oldest first, then each new one as it happens, until the client goes away. See below. |
+
+## Alert stream (SCRUM-71)
+
+`StreamAlerts(user_id)` stays open while the patient has the app open (the
+gateway turns it into server-sent events at `GET /api/v1/watchlist/alerts`).
+
+- **Delivered at least once, then not again.** An alert is marked delivered
+  (`alerts.delivered_at`) only after `Send` succeeded. If the patient is offline
+  when stock comes back, the alert waits and is sent on the next connection. If
+  the connection breaks between `Send` and the mark, the alert can arrive twice;
+  the patient app shows one alert per subscription.
+- **Push and poll.** A saved alert wakes that user's open streams on the same
+  replica at once (`internal/app/stream.go`, `hub`). Every stream also checks the
+  database every 5 s (`DefaultAlertPoll`), so alerts saved by another replica
+  are found too.
+- **No leaks.** When the client cancels, the stream's context ends, the loop
+  returns and the stream leaves the hub. The tests check the hub is empty after
+  disconnect, with `-race`.
 
 ## Events
 

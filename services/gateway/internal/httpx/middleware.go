@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	requestIDHeader = "X-Request-ID"
-	healthPath      = "/healthz"
+	requestIDHeader    = "X-Request-ID"
+	maxRequestIDLength = 128
+	healthPath         = "/healthz"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -26,7 +27,7 @@ func Chain(handler http.Handler, middleware ...Middleware) http.Handler {
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := strings.TrimSpace(r.Header.Get(requestIDHeader))
-		if requestID == "" {
+		if requestID == "" || len(requestID) > maxRequestIDLength {
 			requestID = newRequestID()
 		}
 		w.Header().Set(requestIDHeader, requestID)
@@ -104,6 +105,10 @@ func (r *statusRecorder) Write(body []byte) (int, error) {
 	r.bytes += written
 	return written, err
 }
+
+// Unwrap lets http.ResponseController reach the real writer, so a streaming
+// handler (the watchlist alert stream) can flush each event through this wrapper.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 func newRequestID() string {
 	var value [16]byte

@@ -7,6 +7,11 @@ entryPoints:
   # HTTP traffic for the REST gateway.
   web:
     address: ":8080"
+  # HTTP traffic for the SwiftMed web app (SCRUM-117; one app since SCRUM-139,
+  # the name "patient" predates the merge). Published on host port
+  # ${PATIENT_APP_HTTP_PORT:-3000}.
+  patient:
+    address: ":3000"
   # gRPC traffic from the gateway to the services.
   grpc:
     address: ":50051"
@@ -18,6 +23,8 @@ api:
   dashboard: true
   # Serves the dashboard without auth on the "traefik" entrypoint. Local dev only.
   insecure: true
+
+ping: {}
 
 providers:
   docker:

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -94,6 +95,22 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Use
 		return domain.User{}, TokenPair{}, err
 	}
 	return user, tokens, nil
+}
+
+// LinkPharmacy makes the account the staff account of a pharmacy it has just
+// registered (SCRUM-141). Public sign-up still only makes patients (SCRUM-123):
+// the staff role comes only from here, and only the gateway calls it, after
+// Pharmacy Registry recorded the user as the pharmacy's owner. The pharmacy
+// starts pending, so the account can do nothing visible until an admin approves.
+func (s *Service) LinkPharmacy(ctx context.Context, userID, pharmacyID string) (domain.User, error) {
+	if userID == "" || pharmacyID == "" {
+		return domain.User{}, domain.ErrMissingLink
+	}
+	user, err := s.repo.LinkPharmacy(ctx, userID, pharmacyID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return user, nil
 }
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (TokenPair, error) {
@@ -240,7 +257,20 @@ func newID() (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	// RFC 4122 version 4 UUID: random bits with the version and variant set.
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	encoded := make([]byte, 36)
+	hex.Encode(encoded[0:8], b[0:4])
+	encoded[8] = '-'
+	hex.Encode(encoded[9:13], b[4:6])
+	encoded[13] = '-'
+	hex.Encode(encoded[14:18], b[6:8])
+	encoded[18] = '-'
+	hex.Encode(encoded[19:23], b[8:10])
+	encoded[23] = '-'
+	hex.Encode(encoded[24:36], b[10:16])
+	return string(encoded), nil
 }
 
 func hashToken(token string) string {

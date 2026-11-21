@@ -42,6 +42,21 @@ func (r *memRepo) FindUserByEmail(_ context.Context, email string) (domain.User,
 	return r.users[id], nil
 }
 
+func (r *memRepo) LinkPharmacy(_ context.Context, userID, pharmacyID string) (domain.User, error) {
+	u, ok := r.users[userID]
+	switch {
+	case !ok:
+		return domain.User{}, domain.ErrUserNotFound
+	case u.Role == domain.RoleAdmin:
+		return domain.User{}, domain.ErrAdminLink
+	case u.PharmacyID != "" && u.PharmacyID != pharmacyID:
+		return domain.User{}, domain.ErrAlreadyLinked
+	}
+	u.Role, u.PharmacyID = domain.RolePharmacist, pharmacyID
+	r.users[userID] = u
+	return u, nil
+}
+
 func (r *memRepo) FindUserByID(_ context.Context, id string) (domain.User, error) {
 	u, ok := r.users[id]
 	if !ok {
@@ -83,6 +98,7 @@ func TestToStatusMapsDomainErrors(t *testing.T) {
 		{domain.ErrInvalidPassword, codes.InvalidArgument},
 		{domain.ErrInvalidRole, codes.InvalidArgument},
 		{domain.ErrAdminRegistration, codes.InvalidArgument},
+		{domain.ErrStaffRegistration, codes.InvalidArgument},
 		{domain.ErrUserExists, codes.AlreadyExists},
 		{domain.ErrInvalidCredentials, codes.Unauthenticated},
 		{domain.ErrInvalidToken, codes.Unauthenticated},
@@ -130,23 +146,32 @@ func TestRegisterWithUnspecifiedRoleIsInvalidArgument(t *testing.T) {
 	}
 }
 
+func TestRegisterRejectsPharmacyStaffRole(t *testing.T) {
+	_, err := newHandler().Register(context.Background(), &authv1.RegisterRequest{
+		Email: "staff@example.com", Password: "correct horse", Role: authv1.Role_ROLE_PHARMACY_STAFF,
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))
+	}
+}
+
 // TestFullFlow exercises every RPC once through the handler.
 func TestFullFlow(t *testing.T) {
 	h := newHandler()
 	ctx := context.Background()
 
 	reg, err := h.Register(ctx, &authv1.RegisterRequest{
-		Email: "pharmacist@example.com", Password: "correct horse", Role: authv1.Role_ROLE_PHARMACY_STAFF,
+		Email: "patient@example.com", Password: "correct horse", Role: authv1.Role_ROLE_PATIENT,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	login, err := h.Login(ctx, &authv1.LoginRequest{Email: "pharmacist@example.com", Password: "correct horse"})
+	login, err := h.Login(ctx, &authv1.LoginRequest{Email: "patient@example.com", Password: "correct horse"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if login.GetUserId() != reg.GetUserId() || login.GetRole() != authv1.Role_ROLE_PHARMACY_STAFF {
+	if login.GetUserId() != reg.GetUserId() || login.GetRole() != authv1.Role_ROLE_PATIENT {
 		t.Fatalf("login = %+v", login)
 	}
 	if login.GetTokens().GetAccessTokenExpiresAt() == nil {
@@ -157,7 +182,7 @@ func TestFullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if who.GetUserId() != reg.GetUserId() || who.GetRole() != authv1.Role_ROLE_PHARMACY_STAFF {
+	if who.GetUserId() != reg.GetUserId() || who.GetRole() != authv1.Role_ROLE_PATIENT {
 		t.Fatalf("validate = %+v", who)
 	}
 

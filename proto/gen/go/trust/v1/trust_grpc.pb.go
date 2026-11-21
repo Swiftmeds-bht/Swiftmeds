@@ -6,7 +6,8 @@
 
 // Trust: each pharmacy's accuracy record. Owner: Sherab.
 // Consumes FeedbackSubmitted; "was in stock" raises the score, "not in stock" lowers it.
-// New pharmacies start at a neutral score until they have enough feedback.
+// Recent feedback counts more than old feedback. New pharmacies start at the
+// neutral score (0.5) until they have feedback.
 
 package trustv1
 
@@ -23,14 +24,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TrustService_GetTrustScores_FullMethodName = "/swiftmed.trust.v1.TrustService/GetTrustScores"
+	TrustService_GetTrust_FullMethodName      = "/swiftmed.trust.v1.TrustService/GetTrust"
+	TrustService_BatchGetTrust_FullMethodName = "/swiftmed.trust.v1.TrustService/BatchGetTrust"
 )
 
 // TrustServiceClient is the client API for TrustService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TrustServiceClient interface {
-	GetTrustScores(ctx context.Context, in *GetTrustScoresRequest, opts ...grpc.CallOption) (*GetTrustScoresResponse, error)
+	GetTrust(ctx context.Context, in *GetTrustRequest, opts ...grpc.CallOption) (*GetTrustResponse, error)
+	// Search calls this once per search with every pharmacy that has an offer.
+	BatchGetTrust(ctx context.Context, in *BatchGetTrustRequest, opts ...grpc.CallOption) (*BatchGetTrustResponse, error)
 }
 
 type trustServiceClient struct {
@@ -41,10 +45,20 @@ func NewTrustServiceClient(cc grpc.ClientConnInterface) TrustServiceClient {
 	return &trustServiceClient{cc}
 }
 
-func (c *trustServiceClient) GetTrustScores(ctx context.Context, in *GetTrustScoresRequest, opts ...grpc.CallOption) (*GetTrustScoresResponse, error) {
+func (c *trustServiceClient) GetTrust(ctx context.Context, in *GetTrustRequest, opts ...grpc.CallOption) (*GetTrustResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetTrustScoresResponse)
-	err := c.cc.Invoke(ctx, TrustService_GetTrustScores_FullMethodName, in, out, cOpts...)
+	out := new(GetTrustResponse)
+	err := c.cc.Invoke(ctx, TrustService_GetTrust_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *trustServiceClient) BatchGetTrust(ctx context.Context, in *BatchGetTrustRequest, opts ...grpc.CallOption) (*BatchGetTrustResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGetTrustResponse)
+	err := c.cc.Invoke(ctx, TrustService_BatchGetTrust_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +69,9 @@ func (c *trustServiceClient) GetTrustScores(ctx context.Context, in *GetTrustSco
 // All implementations must embed UnimplementedTrustServiceServer
 // for forward compatibility.
 type TrustServiceServer interface {
-	GetTrustScores(context.Context, *GetTrustScoresRequest) (*GetTrustScoresResponse, error)
+	GetTrust(context.Context, *GetTrustRequest) (*GetTrustResponse, error)
+	// Search calls this once per search with every pharmacy that has an offer.
+	BatchGetTrust(context.Context, *BatchGetTrustRequest) (*BatchGetTrustResponse, error)
 	mustEmbedUnimplementedTrustServiceServer()
 }
 
@@ -66,8 +82,11 @@ type TrustServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedTrustServiceServer struct{}
 
-func (UnimplementedTrustServiceServer) GetTrustScores(context.Context, *GetTrustScoresRequest) (*GetTrustScoresResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetTrustScores not implemented")
+func (UnimplementedTrustServiceServer) GetTrust(context.Context, *GetTrustRequest) (*GetTrustResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTrust not implemented")
+}
+func (UnimplementedTrustServiceServer) BatchGetTrust(context.Context, *BatchGetTrustRequest) (*BatchGetTrustResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BatchGetTrust not implemented")
 }
 func (UnimplementedTrustServiceServer) mustEmbedUnimplementedTrustServiceServer() {}
 func (UnimplementedTrustServiceServer) testEmbeddedByValue()                      {}
@@ -90,20 +109,38 @@ func RegisterTrustServiceServer(s grpc.ServiceRegistrar, srv TrustServiceServer)
 	s.RegisterService(&TrustService_ServiceDesc, srv)
 }
 
-func _TrustService_GetTrustScores_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetTrustScoresRequest)
+func _TrustService_GetTrust_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTrustRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(TrustServiceServer).GetTrustScores(ctx, in)
+		return srv.(TrustServiceServer).GetTrust(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: TrustService_GetTrustScores_FullMethodName,
+		FullMethod: TrustService_GetTrust_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TrustServiceServer).GetTrustScores(ctx, req.(*GetTrustScoresRequest))
+		return srv.(TrustServiceServer).GetTrust(ctx, req.(*GetTrustRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TrustService_BatchGetTrust_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGetTrustRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrustServiceServer).BatchGetTrust(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TrustService_BatchGetTrust_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrustServiceServer).BatchGetTrust(ctx, req.(*BatchGetTrustRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -116,8 +153,12 @@ var TrustService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*TrustServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetTrustScores",
-			Handler:    _TrustService_GetTrustScores_Handler,
+			MethodName: "GetTrust",
+			Handler:    _TrustService_GetTrust_Handler,
+		},
+		{
+			MethodName: "BatchGetTrust",
+			Handler:    _TrustService_BatchGetTrust_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

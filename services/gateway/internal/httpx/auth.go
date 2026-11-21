@@ -44,7 +44,7 @@ func PharmacyIDFromContext(ctx context.Context) string {
 // worker-authenticated internal endpoints available without a bearer token.
 func Auth(authenticator ports.Authenticator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isPublicRoute(r.URL.Path) || r.URL.Path == "/healthz" || isWorkerRoute(r.URL.Path) {
+		if isPublicRoute(r.URL.Path) || isPublicLookup(r) || r.URL.Path == "/healthz" || isWorkerRoute(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -73,7 +73,7 @@ func Auth(authenticator ports.Authenticator, next http.Handler) http.Handler {
 			WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth service unavailable"})
 			return
 		}
-		if requiredRole := roleForRoute(r.URL.Path); !roleAllowed(identity.Role, requiredRole) {
+		if requiredRole := roleForRequest(r); !roleAllowed(identity.Role, requiredRole) {
 			WriteJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
 			return
 		}
@@ -104,7 +104,34 @@ func isPublicRoute(path string) bool {
 		routeMatches(path, "/api/v1/nearby") ||
 		routeMatches(path, "/api/v1/medicines") ||
 		routeMatches(path, "/api/v1/login") ||
-		routeMatches(path, "/api/v1/auth/login")
+		path == "/api/v1/auth/register" || path == "/api/v1/auth/login" || path == "/api/v1/auth/refresh"
+}
+
+// isPublicLookup reports whether the request reads one medicine or one
+// pharmacy by ID (getProduct, getPharmacy in docs/api/openapi.yaml, SCRUM-138).
+// Only GET of exactly one path segment is public: /api/v1/pharmacies/{id}/stock
+// and every other pharmacy route still need a staff token.
+func isPublicLookup(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	for _, prefix := range []string{"/api/v1/products/", "/api/v1/pharmacies/"} {
+		if id, ok := strings.CutPrefix(r.URL.Path, prefix); ok && id != "" && !strings.Contains(id, "/") && id != "me" {
+			return true
+		}
+	}
+	return false
+}
+
+// roleForRequest is roleForRoute, except that registering a pharmacy
+// (POST /api/v1/pharmacies, SCRUM-141) is open to any signed-in account: a new
+// pharmacy owner signs up as a patient and becomes the pharmacy's staff
+// account when it registers. The handler checks the rest.
+func roleForRequest(r *http.Request) authv1.Role {
+	if r.Method == http.MethodPost && r.URL.Path == "/api/v1/pharmacies" {
+		return authv1.Role_ROLE_UNSPECIFIED
+	}
+	return roleForRoute(r.URL.Path)
 }
 
 func roleForRoute(path string) authv1.Role {

@@ -69,6 +69,27 @@ message HoldConfirmed {
   google.protobuf.Timestamp expires_at = 8;
 }
 
+// Routing key: hold.expired
+// Producer: holds. Consumers: notification, analytics.
+message HoldExpired {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string user_id = 3;
+  string pharmacy_id = 4;
+  string product_id = 5;
+}
+
+// Routing key: hold.rejected
+// Producer: holds. Consumers: notification, analytics.
+message HoldRejected {
+  EventMetadata metadata = 1;
+  string hold_id = 2;
+  string user_id = 3;
+  string pharmacy_id = 4;
+  string product_id = 5;
+  string reason = 6;
+}
+
 // --- Stock and trust ---
 
 // Routing key: stock.increased
@@ -79,6 +100,18 @@ message StockIncreased {
   string product_id = 3;
   int32 previous_available = 4;
   int32 new_available = 5;
+}
+
+// Routing key: watchlist.alert
+// Producer: watchlist. Consumers: notification.
+message WatchlistAlert {
+  EventMetadata metadata = 1;
+  string alert_id = 2;
+  string subscription_id = 3;
+  string user_id = 4;
+  string product_id = 5;
+  string pharmacy_id = 6;
+  int32 quantity_available = 7;
 }
 
 // Routing key: feedback.submitted
@@ -92,4 +125,17 @@ message FeedbackSubmitted {
   string product_id = 5;
   bool was_in_stock = 6;
   int32 rating = 7;
+}
+
+// Routing key: search.recorded
+// Producer: search. Consumer: analytics.
+// Search publishes one event per matched product for each completed search.
+message SearchRecorded {
+  EventMetadata metadata = 1;
+  string search_id = 2;
+  string product_id = 3;
+  string product_name = 4;
+  string dzongkhag = 5;
+  // True when at least one nearby offer had available stock.
+  bool has_stock = 6;
 }

@@ -15,14 +15,21 @@ import (
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	analyticsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/analytics/v1"
 	authv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/auth/v1"
+	catalogv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/catalog/v1"
 	expiryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/expiry/v1"
 	feedbackv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/feedback/v1"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	holdsv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/holds/v1"
+	inventoryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/inventory/v1"
+	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
+	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
+	stocksyncv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/stock-sync/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
+	userprofilev1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/user-profile/v1"
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/adapters/clients"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/app"
@@ -70,12 +77,13 @@ func run() error {
 		return fmt.Errorf("expiry client: %w", err)
 	}
 	expiry := clients.NewExpiryClient(expiryv1.NewExpiryServiceClient(expiryConn))
-	authConn, err := conns.Connection(context.Background(), "auth")
+	// Register and Login run bcrypt, so Auth gets a longer per-call limit.
+	authConn, err := conns.ConnectionWithTimeout(context.Background(), "auth", app.AuthCallTimeout)
 	if err != nil {
 		return fmt.Errorf("auth client: %w", err)
 	}
 	auth := clients.NewAuthClient(authv1.NewAuthServiceClient(authConn))
-	searchConn, err := conns.Connection(context.Background(), "search")
+	searchConn, err := conns.ConnectionWithTimeout(context.Background(), "search", app.SearchCallTimeout)
 	if err != nil {
 		return fmt.Errorf("search client: %w", err)
 	}
@@ -99,10 +107,50 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("feedback client: %w", err)
 	}
+	notificationConn, err := conns.Connection(context.Background(), "notification")
+	if err != nil {
+		return fmt.Errorf("notification client: %w", err)
+	}
+	profileConn, err := conns.Connection(context.Background(), "user-profile")
+	if err != nil {
+		return fmt.Errorf("user profile client: %w", err)
+	}
+	catalogConn, err := conns.Connection(context.Background(), "catalog")
+	if err != nil {
+		return fmt.Errorf("catalog client: %w", err)
+	}
+	pharmacyRegistryConn, err := conns.Connection(context.Background(), "pharmacy-registry")
+	if err != nil {
+		return fmt.Errorf("pharmacy registry client: %w", err)
+	}
+
+	analyticsConn, err := conns.Connection(context.Background(), "analytics")
+	if err != nil {
+		return fmt.Errorf("analytics client: %w", err)
+	}
+	inventoryConn, err := conns.Connection(context.Background(), "inventory")
+	if err != nil {
+		return fmt.Errorf("inventory client: %w", err)
+	}
+	// An upload is parsed and applied before Stock Sync answers, so it gets a
+	// longer per-call limit than the default.
+	stockSyncConn, err := conns.ConnectionWithTimeout(context.Background(), "stock-sync", app.StockSyncCallTimeout)
+	if err != nil {
+		return fmt.Errorf("stock sync client: %w", err)
+	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
 		Handler: app.NewRouter(cfg, log,
+			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
+			app.WithPharmacyRegistry(clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn))),
+			app.WithPharmacyOnboarding(
+				clients.NewPharmacyRegistryClient(pharmacyregistryv1.NewPharmacyRegistryServiceClient(pharmacyRegistryConn)),
+				auth,
+				clients.NewGeoClient(geov1.NewGeoServiceClient(geoConn)),
+			),
+			app.WithProducts(clients.NewCatalogClient(catalogv1.NewCatalogServiceClient(catalogConn))),
+			app.WithAnalytics(clients.NewAnalyticsClient(analyticsv1.NewAnalyticsServiceClient(analyticsConn))),
 			app.WithFreshness(freshness),
 			app.WithExpiry(expiry),
 			app.WithAuth(auth),
@@ -111,7 +159,10 @@ func run() error {
 			app.WithSubstitution(clients.NewSubstitutionClient(substitutionv1.NewSubstitutionServiceClient(substitutionConn))),
 			app.WithHolds(clients.NewHoldsClient(holdsv1.NewHoldsServiceClient(holdsConn))),
 			app.WithWatchlist(clients.NewWatchlistClient(watchlistv1.NewWatchlistServiceClient(watchlistConn))),
-			app.WithFeedback(clients.NewFeedbackClient(feedbackv1.NewFeedbackServiceClient(feedbackConn))),
+			app.WithNotifications(clients.NewNotificationClient(notificationv1.NewNotificationServiceClient(notificationConn))),
+			app.WithProfile(clients.NewProfileClient(userprofilev1.NewUserProfileServiceClient(profileConn))),
+			app.WithInventory(clients.NewInventoryClient(inventoryv1.NewInventoryServiceClient(inventoryConn))),
+			app.WithStockSync(clients.NewStockSyncClient(stocksyncv1.NewStockSyncServiceClient(stockSyncConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

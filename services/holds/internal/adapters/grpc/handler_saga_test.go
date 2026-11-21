@@ -19,8 +19,9 @@ import (
 // switchableInventory fails while down is true, like Inventory being unreachable.
 type switchableInventory struct{ down bool }
 
-func (s *switchableInventory) Release(context.Context, string) error { return s.result() }
-func (s *switchableInventory) Commit(context.Context, string) error  { return s.result() }
+func (s *switchableInventory) CheckStocked(context.Context, string, string) error { return s.result() }
+func (s *switchableInventory) Release(context.Context, string) error              { return s.result() }
+func (s *switchableInventory) Commit(context.Context, string) error               { return s.result() }
 func (s *switchableInventory) result() error {
 	if s.down {
 		return domain.ErrInventoryUnavailable
@@ -32,6 +33,8 @@ type switchableEvents struct{ down bool }
 
 func (s *switchableEvents) HoldRequested(context.Context, domain.Hold) error { return s.result() }
 func (s *switchableEvents) HoldConfirmed(context.Context, domain.Hold) error { return s.result() }
+func (s *switchableEvents) HoldExpired(context.Context, domain.Hold) error   { return s.result() }
+func (s *switchableEvents) HoldRejected(context.Context, domain.Hold) error  { return s.result() }
 func (s *switchableEvents) result() error {
 	if s.down {
 		return errors.New("rabbitmq is down")

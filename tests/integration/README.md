@@ -53,8 +53,31 @@ TESTCONTAINERS_RYUK_DISABLED=true go test -tags integration -race -count=1 ./...
 
 CI runs this in the `Saga integration tests` job.
 
+## Compose gateway suite (`compose/`, SCRUM-67)
+
+The Compose suite runs the high-risk cross-service journeys through the
+gateway on the full stack: seeded search, reservation and expiry, one-shot
+watchlist restock alert, and feedback flowing into the trust score used by
+search. It uses the deterministic fixtures in `deploy/seed`; the watchlist
+case publishes the same protobuf `stock.increased` event that Inventory
+publishes so the alert path is exercised without adding a test-only API.
+
+Run it after starting and seeding Compose:
+
+```bash
+cd tests/integration
+GATEWAY_URL=http://127.0.0.1:8080 \
+RABBITMQ_URL=amqp://swiftmed:change-me@127.0.0.1:5672/ \
+WORKER_SHARED_SECRET=change-me-worker-secret \
+GOWORK=off go test -tags integration -count=1 -v ./compose
+```
+
+CI runs this package in the **Compose gateway integration suite** job, which
+starts the full Compose stack, seeds it, runs the tests, prints logs on
+failure, and removes the stack and volumes.
+
 ### Versions
 
 `testcontainers-go` is pinned to **v0.44.0**, the newest release that supports
-Go 1.25 (v0.45 needs Go 1.26). This module has its own `go.mod`, so its test
+Go 1.26 (v0.45 needs Go 1.26). This module has its own `go.mod`, so its test
 dependencies do not reach any service.

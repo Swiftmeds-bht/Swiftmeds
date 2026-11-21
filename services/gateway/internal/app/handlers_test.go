@@ -13,6 +13,7 @@ import (
 	watchlistv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/watchlist/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/httpx"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -78,6 +79,12 @@ func TestHoldHandlersMapAuthenticatedIdentity(t *testing.T) {
 	handler(httptest.NewRecorder(), collect)
 	if fake.collect == nil || fake.collect.GetPharmacyId() != "pharmacy-1" || fake.collect.GetPickupCode() != "482913" {
 		t.Fatalf("collect request did not use token pharmacy: %v", fake.collect)
+	}
+
+	list := withIdentity(httptest.NewRequest(http.MethodGet, "/api/v1/holds", nil), ports.Identity{UserID: "staff-1", PharmacyID: "pharmacy-1", Role: authv1.Role_ROLE_PHARMACY_STAFF})
+	handler(httptest.NewRecorder(), list)
+	if fake.list == nil || fake.list.GetPharmacyId() != "pharmacy-1" || fake.list.GetUserId() != "" {
+		t.Fatalf("staff list request was not restricted to token pharmacy: %v", fake.list)
 	}
 }
 
@@ -172,6 +179,18 @@ func TestHoldHandlersRejectForbiddenRoles(t *testing.T) {
 
 type fakeWatchlistClient struct {
 	subscribe *watchlistv1.SubscribeRequest
+	stream    *fakeAlertStream
+	openErr   error
+	streamReq *watchlistv1.StreamAlertsRequest
+}
+
+func (f *fakeWatchlistClient) StreamAlerts(ctx context.Context, req *watchlistv1.StreamAlertsRequest) (grpc.ServerStreamingClient[watchlistv1.StockAlert], error) {
+	f.streamReq = req
+	if f.openErr != nil {
+		return nil, f.openErr
+	}
+	f.stream.ctx = ctx
+	return f.stream, nil
 }
 
 func (f *fakeWatchlistClient) Subscribe(_ context.Context, req *watchlistv1.SubscribeRequest) (*watchlistv1.SubscribeResponse, error) {
@@ -259,6 +278,8 @@ func TestFeedbackHandlerRejectsInvalidRequests(t *testing.T) {
 	handler := feedbackHandler(&fakeFeedbackClient{}, nil)
 	tests := []string{
 		`{`,
+		`{"rating":5}`,
+		`{"wasInStock":true,"rating":5,"unexpected":true}`,
 		`{"rating":6}`,
 		`{"rating":1,"comment":"` + strings.Repeat("x", 501) + `"}`,
 	}

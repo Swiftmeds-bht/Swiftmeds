@@ -327,3 +327,26 @@ func TestARejectedHoldFreesThePatientsSlot(t *testing.T) {
 		t.Fatalf("err = %v, want a new hold to be allowed", err)
 	}
 }
+
+// A duplicate stock.reserved whose hold.confirmed fails again must return the
+// error, so the consumer keeps retrying until the confirmation is sent.
+func TestDuplicateStockReservedReturnsAFailedConfirmation(t *testing.T) {
+	svc, inv, ev, _ := sagaService(t)
+	h := pendingHold(t, svc, ev)
+	if _, err := svc.HandleStockReserved(context.Background(), h.ID); err != nil {
+		t.Fatal(err)
+	}
+	ev.errConfirmed = errBoom
+
+	outcome, err := svc.HandleStockReserved(context.Background(), h.ID)
+
+	if !errors.Is(err, errBoom) || outcome != "" {
+		t.Fatalf("got (%q, %v), want (\"\", the publish error)", outcome, err)
+	}
+	if got := mustGet(t, svc, h.ID); got.Status != domain.Active {
+		t.Fatalf("status = %s, want ACTIVE (the stock is still reserved)", got.Status)
+	}
+	if len(inv.calls) != 0 {
+		t.Fatalf("Inventory was called %v, want no call", inv.calls)
+	}
+}

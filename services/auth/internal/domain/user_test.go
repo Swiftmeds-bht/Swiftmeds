@@ -54,7 +54,7 @@ func TestValidateRegistration(t *testing.T) {
 		want     error
 	}{
 		{"valid patient", email, pw(12), RolePatient, nil},
-		{"valid pharmacist", email, pw(12), RolePharmacist, nil},
+		{"pharmacist cannot self-register", email, pw(12), RolePharmacist, ErrStaffRegistration},
 
 		{"password 7 (below min)", email, pw(MinPasswordLength - 1), RolePatient, ErrInvalidPassword},
 		{"password 8 (min)", email, pw(MinPasswordLength), RolePatient, nil},

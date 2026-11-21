@@ -2,9 +2,8 @@
 # Generates Go code from proto/**/*.proto into proto/gen/go/.
 # Usage: ./scripts/gen-proto.sh   (or: make proto)
 #
-# Needs: protoc, protoc-gen-go, protoc-gen-go-grpc on PATH.
-#   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-#   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+# Needs protoc 3.21.12, protoc-gen-go 1.36.12, and protoc-gen-go-grpc 1.6.2.
+# Pinning these versions keeps generated files reproducible in CI and locally.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -15,6 +14,17 @@ OUT_DIR=proto/gen/go
 for tool in protoc protoc-gen-go protoc-gen-go-grpc; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "error: $tool not found on PATH (is \$(go env GOPATH)/bin on PATH?)" >&2
+    exit 1
+  fi
+done
+
+for spec in "protoc|libprotoc 3.21.12" "protoc-gen-go|protoc-gen-go v1.36.12" "protoc-gen-go-grpc|protoc-gen-go-grpc 1.6.2"; do
+  tool="${spec%%|*}"
+  expected="${spec#*|}"
+  actual="$("$tool" --version)"
+  actual="${actual/.exe/}"
+  if [ "$actual" != "$expected" ]; then
+    echo "error: $tool version mismatch: got '$actual', want '$expected'" >&2
     exit 1
   fi
 done

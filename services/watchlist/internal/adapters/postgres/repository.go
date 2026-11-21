@@ -100,6 +100,35 @@ func (r *Repository) Notify(ctx context.Context, a domain.Alert) (bool, error) {
 	return saved, nil
 }
 
+func (r *Repository) PendingAlerts(ctx context.Context, userID string) ([]domain.Alert, error) {
+	rows, err := r.db.Query(ctx, `SELECT alert_id, subscription_id, user_id, product_id, pharmacy_id, quantity_available, occurred_at
+		FROM alerts WHERE user_id = $1 AND delivered_at IS NULL ORDER BY occurred_at, alert_id`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("query pending alerts: %w", err)
+	}
+	defer rows.Close()
+	out := []domain.Alert{}
+	for rows.Next() {
+		var a domain.Alert
+		if err := rows.Scan(&a.ID, &a.SubscriptionID, &a.UserID, &a.ProductID, &a.PharmacyID, &a.QuantityAvailable, &a.OccurredAt); err != nil {
+			return nil, fmt.Errorf("scan alert: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("query pending alerts: %w", err)
+	}
+	return out, nil
+}
+
+// MarkDelivered only sets delivered_at once, so the first delivery time is kept.
+func (r *Repository) MarkDelivered(ctx context.Context, alertID string, at time.Time) error {
+	if _, err := r.db.Exec(ctx, `UPDATE alerts SET delivered_at = $2 WHERE alert_id = $1 AND delivered_at IS NULL`, alertID, at); err != nil {
+		return fmt.Errorf("mark alert delivered: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) query(ctx context.Context, sql string, arg string) ([]domain.Subscription, error) {
 	rows, err := r.db.Query(ctx, sql, arg)
 	if err != nil {

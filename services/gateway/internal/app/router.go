@@ -12,15 +12,27 @@ import (
 type RouterOption func(*routes)
 
 type routes struct {
-	freshness  ports.DecayApplier
-	expiry     ports.HoldExpirySweeper
-	auth       ports.Authenticator
-	search     ports.Searcher
-	geo        ports.NearbyPharmacyFinder
-	substitute ports.SubstituteFinder
-	holds      ports.HoldsClient
-	watchlist  ports.WatchlistClient
-	feedback   ports.FeedbackClient
+	freshness        ports.DecayApplier
+	expiry           ports.HoldExpirySweeper
+	auth             ports.Authenticator
+	authRoutes       ports.AuthRoutes
+	search           ports.Searcher
+	suggester        ports.Suggester
+	geo              ports.NearbyPharmacyFinder
+	substitute       ports.SubstituteFinder
+	holds            ports.HoldsClient
+	watchlist        ports.WatchlistClient
+	feedback         ports.FeedbackClient
+	notifications    ports.NotificationClient
+	profile          ports.ProfileClient
+	products         ports.ProductLookup
+	pharmacyRegistry ports.PharmacyRegistryClient
+	analytics        ports.AnalyticsClient
+	inventory        ports.InventoryClient
+	stockSync        ports.StockSyncClient
+	onboarding       ports.PharmacyOnboarding
+	linker           ports.PharmacyLinker
+	locations        ports.PharmacyLocations
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
@@ -37,11 +49,17 @@ func WithExpiry(sweeper ports.HoldExpirySweeper) RouterOption {
 
 // WithAuth adds the Auth service client used by protected API routes.
 func WithAuth(authenticator ports.Authenticator) RouterOption {
-	return func(r *routes) { r.auth = authenticator }
+	return func(r *routes) { r.auth = authenticator; r.authRoutes, _ = authenticator.(ports.AuthRoutes) }
 }
 
+func WithAuthRoutes(client ports.AuthRoutes) RouterOption {
+	return func(r *routes) { r.authRoutes = client }
+}
+
+// WithSearch adds the search route, and the autocomplete route when the client
+// also offers suggestions (the Search service client does).
 func WithSearch(searcher ports.Searcher) RouterOption {
-	return func(r *routes) { r.search = searcher }
+	return func(r *routes) { r.search = searcher; r.suggester, _ = searcher.(ports.Suggester) }
 }
 
 func WithGeo(finder ports.NearbyPharmacyFinder) RouterOption {
@@ -56,12 +74,52 @@ func WithHolds(client ports.HoldsClient) RouterOption {
 	return func(r *routes) { r.holds = client }
 }
 
+func WithPharmacyRegistry(client ports.PharmacyRegistryClient) RouterOption {
+	return func(r *routes) { r.pharmacyRegistry = client }
+}
+
+func WithAnalytics(client ports.AnalyticsClient) RouterOption {
+	return func(r *routes) { r.analytics = client }
+}
+
+// WithInventory adds the pharmacy dashboard's stock list and stock edit routes
+// (SCRUM-58).
+func WithInventory(client ports.InventoryClient) RouterOption {
+	return func(r *routes) { r.inventory = client }
+}
+
+// WithStockSync adds the pharmacy dashboard's CSV upload and import report
+// routes (SCRUM-70).
+func WithStockSync(client ports.StockSyncClient) RouterOption {
+	return func(r *routes) { r.stockSync = client }
+}
+
 func WithWatchlist(client ports.WatchlistClient) RouterOption {
 	return func(r *routes) { r.watchlist = client }
 }
 
 func WithFeedback(client ports.FeedbackClient) RouterOption {
 	return func(r *routes) { r.feedback = client }
+}
+
+func WithNotifications(client ports.NotificationClient) RouterOption {
+	return func(r *routes) { r.notifications = client }
+}
+
+// WithProfile adds the signed-in user's own profile routes (SCRUM-137).
+func WithProfile(client ports.ProfileClient) RouterOption {
+	return func(r *routes) { r.profile = client }
+}
+
+// WithPharmacyOnboarding adds pharmacy sign-up and the admin review routes
+// (SCRUM-141): registerPharmacy, listPharmacies and setPharmacyVerification.
+func WithPharmacyOnboarding(registry ports.PharmacyOnboarding, linker ports.PharmacyLinker, locations ports.PharmacyLocations) RouterOption {
+	return func(r *routes) { r.onboarding, r.linker, r.locations = registry, linker, locations }
+}
+
+// WithProducts adds the public medicine lookup, getProduct (SCRUM-138).
+func WithProducts(client ports.ProductLookup) RouterOption {
+	return func(r *routes) { r.products = client }
 }
 
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
@@ -83,6 +141,15 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	if wired.search != nil {
 		mux.Handle("GET /api/v1/search", searchHandler(wired.search, logger))
 	}
+	if wired.suggester != nil {
+		mux.Handle("GET /api/v1/search/autocomplete", autocompleteHandler(wired.suggester, logger))
+	}
+	if wired.authRoutes != nil {
+		mux.Handle("POST /api/v1/auth/register", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/login", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/refresh", authHandler(wired.authRoutes, logger))
+		mux.Handle("POST /api/v1/auth/logout", authHandler(wired.authRoutes, logger))
+	}
 	if wired.geo != nil {
 		mux.Handle("GET /api/v1/pharmacies/nearby", nearbyHandler(wired.geo, logger))
 	}
@@ -96,15 +163,50 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		mux.Handle("POST /api/v1/holds/{holdId}/cancel", holdsHandler(wired.holds, logger))
 		mux.Handle("POST /api/v1/holds/{holdId}/collect", holdsHandler(wired.holds, logger))
 	}
+	if wired.inventory != nil {
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock", stockHandler(wired.inventory, logger))
+		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/stock/{productId}", stockHandler(wired.inventory, logger))
+	}
+	if wired.stockSync != nil {
+		mux.Handle("POST /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs", stockSyncHandler(wired.stockSync, logger))
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs", stockSyncHandler(wired.stockSync, logger))
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs/{jobId}", stockSyncHandler(wired.stockSync, logger))
+	}
 	if wired.watchlist != nil {
 		mux.Handle("POST /api/v1/watchlist", watchlistHandler(wired.watchlist, logger))
 		mux.Handle("GET /api/v1/watchlist", watchlistHandler(wired.watchlist, logger))
 		mux.Handle("DELETE /api/v1/watchlist/{subscriptionId}", watchlistHandler(wired.watchlist, logger))
+		mux.Handle("GET /api/v1/watchlist/alerts", alertsHandler(wired.watchlist, logger, AlertHeartbeat))
 	}
 	if wired.feedback != nil {
 		mux.Handle("POST /api/v1/holds/{holdId}/feedback", feedbackHandler(wired.feedback, logger))
 	}
+	if wired.notifications != nil {
+		mux.Handle("GET /api/v1/notifications", notificationsHandler(wired.notifications, logger))
+	}
+	// Public lookups by ID (SCRUM-138); httpx.Auth lets exactly these through.
+	if wired.products != nil {
+		mux.Handle("GET /api/v1/products/{productId}", productHandler(wired.products, logger))
+	}
+	if wired.pharmacyRegistry != nil {
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}", pharmacyHandler(wired.pharmacyRegistry, logger))
+	}
+	if wired.onboarding != nil && wired.linker != nil && wired.locations != nil {
+		mux.Handle("POST /api/v1/pharmacies", registerPharmacyHandler(wired.onboarding, wired.linker, logger))
+		mux.Handle("GET /api/v1/pharmacies", listPharmaciesHandler(wired.onboarding, logger))
+		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/verification", verificationHandler(wired.onboarding, wired.locations, logger))
+	}
+	if wired.profile != nil {
+		mux.Handle("GET "+ProfilePath, profileHandler(wired.profile, logger))
+		mux.Handle("PUT "+ProfilePath, profileHandler(wired.profile, logger))
+	}
 	mux.Handle("/api/v1/", http.NotFoundHandler())
+
+	if wired.pharmacyRegistry != nil && wired.analytics != nil {
+		mux.Handle(
+			"GET /api/v1/pharmacies/me/analytics/unmet-demand",
+			unmetDemandHandler(wired.analytics, wired.pharmacyRegistry, logger))
+	}
 
 	// The first middleware is the outermost. Recover sits inside Logging so a
 	// panic is logged as a 500 request, and outside CORS and the handlers.

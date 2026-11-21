@@ -179,7 +179,7 @@ type Trust struct{ C trustv1.TrustServiceClient }
 func NewTrust(cc grpc.ClientConnInterface) Trust { return Trust{trustv1.NewTrustServiceClient(cc)} }
 
 func (t Trust) Scores(ctx context.Context, pharmacyIDs []string) (map[string]float64, error) {
-	resp, err := t.C.GetTrustScores(ctx, &trustv1.GetTrustScoresRequest{PharmacyIds: pharmacyIDs})
+	resp, err := t.C.BatchGetTrust(ctx, &trustv1.BatchGetTrustRequest{PharmacyIds: pharmacyIDs})
 	if err != nil {
 		return nil, err
 	}

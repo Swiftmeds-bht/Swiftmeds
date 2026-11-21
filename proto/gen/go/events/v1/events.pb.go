@@ -459,6 +459,170 @@ func (x *HoldConfirmed) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// Routing key: hold.expired
+// Producer: holds. Consumers: notification, analytics.
+type HoldExpired struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	HoldId        string                 `protobuf:"bytes,2,opt,name=hold_id,json=holdId,proto3" json:"hold_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PharmacyId    string                 `protobuf:"bytes,4,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	ProductId     string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HoldExpired) Reset() {
+	*x = HoldExpired{}
+	mi := &file_events_v1_events_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoldExpired) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoldExpired) ProtoMessage() {}
+
+func (x *HoldExpired) ProtoReflect() protoreflect.Message {
+	mi := &file_events_v1_events_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoldExpired.ProtoReflect.Descriptor instead.
+func (*HoldExpired) Descriptor() ([]byte, []int) {
+	return file_events_v1_events_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *HoldExpired) GetMetadata() *EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *HoldExpired) GetHoldId() string {
+	if x != nil {
+		return x.HoldId
+	}
+	return ""
+}
+
+func (x *HoldExpired) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *HoldExpired) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+func (x *HoldExpired) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+// Routing key: hold.rejected
+// Producer: holds. Consumers: notification, analytics.
+type HoldRejected struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metadata      *EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	HoldId        string                 `protobuf:"bytes,2,opt,name=hold_id,json=holdId,proto3" json:"hold_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PharmacyId    string                 `protobuf:"bytes,4,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	ProductId     string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,6,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HoldRejected) Reset() {
+	*x = HoldRejected{}
+	mi := &file_events_v1_events_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoldRejected) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoldRejected) ProtoMessage() {}
+
+func (x *HoldRejected) ProtoReflect() protoreflect.Message {
+	mi := &file_events_v1_events_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoldRejected.ProtoReflect.Descriptor instead.
+func (*HoldRejected) Descriptor() ([]byte, []int) {
+	return file_events_v1_events_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *HoldRejected) GetMetadata() *EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *HoldRejected) GetHoldId() string {
+	if x != nil {
+		return x.HoldId
+	}
+	return ""
+}
+
+func (x *HoldRejected) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *HoldRejected) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+func (x *HoldRejected) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *HoldRejected) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 // Routing key: stock.increased
 // Producer: inventory. Consumers: watchlist.
 type StockIncreased struct {
@@ -474,7 +638,7 @@ type StockIncreased struct {
 
 func (x *StockIncreased) Reset() {
 	*x = StockIncreased{}
-	mi := &file_events_v1_events_proto_msgTypes[5]
+	mi := &file_events_v1_events_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +650,7 @@ func (x *StockIncreased) String() string {
 func (*StockIncreased) ProtoMessage() {}
 
 func (x *StockIncreased) ProtoReflect() protoreflect.Message {
-	mi := &file_events_v1_events_proto_msgTypes[5]
+	mi := &file_events_v1_events_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +663,7 @@ func (x *StockIncreased) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StockIncreased.ProtoReflect.Descriptor instead.
 func (*StockIncreased) Descriptor() ([]byte, []int) {
-	return file_events_v1_events_proto_rawDescGZIP(), []int{5}
+	return file_events_v1_events_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StockIncreased) GetMetadata() *EventMetadata {
@@ -537,6 +701,100 @@ func (x *StockIncreased) GetNewAvailable() int32 {
 	return 0
 }
 
+// Routing key: watchlist.alert
+// Producer: watchlist. Consumers: notification.
+type WatchlistAlert struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Metadata          *EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	AlertId           string                 `protobuf:"bytes,2,opt,name=alert_id,json=alertId,proto3" json:"alert_id,omitempty"`
+	SubscriptionId    string                 `protobuf:"bytes,3,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	UserId            string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProductId         string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	PharmacyId        string                 `protobuf:"bytes,6,opt,name=pharmacy_id,json=pharmacyId,proto3" json:"pharmacy_id,omitempty"`
+	QuantityAvailable int32                  `protobuf:"varint,7,opt,name=quantity_available,json=quantityAvailable,proto3" json:"quantity_available,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *WatchlistAlert) Reset() {
+	*x = WatchlistAlert{}
+	mi := &file_events_v1_events_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WatchlistAlert) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WatchlistAlert) ProtoMessage() {}
+
+func (x *WatchlistAlert) ProtoReflect() protoreflect.Message {
+	mi := &file_events_v1_events_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WatchlistAlert.ProtoReflect.Descriptor instead.
+func (*WatchlistAlert) Descriptor() ([]byte, []int) {
+	return file_events_v1_events_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *WatchlistAlert) GetMetadata() *EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *WatchlistAlert) GetAlertId() string {
+	if x != nil {
+		return x.AlertId
+	}
+	return ""
+}
+
+func (x *WatchlistAlert) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *WatchlistAlert) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *WatchlistAlert) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *WatchlistAlert) GetPharmacyId() string {
+	if x != nil {
+		return x.PharmacyId
+	}
+	return ""
+}
+
+func (x *WatchlistAlert) GetQuantityAvailable() int32 {
+	if x != nil {
+		return x.QuantityAvailable
+	}
+	return 0
+}
+
 // Routing key: feedback.submitted
 // Producer: feedback. Consumers: trust, analytics.
 // Deliberately carries no user_id (minimal personal data, risk R8).
@@ -555,7 +813,7 @@ type FeedbackSubmitted struct {
 
 func (x *FeedbackSubmitted) Reset() {
 	*x = FeedbackSubmitted{}
-	mi := &file_events_v1_events_proto_msgTypes[6]
+	mi := &file_events_v1_events_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -567,7 +825,7 @@ func (x *FeedbackSubmitted) String() string {
 func (*FeedbackSubmitted) ProtoMessage() {}
 
 func (x *FeedbackSubmitted) ProtoReflect() protoreflect.Message {
-	mi := &file_events_v1_events_proto_msgTypes[6]
+	mi := &file_events_v1_events_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -580,7 +838,7 @@ func (x *FeedbackSubmitted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeedbackSubmitted.ProtoReflect.Descriptor instead.
 func (*FeedbackSubmitted) Descriptor() ([]byte, []int) {
-	return file_events_v1_events_proto_rawDescGZIP(), []int{6}
+	return file_events_v1_events_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FeedbackSubmitted) GetMetadata() *EventMetadata {
@@ -630,6 +888,94 @@ func (x *FeedbackSubmitted) GetRating() int32 {
 		return x.Rating
 	}
 	return 0
+}
+
+// Routing key: search.recorded
+// Producer: search. Consumer: analytics.
+// Search publishes one event per matched product for each completed search.
+type SearchRecorded struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Metadata    *EventMetadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	SearchId    string                 `protobuf:"bytes,2,opt,name=search_id,json=searchId,proto3" json:"search_id,omitempty"`
+	ProductId   string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	ProductName string                 `protobuf:"bytes,4,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
+	Dzongkhag   string                 `protobuf:"bytes,5,opt,name=dzongkhag,proto3" json:"dzongkhag,omitempty"`
+	// True when at least one nearby offer had available stock.
+	HasStock      bool `protobuf:"varint,6,opt,name=has_stock,json=hasStock,proto3" json:"has_stock,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchRecorded) Reset() {
+	*x = SearchRecorded{}
+	mi := &file_events_v1_events_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchRecorded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchRecorded) ProtoMessage() {}
+
+func (x *SearchRecorded) ProtoReflect() protoreflect.Message {
+	mi := &file_events_v1_events_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchRecorded.ProtoReflect.Descriptor instead.
+func (*SearchRecorded) Descriptor() ([]byte, []int) {
+	return file_events_v1_events_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SearchRecorded) GetMetadata() *EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *SearchRecorded) GetSearchId() string {
+	if x != nil {
+		return x.SearchId
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetProductName() string {
+	if x != nil {
+		return x.ProductName
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetDzongkhag() string {
+	if x != nil {
+		return x.Dzongkhag
+	}
+	return ""
+}
+
+func (x *SearchRecorded) GetHasStock() bool {
+	if x != nil {
+		return x.HasStock
+	}
+	return false
 }
 
 var File_events_v1_events_proto protoreflect.FileDescriptor
@@ -683,7 +1029,24 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"\vpickup_code\x18\a \x01(\tR\n" +
 	"pickupCode\x129\n" +
 	"\n" +
-	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xe3\x01\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xbe\x01\n" +
+	"\vHoldExpired\x12=\n" +
+	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x17\n" +
+	"\ahold_id\x18\x02 \x01(\tR\x06holdId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vpharmacy_id\x18\x04 \x01(\tR\n" +
+	"pharmacyId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x05 \x01(\tR\tproductId\"\xd7\x01\n" +
+	"\fHoldRejected\x12=\n" +
+	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x17\n" +
+	"\ahold_id\x18\x02 \x01(\tR\x06holdId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vpharmacy_id\x18\x04 \x01(\tR\n" +
+	"pharmacyId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x05 \x01(\tR\tproductId\x12\x16\n" +
+	"\x06reason\x18\x06 \x01(\tR\x06reason\"\xe3\x01\n" +
 	"\x0eStockIncreased\x12=\n" +
 	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x1f\n" +
 	"\vpharmacy_id\x18\x02 \x01(\tR\n" +
@@ -691,7 +1054,17 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"\n" +
 	"product_id\x18\x03 \x01(\tR\tproductId\x12-\n" +
 	"\x12previous_available\x18\x04 \x01(\x05R\x11previousAvailable\x12#\n" +
-	"\rnew_available\x18\x05 \x01(\x05R\fnewAvailable\"\x86\x02\n" +
+	"\rnew_available\x18\x05 \x01(\x05R\fnewAvailable\"\x9b\x02\n" +
+	"\x0eWatchlistAlert\x12=\n" +
+	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x19\n" +
+	"\balert_id\x18\x02 \x01(\tR\aalertId\x12'\n" +
+	"\x0fsubscription_id\x18\x03 \x01(\tR\x0esubscriptionId\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x05 \x01(\tR\tproductId\x12\x1f\n" +
+	"\vpharmacy_id\x18\x06 \x01(\tR\n" +
+	"pharmacyId\x12-\n" +
+	"\x12quantity_available\x18\a \x01(\x05R\x11quantityAvailable\"\x86\x02\n" +
 	"\x11FeedbackSubmitted\x12=\n" +
 	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x1f\n" +
 	"\vfeedback_id\x18\x02 \x01(\tR\n" +
@@ -703,7 +1076,15 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"product_id\x18\x05 \x01(\tR\tproductId\x12 \n" +
 	"\fwas_in_stock\x18\x06 \x01(\bR\n" +
 	"wasInStock\x12\x16\n" +
-	"\x06rating\x18\a \x01(\x05R\x06ratingBDZBgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/events/v1;eventsv1b\x06proto3"
+	"\x06rating\x18\a \x01(\x05R\x06rating\"\xe9\x01\n" +
+	"\x0eSearchRecorded\x12=\n" +
+	"\bmetadata\x18\x01 \x01(\v2!.swiftmed.events.v1.EventMetadataR\bmetadata\x12\x1b\n" +
+	"\tsearch_id\x18\x02 \x01(\tR\bsearchId\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x03 \x01(\tR\tproductId\x12!\n" +
+	"\fproduct_name\x18\x04 \x01(\tR\vproductName\x12\x1c\n" +
+	"\tdzongkhag\x18\x05 \x01(\tR\tdzongkhag\x12\x1b\n" +
+	"\thas_stock\x18\x06 \x01(\bR\bhasStockBDZBgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/events/v1;eventsv1b\x06proto3"
 
 var (
 	file_events_v1_events_proto_rawDescOnce sync.Once
@@ -717,32 +1098,40 @@ func file_events_v1_events_proto_rawDescGZIP() []byte {
 	return file_events_v1_events_proto_rawDescData
 }
 
-var file_events_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_events_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_events_v1_events_proto_goTypes = []any{
 	(*EventMetadata)(nil),         // 0: swiftmed.events.v1.EventMetadata
 	(*HoldRequested)(nil),         // 1: swiftmed.events.v1.HoldRequested
 	(*StockReserved)(nil),         // 2: swiftmed.events.v1.StockReserved
 	(*StockUnavailable)(nil),      // 3: swiftmed.events.v1.StockUnavailable
 	(*HoldConfirmed)(nil),         // 4: swiftmed.events.v1.HoldConfirmed
-	(*StockIncreased)(nil),        // 5: swiftmed.events.v1.StockIncreased
-	(*FeedbackSubmitted)(nil),     // 6: swiftmed.events.v1.FeedbackSubmitted
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*HoldExpired)(nil),           // 5: swiftmed.events.v1.HoldExpired
+	(*HoldRejected)(nil),          // 6: swiftmed.events.v1.HoldRejected
+	(*StockIncreased)(nil),        // 7: swiftmed.events.v1.StockIncreased
+	(*WatchlistAlert)(nil),        // 8: swiftmed.events.v1.WatchlistAlert
+	(*FeedbackSubmitted)(nil),     // 9: swiftmed.events.v1.FeedbackSubmitted
+	(*SearchRecorded)(nil),        // 10: swiftmed.events.v1.SearchRecorded
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_events_v1_events_proto_depIdxs = []int32{
-	7, // 0: swiftmed.events.v1.EventMetadata.occurred_at:type_name -> google.protobuf.Timestamp
-	0, // 1: swiftmed.events.v1.HoldRequested.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	7, // 2: swiftmed.events.v1.HoldRequested.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 3: swiftmed.events.v1.StockReserved.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 4: swiftmed.events.v1.StockUnavailable.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 5: swiftmed.events.v1.HoldConfirmed.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	7, // 6: swiftmed.events.v1.HoldConfirmed.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 7: swiftmed.events.v1.StockIncreased.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	0, // 8: swiftmed.events.v1.FeedbackSubmitted.metadata:type_name -> swiftmed.events.v1.EventMetadata
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	11, // 0: swiftmed.events.v1.EventMetadata.occurred_at:type_name -> google.protobuf.Timestamp
+	0,  // 1: swiftmed.events.v1.HoldRequested.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	11, // 2: swiftmed.events.v1.HoldRequested.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: swiftmed.events.v1.StockReserved.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 4: swiftmed.events.v1.StockUnavailable.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 5: swiftmed.events.v1.HoldConfirmed.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	11, // 6: swiftmed.events.v1.HoldConfirmed.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: swiftmed.events.v1.HoldExpired.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 8: swiftmed.events.v1.HoldRejected.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 9: swiftmed.events.v1.StockIncreased.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 10: swiftmed.events.v1.WatchlistAlert.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 11: swiftmed.events.v1.FeedbackSubmitted.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	0,  // 12: swiftmed.events.v1.SearchRecorded.metadata:type_name -> swiftmed.events.v1.EventMetadata
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_events_v1_events_proto_init() }
@@ -756,7 +1145,7 @@ func file_events_v1_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_events_v1_events_proto_rawDesc), len(file_events_v1_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

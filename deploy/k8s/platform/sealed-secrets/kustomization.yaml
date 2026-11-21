@@ -1,0 +1,9 @@
+# The Sealed Secrets controller (SCRUM-108), installed once per cluster before
+# the prod overlay. It decrypts the SealedSecret committed in overlays/prod into
+# the Secret swiftmed-secrets. Pinned to a release; installs into kube-system.
+#   kubectl apply -k deploy/k8s/platform/sealed-secrets
+# Back up its key right after the first install (docs/deployment.md, "Secrets").
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/bitnami/sealed-secrets/releases/download/v0.41.2/controller.yaml

@@ -19,9 +19,11 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/grpcx"
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/logger"
+	"github.com/Swiftmeds-bht/Swiftmeds/pkg/messaging"
 	freshnessv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/freshness/v1"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/freshness/internal/adapters/grpc"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/freshness/internal/adapters/postgres"
+	rabbitmqadapter "github.com/Swiftmeds-bht/Swiftmeds/services/freshness/internal/adapters/rabbitmq"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/freshness/internal/app"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/freshness/internal/domain"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/freshness/migrations"
@@ -80,23 +82,56 @@ func serve(ctx context.Context, s settings, lis net.Listener) error {
 	if err := postgres.Migrate(ctx, db, migrations.FS); err != nil {
 		return err
 	}
+	if err := messaging.EnsureSchema(ctx, db); err != nil {
+		return fmt.Errorf("messaging deduplication schema: %w", err)
+	}
 
 	svc := app.NewService(postgres.NewRepository(db), s.thresholds, time.Now)
 
 	srv := grpcx.NewServer(log)
 	freshnessv1.RegisterFreshnessServiceServer(srv, grpcadapter.NewHandler(svc))
+	rabbitConn, err := messaging.Dial(ctx, s.rabbitURL, log)
+	if err != nil {
+		return fmt.Errorf("RabbitMQ connection: %w", err)
+	}
+	// Bound the AMQP close handshake so shutdown cannot hang after gRPC stops.
+	defer func() { _ = rabbitConn.CloseDeadline(time.Now().Add(2 * time.Second)) }()
+	consumerChannel, err := rabbitConn.Channel()
+	if err != nil {
+		return fmt.Errorf("RabbitMQ consumer channel: %w", err)
+	}
+	deduper, err := messaging.NewPostgresDeduper(db)
+	if err != nil {
+		return fmt.Errorf("create event deduper: %w", err)
+	}
+	stockConsumer, err := rabbitmqadapter.NewStockIncreasedConsumer(consumerChannel, deduper, svc, time.Now)
+	if err != nil {
+		return err
+	}
 
 	log.Info("starting",
 		"port", lis.Addr().(*net.TCPAddr).Port,
 		"high_within", s.thresholds.HighWithin.String(),
 		"medium_within", s.thresholds.MediumWithin.String())
-	return srv.ServeListener(ctx, lis)
+	serveCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	runtimeErrors := make(chan error, 2)
+	go func() { runtimeErrors <- srv.ServeListener(serveCtx, lis) }()
+	go func() { runtimeErrors <- stockConsumer.Start(serveCtx) }()
+	first := <-runtimeErrors
+	cancel()
+	second := <-runtimeErrors
+	if first != nil {
+		return first
+	}
+	return second
 }
 
 // settings are the values read from environment variables.
 type settings struct {
 	port        int
 	databaseURL string
+	rabbitURL   string
 	thresholds  domain.Thresholds
 	logLevel    string
 }
@@ -107,6 +142,7 @@ func loadSettings(cfg *config.Loader) (settings, error) {
 	s := settings{
 		port:        cfg.Int(portEnv, defaultPort),
 		databaseURL: cfg.Required("FRESHNESS_DATABASE_URL"),
+		rabbitURL:   cfg.Required("RABBITMQ_URL"),
 		logLevel:    cfg.String("LOG_LEVEL", "info"),
 	}
 	high := cfg.Duration("FRESHNESS_HIGH_WITHIN", def.HighWithin)
@@ -123,11 +159,11 @@ func loadSettings(cfg *config.Loader) (settings, error) {
 	return s, nil
 }
 
-// healthcheck returns 0 if the service on localhost:port reports healthy, otherwise 1.
+// healthcheck returns 0 if the service on 127.0.0.1:port reports healthy, otherwise 1.
 func healthcheck(port int) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	if err := grpcx.CheckHealth(ctx, fmt.Sprintf("localhost:%d", port)); err != nil {
+	if err := grpcx.CheckHealth(ctx, fmt.Sprintf("127.0.0.1:%d", port)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}

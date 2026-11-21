@@ -89,6 +89,7 @@ const (
 	Template_TEMPLATE_BACK_IN_STOCK      Template = 4
 	Template_TEMPLATE_FEEDBACK_REQUEST   Template = 5
 	Template_TEMPLATE_PHARMACY_VERIFIED  Template = 6
+	Template_TEMPLATE_HOLD_REJECTED      Template = 7
 )
 
 // Enum value maps for Template.
@@ -101,6 +102,7 @@ var (
 		4: "TEMPLATE_BACK_IN_STOCK",
 		5: "TEMPLATE_FEEDBACK_REQUEST",
 		6: "TEMPLATE_PHARMACY_VERIFIED",
+		7: "TEMPLATE_HOLD_REJECTED",
 	}
 	Template_value = map[string]int32{
 		"TEMPLATE_UNSPECIFIED":        0,
@@ -110,6 +112,7 @@ var (
 		"TEMPLATE_BACK_IN_STOCK":      4,
 		"TEMPLATE_FEEDBACK_REQUEST":   5,
 		"TEMPLATE_PHARMACY_VERIFIED":  6,
+		"TEMPLATE_HOLD_REJECTED":      7,
 	}
 )
 
@@ -486,7 +489,7 @@ const file_notification_v1_notification_proto_rawDesc = "" +
 	"\x13CHANNEL_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eCHANNEL_IN_APP\x10\x01\x12\x11\n" +
 	"\rCHANNEL_EMAIL\x10\x02\x12\x0f\n" +
-	"\vCHANNEL_SMS\x10\x03*\xd8\x01\n" +
+	"\vCHANNEL_SMS\x10\x03*\xf4\x01\n" +
 	"\bTemplate\x12\x18\n" +
 	"\x14TEMPLATE_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17TEMPLATE_HOLD_CONFIRMED\x10\x01\x12\x1f\n" +
@@ -494,7 +497,8 @@ const file_notification_v1_notification_proto_rawDesc = "" +
 	"\x15TEMPLATE_HOLD_EXPIRED\x10\x03\x12\x1a\n" +
 	"\x16TEMPLATE_BACK_IN_STOCK\x10\x04\x12\x1d\n" +
 	"\x19TEMPLATE_FEEDBACK_REQUEST\x10\x05\x12\x1e\n" +
-	"\x1aTEMPLATE_PHARMACY_VERIFIED\x10\x062\x8e\x02\n" +
+	"\x1aTEMPLATE_PHARMACY_VERIFIED\x10\x06\x12\x1a\n" +
+	"\x16TEMPLATE_HOLD_REJECTED\x10\a2\x8e\x02\n" +
 	"\x13NotificationService\x12y\n" +
 	"\x10SendNotification\x121.swiftmed.notification.v1.SendNotificationRequest\x1a2.swiftmed.notification.v1.SendNotificationResponse\x12|\n" +
 	"\x11ListNotifications\x122.swiftmed.notification.v1.ListNotificationsRequest\x1a3.swiftmed.notification.v1.ListNotificationsResponseBPZNgithub.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1;notificationv1b\x06proto3"

@@ -45,6 +45,7 @@ func (p Point) valid() bool {
 // Query is a validated search request.
 type Query struct {
 	Text      string
+	Dzongkhag string
 	Center    Point
 	RadiusM   int32
 	MaxOffers int
@@ -52,7 +53,7 @@ type Query struct {
 
 // NewQuery trims and validates a request and applies the defaults (radius 0 ->
 // 5000 m, max offers 0 -> 10).
-func NewQuery(text string, center Point, radiusM, maxOffers int32) (Query, error) {
+func NewQuery(text, dzongkhag string, center Point, radiusM, maxOffers int32) (Query, error) {
 	text = strings.TrimSpace(text)
 	if n := utf8.RuneCountInString(text); n < MinQueryLen || n > MaxQueryLen {
 		return Query{}, ErrInvalidQuery
@@ -72,7 +73,7 @@ func NewQuery(text string, center Point, radiusM, maxOffers int32) (Query, error
 	if maxOffers < 1 || maxOffers > MaxMaxOffers {
 		return Query{}, ErrInvalidMaxOffer
 	}
-	return Query{Text: text, Center: center, RadiusM: radiusM, MaxOffers: int(maxOffers)}, nil
+	return Query{Text: text, Dzongkhag: strings.TrimSpace(dzongkhag), Center: center, RadiusM: radiusM, MaxOffers: int(maxOffers)}, nil
 }
 
 // SuggestQuery is a validated autocomplete request.

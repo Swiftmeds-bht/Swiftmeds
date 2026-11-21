@@ -1,0 +1,139 @@
+{
+  "uid": "swiftmed-overview",
+  "title": "SwiftMed overview",
+  "description": "Requests, latency, resources, scaling and logs of the SwiftMed deployment (SCRUM-108). Request metrics come from Traefik, which every call passes through.",
+  "tags": ["swiftmed"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "templating": {"list": []},
+  "panels": [
+    {
+      "type": "row", "title": "Traffic (through Traefik)", "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+    },
+    {
+      "type": "timeseries", "title": "Requests per second, by service",
+      "description": "Every gRPC call between services and every outside request, per Traefik service.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"], "sortBy": "Last *", "sortDesc": true}},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{svc}}",
+        "expr": "sum by (svc) (label_replace(rate(traefik_service_requests_total[2m]), \"svc\", \"$1\", \"service\", \"swiftmed-(.+)-(grpc|http)@kubernetes\"))"
+      }]
+    },
+    {
+      "type": "timeseries", "title": "Latency p95, by service",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"], "sortBy": "Last *", "sortDesc": true}},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{svc}}",
+        "expr": "histogram_quantile(0.95, sum by (le, svc) (label_replace(rate(traefik_service_request_duration_seconds_bucket[5m]), \"svc\", \"$1\", \"service\", \"swiftmed-(.+)-(grpc|http)@kubernetes\")))"
+      }]
+    },
+    {
+      "type": "timeseries", "title": "Gateway and web apps: responses by HTTP status",
+      "description": "gRPC calls always show HTTP 200 (their status travels in trailers), so errors are counted here, at the gateway's REST API and the web apps.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{svc}} {{code}}",
+        "expr": "sum by (svc, code) (label_replace(rate(traefik_service_requests_total{service=~\"swiftmed-(gateway|web)-http@kubernetes\"}[2m]), \"svc\", \"$1\", \"service\", \"swiftmed-(.+)-http@kubernetes\"))"
+      }]
+    },
+    {
+      "type": "stat", "title": "Gateway 5xx share (5 min)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 9},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 2,
+        "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.01}, {"color": "red", "value": 0.05}]}}, "overrides": []},
+      "targets": [{
+        "refId": "A",
+        "expr": "sum(rate(traefik_service_requests_total{service=~\"swiftmed-gateway-http@kubernetes\", code=~\"5..\"}[5m])) / clamp_min(sum(rate(traefik_service_requests_total{service=~\"swiftmed-gateway-http@kubernetes\"}[5m])), 1e-9)"
+      }]
+    },
+    {
+      "type": "stat", "title": "Requests per second, all services",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 9},
+      "fieldConfig": {"defaults": {"unit": "reqps", "decimals": 1}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "sum(rate(traefik_service_requests_total[2m]))"}]
+    },
+    {
+      "type": "row", "title": "Pods", "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17}
+    },
+    {
+      "type": "timeseries", "title": "CPU by pod",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "fieldConfig": {"defaults": {"unit": "cores"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"], "sortBy": "Last *", "sortDesc": true}},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{pod}}",
+        "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"swiftmed\", container!=\"\"}[2m]))"
+      }]
+    },
+    {
+      "type": "timeseries", "title": "Memory by pod",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["lastNotNull"], "sortBy": "Last *", "sortDesc": true}},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{pod}}",
+        "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"swiftmed\", container!=\"\"})"
+      }]
+    },
+    {
+      "type": "timeseries", "title": "Replicas (autoscaled: gateway, search)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+      "fieldConfig": {"defaults": {"unit": "short", "decimals": 0}, "overrides": []},
+      "targets": [
+        {"refId": "A", "legendFormat": "{{horizontalpodautoscaler}} (HPA)",
+         "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace=\"swiftmed\"}"},
+        {"refId": "B", "legendFormat": "{{deployment}}",
+         "expr": "kube_deployment_status_replicas_available{namespace=\"swiftmed\", deployment=~\"traefik|holds|inventory\"}"}
+      ]
+    },
+    {
+      "type": "table", "title": "Container restarts (last hour)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+      "targets": [{
+        "refId": "A", "instant": true, "format": "table",
+        "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"swiftmed\"}[1h])) > 0"
+      }],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"Value": "restarts"}}}]
+    },
+    {
+      "type": "row", "title": "Logs (Loki)", "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 34}
+    },
+    {
+      "type": "timeseries", "title": "Log lines per minute, by app and level",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 35},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "targets": [{
+        "refId": "A", "legendFormat": "{{app}} {{level}}",
+        "expr": "sum by (app, level) (count_over_time({namespace=\"swiftmed\"}[1m]))"
+      }]
+    },
+    {
+      "type": "logs", "title": "Warnings and errors",
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 43},
+      "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true},
+      "targets": [{"refId": "A", "expr": "{namespace=\"swiftmed\", level=~\"WARN|ERROR\"}"}]
+    }
+  ]
+}

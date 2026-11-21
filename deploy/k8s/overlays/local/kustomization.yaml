@@ -1,0 +1,55 @@
+# A development cluster on a laptop (k3d, cluster.yaml): images built here and
+# loaded into the cluster under :dev, one replica of everything, and the Secret
+# from a local secrets.env (gitignored; make-secrets.sh writes it from .env).
+#   deploy/k8s/overlays/local/up.sh
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: swiftmed
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  - name: swiftmed-config
+    behavior: merge
+    literals:
+      - CORS_ALLOWED_ORIGINS=http://localhost:9100
+
+secretGenerator:
+  - name: swiftmed-secrets
+    envs: [secrets.env]
+    options:
+      disableNameSuffixHash: true
+
+# One replica and no minimum of two: a development cluster needs no failover.
+patches:
+  - target: {kind: Deployment, name: traefik|gateway|search|holds|inventory}
+    patch: |
+      - {op: add, path: /spec/replicas, value: 1}
+  - target: {kind: HorizontalPodAutoscaler}
+    patch: |
+      - {op: replace, path: /spec/minReplicas, value: 1}
+
+images:
+  - {name: ghcr.io/swiftmeds-bht/analytics, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/auth, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/catalog, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/expiry, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/feedback, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/freshness, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/gateway, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/geo, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/holds, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/inventory, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/notification, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-registry, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/pricing, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/ranking, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/search, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/stock-sync, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/substitution, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/trust, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/web, newTag: dev}
+  - {name: ghcr.io/swiftmeds-bht/seed, newTag: dev}

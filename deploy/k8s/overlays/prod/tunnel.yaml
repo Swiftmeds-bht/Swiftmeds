@@ -1,0 +1,88 @@
+# Public HTTPS access (SCRUM-75) through Cloudflare quick tunnels: no account,
+# no domain, no open port on the laptop. One tunnel per public entrypoint of
+# Traefik:
+#   patient    -> traefik:3000  the SwiftMed web app (patients at "/", pharmacy
+#                               staff at /pharmacy-portal; one app since SCRUM-139)
+#   api        -> traefik:8080  API gateway (also used by the Cloudflare Workers)
+# Each gets a random https://<words>.trycloudflare.com address, printed in its
+# log; it stays the same while the pod runs and changes when the pod restarts.
+#   deploy/k8s/overlays/prod/tunnel-urls.sh      prints them (and updates the workers)
+#
+# api-fixed (SCRUM-156): the API again, on ngrok's free static domain, whose
+# address never changes (https://entrench-surging-backtrack.ngrok-free.dev). The Workers
+# and the web app on Vercel use it, so nothing needs updating before a demo.
+# Its authtoken is the swiftmed-ngrok SealedSecret (seal-ngrok.sh); without it
+# the container waits and the quick tunnels work as before.
+# Moving to a named tunnel with a fixed domain later: docs/deployment.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: public-tunnel
+  labels:
+    app.kubernetes.io/name: public-tunnel
+    app.kubernetes.io/part-of: swiftmed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: public-tunnel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: public-tunnel
+        app.kubernetes.io/part-of: swiftmed
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: patient
+          image: cloudflare/cloudflared:2026.10.7
+          args: [tunnel, --no-autoupdate, --metrics, "0.0.0.0:2000", --url, "http://traefik:3000"]
+          ports:
+            - {name: metrics-p, containerPort: 2000}
+          readinessProbe:
+            httpGet: {path: /ready, port: metrics-p}
+            periodSeconds: 10
+          resources: &tunnel-resources
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          securityContext: &tunnel-security
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+        - name: api
+          image: cloudflare/cloudflared:2026.10.7
+          args: [tunnel, --no-autoupdate, --metrics, "0.0.0.0:2002", --url, "http://traefik:8080"]
+          ports:
+            - {name: metrics-a, containerPort: 2002}
+          readinessProbe:
+            httpGet: {path: /ready, port: metrics-a}
+            periodSeconds: 10
+          resources: *tunnel-resources
+          securityContext: *tunnel-security
+        - name: api-fixed
+          image: ngrok/ngrok:3.39.13-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -z "$NGROK_AUTHTOKEN" ]; then
+                echo "No swiftmed-ngrok secret: the fixed API address is off (overlays/prod/seal-ngrok.sh)."
+                exec sleep 2147483647
+              fi
+              exec ngrok http http://traefik:8080 --url "$NGROK_URL" --pooling-enabled \
+                --log stdout --log-format logfmt
+          env:
+            - {name: NGROK_URL, value: "https://entrench-surging-backtrack.ngrok-free.dev"}
+            - name: NGROK_AUTHTOKEN
+              valueFrom: {secretKeyRef: {name: swiftmed-ngrok, key: NGROK_AUTHTOKEN, optional: true}}
+            # ngrok keeps its state under $HOME; the root filesystem is read-only.
+            - {name: HOME, value: /tmp}
+          volumeMounts:
+            - {name: ngrok-home, mountPath: /tmp}
+          resources: *tunnel-resources
+          securityContext: *tunnel-security
+      volumes:
+        - {name: ngrok-home, emptyDir: {sizeLimit: 16Mi}}

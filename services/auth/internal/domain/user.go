@@ -25,11 +25,18 @@ var (
 	ErrInvalidPassword    = errors.New("password must be between 8 and 72 bytes")
 	ErrInvalidRole        = errors.New("role is invalid")
 	ErrAdminRegistration  = errors.New("admin accounts cannot self-register")
+	ErrStaffRegistration  = errors.New("pharmacy staff accounts cannot self-register")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserExists         = errors.New("user already exists")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrRefreshRevoked     = errors.New("refresh token is revoked")
+	// ErrMissingLink: LinkPharmacy needs both a user and a pharmacy.
+	ErrMissingLink = errors.New("user_id and pharmacy_id are required")
+	// ErrAlreadyLinked: the account already belongs to another pharmacy.
+	ErrAlreadyLinked = errors.New("account is already linked to another pharmacy")
+	// ErrAdminLink: admin accounts are never linked to a pharmacy this way.
+	ErrAdminLink = errors.New("admin accounts cannot be linked to a pharmacy")
 )
 
 type User struct {
@@ -58,10 +65,13 @@ func ValidateRegistration(email, password string, role Role) error {
 	if len(password) < MinPasswordLength || len(password) > MaxPasswordLength {
 		return ErrInvalidPassword
 	}
-	if role != RolePatient && role != RolePharmacist {
-		if role == RoleAdmin {
-			return ErrAdminRegistration
-		}
+	if role == RoleAdmin {
+		return ErrAdminRegistration
+	}
+	if role == RolePharmacist {
+		return ErrStaffRegistration
+	}
+	if role != RolePatient {
 		return ErrInvalidRole
 	}
 	return nil

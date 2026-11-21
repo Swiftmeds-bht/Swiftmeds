@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
+	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -24,6 +26,29 @@ type fakeSearcher struct {
 func (f *fakeSearcher) SearchMedicine(_ context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
 	f.request = req
 	return f.response, f.err
+}
+
+type degradedSearcher struct {
+	fakeSearcher
+	degraded string
+}
+
+func (f *degradedSearcher) SearchMedicine(ctx context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
+	ports.SetSearchDegraded(ctx, f.degraded)
+	return f.fakeSearcher.SearchMedicine(ctx, req)
+}
+
+// fakeSearchService answers both search and autocomplete, as the Search client does.
+type fakeSearchService struct {
+	fakeSearcher
+	suggestions *searchv1.AutocompleteResponse
+	suggestErr  error
+	suggestReq  *searchv1.AutocompleteRequest
+}
+
+func (f *fakeSearchService) Autocomplete(_ context.Context, req *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error) {
+	f.suggestReq = req
+	return f.suggestions, f.suggestErr
 }
 
 type fakeGeo struct {
@@ -86,6 +111,17 @@ func TestSearchRoutesSuccess(t *testing.T) {
 	})
 }
 
+func TestSearchPassesDegradedHeaderToClient(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
+	fake := &degradedSearcher{fakeSearcher: fakeSearcher{response: &searchv1.SearchMedicineResponse{SearchId: "s-1"}}, degraded: "freshness,ranking"}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=napa&lat=27&lng=89", nil)
+	rec := httptest.NewRecorder()
+	searchHandler(fake, logger).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("x-search-degraded") != "freshness,ranking" {
+		t.Fatalf("status = %d, degraded header = %q", rec.Code, rec.Header().Get("x-search-degraded"))
+	}
+}
+
 func TestSearchRoutesMapGRPCErrors(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
 	for _, code := range []codes.Code{codes.NotFound, codes.InvalidArgument, codes.Unavailable} {
@@ -103,6 +139,17 @@ func TestSearchRoutesMapGRPCErrors(t *testing.T) {
 				t.Fatalf("got %d %s, want %d without internal detail", rec.Code, rec.Body.String(), want)
 			}
 		})
+	}
+}
+
+func TestFourXXDownstreamResponsesAreNotLoggedAtError(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	fake := &fakeSearcher{err: status.Error(codes.NotFound, "not found")}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=napa&lat=27&lng=89", nil)
+	searchHandler(fake, logger).ServeHTTP(httptest.NewRecorder(), req)
+	if strings.Contains(logs.String(), `"level":"ERROR"`) || !strings.Contains(logs.String(), `"level":"WARN"`) {
+		t.Fatalf("4xx downstream response log = %s, want WARN and no ERROR", logs.String())
 	}
 }
 
@@ -134,6 +181,79 @@ func TestOtherRoutesMapGRPCErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAutocompleteRoute(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(httptest.NewRecorder(), nil))
+	napa := &searchv1.AutocompleteResponse{Suggestions: []*searchv1.Suggestion{
+		{ProductId: "p-1", DisplayName: "Napa 500mg (Paracetamol)"},
+	}}
+
+	t.Run("public, mapped and shaped like the spec", func(t *testing.T) {
+		fake := &fakeSearchService{suggestions: napa}
+		// No WithAuth and no bearer token: the route must still answer.
+		router := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, logger, WithSearch(fake))
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=%20na%20&limit=5", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		want := `{"suggestions":[{"productId":"p-1","displayName":"Napa 500mg (Paracetamol)"}]}`
+		if rec.Code != http.StatusOK || strings.ReplaceAll(rec.Body.String(), " ", "") != strings.ReplaceAll(want, " ", "") {
+			t.Fatalf("got %d %s, want 200 %s", rec.Code, rec.Body.String(), want)
+		}
+		if fake.suggestReq.GetPrefix() != "na" || fake.suggestReq.GetLimit() != 5 {
+			t.Fatalf("request was not mapped: %v", fake.suggestReq)
+		}
+	})
+
+	t.Run("default limit", func(t *testing.T) {
+		fake := &fakeSearchService{suggestions: &searchv1.AutocompleteResponse{}}
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK || fake.suggestReq.GetLimit() != defaultSuggestions {
+			t.Fatalf("got %d, limit %d", rec.Code, fake.suggestReq.GetLimit())
+		}
+	})
+
+	for name, query := range map[string]string{
+		"no prefix":        "",
+		"short prefix":     "prefix=n",
+		"blank prefix":     "prefix=%20%20%20",
+		"long prefix":      "prefix=" + strings.Repeat("n", 101),
+		"zero limit":       "prefix=na&limit=0",
+		"limit over max":   "prefix=na&limit=21",
+		"non-number limit": "prefix=na&limit=many",
+	} {
+		t.Run("400/"+name, func(t *testing.T) {
+			fake := &fakeSearchService{suggestions: napa}
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?"+query, nil)
+			rec := httptest.NewRecorder()
+			autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest || fake.suggestReq != nil {
+				t.Fatalf("got %d (called: %v), want 400 without a Search call", rec.Code, fake.suggestReq != nil)
+			}
+		})
+	}
+
+	t.Run("downstream error hides detail", func(t *testing.T) {
+		fake := &fakeSearchService{suggestErr: status.Error(codes.Unavailable, "catalog down: dial tcp")}
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		autocompleteHandler(fake, logger).ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || strings.Contains(rec.Body.String(), "dial tcp") {
+			t.Fatalf("got %d %s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("absent when the client cannot suggest", func(t *testing.T) {
+		router := NewRouter(Config{CORSOrigins: defaultCORSOrigins}, logger, WithSearch(&fakeSearcher{}))
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/search/autocomplete?prefix=na", nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("got %d, want 404", rec.Code)
+		}
+	})
 }
 
 func TestSearchValidation(t *testing.T) {

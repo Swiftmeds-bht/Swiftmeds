@@ -2,15 +2,20 @@ package clients
 
 import (
 	"context"
+	"strings"
 
 	geov1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/geo/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/gateway/internal/ports"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var _ ports.Searcher = (*SearchClient)(nil)
+var _ ports.Suggester = (*SearchClient)(nil)
 var _ ports.NearbyPharmacyFinder = (*GeoClient)(nil)
+var _ ports.PharmacyLocations = (*GeoClient)(nil)
 var _ ports.SubstituteFinder = (*SubstitutionClient)(nil)
 
 type SearchClient struct{ client searchv1.SearchServiceClient }
@@ -20,7 +25,14 @@ func NewSearchClient(client searchv1.SearchServiceClient) *SearchClient {
 }
 
 func (c *SearchClient) SearchMedicine(ctx context.Context, req *searchv1.SearchMedicineRequest) (*searchv1.SearchMedicineResponse, error) {
-	return c.client.SearchMedicine(ctx, req)
+	var headers metadata.MD
+	resp, err := c.client.SearchMedicine(ctx, req, grpc.Header(&headers))
+	ports.SetSearchDegraded(ctx, strings.Join(headers.Get("x-search-degraded"), ","))
+	return resp, err
+}
+
+func (c *SearchClient) Autocomplete(ctx context.Context, req *searchv1.AutocompleteRequest) (*searchv1.AutocompleteResponse, error) {
+	return c.client.Autocomplete(ctx, req)
 }
 
 type GeoClient struct{ client geov1.GeoServiceClient }
@@ -31,6 +43,14 @@ func NewGeoClient(client geov1.GeoServiceClient) *GeoClient {
 
 func (c *GeoClient) FindNearbyPharmacies(ctx context.Context, req *geov1.FindNearbyPharmaciesRequest) (*geov1.FindNearbyPharmaciesResponse, error) {
 	return c.client.FindNearbyPharmacies(ctx, req)
+}
+
+func (c *GeoClient) UpsertPharmacyLocation(ctx context.Context, req *geov1.UpsertPharmacyLocationRequest) (*geov1.UpsertPharmacyLocationResponse, error) {
+	return c.client.UpsertPharmacyLocation(ctx, req)
+}
+
+func (c *GeoClient) RemovePharmacyLocation(ctx context.Context, req *geov1.RemovePharmacyLocationRequest) (*geov1.RemovePharmacyLocationResponse, error) {
+	return c.client.RemovePharmacyLocation(ctx, req)
 }
 
 type SubstitutionClient struct {
