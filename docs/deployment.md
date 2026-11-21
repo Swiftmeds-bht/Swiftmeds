@@ -328,6 +328,30 @@ curl -s https://entrench-surging-backtrack.ngrok-free.dev/healthz        # {"sta
 Then open the Vercel site, search once (the first search warms the services up)
 and log in with the demo accounts. Afterwards: `k3d cluster stop swiftmed`.
 
+**Running the demo on another laptop.** Every secret is committed in encrypted
+form (`sealed-secrets.yaml`, `sealed-ngrok.yaml`), so a teammate needs only the
+**controller key backup** (`sealed-secrets-key.yaml`, see [Secrets](#secrets)).
+Share it like a password, never through Git or a chat: a Bitwarden Send link
+(expiring, one view), or an encrypted file (`age -p` or a password-protected
+zip) with the passphrase given separately. Anyone with it can read every
+secret; if it leaks, make a new key, re-seal both files and change the secrets.
+
+```bash
+k3d cluster create --config deploy/k8s/overlays/prod/cluster.yaml
+kubectl apply -f sealed-secrets-key.yaml                 # before the controller
+kubectl apply -k deploy/k8s/platform/sealed-secrets
+scripts/k8s-images.sh --tag v1.0.0 --import swiftmed     # or pull from GHCR
+kubectl apply -k deploy/k8s/overlays/prod
+kubectl -n swiftmed create job seed-$(date +%s) --from=cronjob/seed
+```
+
+**Only one cluster online at a time.** Every cluster connects to the same fixed
+address with pooling on, so if two laptops run at once, ngrok splits the requests
+between them: two different databases, and logins and holds fail at random. Stop
+yours before a teammate starts theirs (`k3d cluster stop swiftmed`). To run a
+cluster without the fixed address, delete its secret:
+`kubectl -n swiftmed delete sealedsecret swiftmed-ngrok` (the quick tunnels still work).
+
 Limits: ngrok's free plan caps requests and bandwidth (enough for a demo) and
 shows a warning page to browsers that open the API address directly; the web app
 calls it from its server, so visitors never see it. On Vercel, several function
