@@ -12,6 +12,8 @@ resources:
   - ../../base
   # Encrypted; made by seal-secrets.sh for this cluster's controller.
   - sealed-secrets.yaml
+  # The ngrok authtoken for the fixed API address (SCRUM-156, seal-ngrok.sh).
+  - sealed-ngrok.yaml
   # Public HTTPS URLs through Cloudflare quick tunnels (SCRUM-75).
   - tunnel.yaml
 

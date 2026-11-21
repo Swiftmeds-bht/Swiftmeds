@@ -7,6 +7,12 @@
 # Each gets a random https://<words>.trycloudflare.com address, printed in its
 # log; it stays the same while the pod runs and changes when the pod restarts.
 #   deploy/k8s/overlays/prod/tunnel-urls.sh      prints them (and updates the workers)
+#
+# api-fixed (SCRUM-156): the API again, on ngrok's free static domain, whose
+# address never changes (https://entrench-surging-backtrack.ngrok-free.dev). The Workers
+# and the web app on Vercel use it, so nothing needs updating before a demo.
+# Its authtoken is the swiftmed-ngrok SealedSecret (seal-ngrok.sh); without it
+# the container waits and the quick tunnels work as before.
 # Moving to a named tunnel with a fixed domain later: docs/deployment.md.
 apiVersion: apps/v1
 kind: Deployment
@@ -57,3 +63,26 @@ spec:
             periodSeconds: 10
           resources: *tunnel-resources
           securityContext: *tunnel-security
+        - name: api-fixed
+          image: ngrok/ngrok:3.39.13-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -z "$NGROK_AUTHTOKEN" ]; then
+                echo "No swiftmed-ngrok secret: the fixed API address is off (overlays/prod/seal-ngrok.sh)."
+                exec sleep 2147483647
+              fi
+              exec ngrok http http://traefik:8080 --url "$NGROK_URL" --pooling-enabled \
+                --log stdout --log-format logfmt
+          env:
+            - {name: NGROK_URL, value: "https://entrench-surging-backtrack.ngrok-free.dev"}
+            - name: NGROK_AUTHTOKEN
+              valueFrom: {secretKeyRef: {name: swiftmed-ngrok, key: NGROK_AUTHTOKEN, optional: true}}
+            # ngrok keeps its state under $HOME; the root filesystem is read-only.
+            - {name: HOME, value: /tmp}
+          volumeMounts:
+            - {name: ngrok-home, mountPath: /tmp}
+          resources: *tunnel-resources
+          securityContext: *tunnel-security
+      volumes:
+        - {name: ngrok-home, emptyDir: {sizeLimit: 16Mi}}

@@ -1,0 +1,13 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: swiftmed-ngrok
+  namespace: swiftmed
+spec:
+  encryptedData:
+    NGROK_AUTHTOKEN: AgCU/U6Sb3zny9tEgl872r0DCQETlhnhcGFngkwSdL/KyxEWhHwoe7bFS6+Ma6GiCPVp2/qDoq18ioVB2VDyEf9fyU3iCMV7WluYbgN0R7FqobjUVnSmYDvWMnO36d9MONv9rjZ1SooDe/s+3cJ0/6l4b39BrkzQLwO/54BjbrBrbbZXormFFEI5qVQe34umZIuBfMGhVqgDd5N8+QJiMSxZbsUJ9SjcPeJuI5qz0cHRD4eVGh4G4qso3AE8MJaOW7KkzCEl2ld57LSCxE4yzstw9T97WAppERTBUy4znVN0Ajzfv1/edQ52wq1xUrwr36bJS5egS4nMOGvWS9vqmvmPkpPoDLV0Rn52uvh9Yu3xMaUMNPyMPybNJYSywwPmqFOYvUIHlSlRo94ORVW5LoJiShuDklE+r+Oey9G669FdB6JBSYLsTELsBpji8gKz0GPWaFDByiZilcWQ0tpfaKqMq4TElcDl0uw6DikseQ11F+FdjGFwNIgvX3Khpgjzmexn03F+E6nVPpoSAQR1NkYlOaiC7V4wohYJLvx4KWKLNbjm64Yp1aYid5wms/CXt4Gz9ijPYz+Ce2kPD3EbYguT1+HKcvWXTzxG0ivUeMaGE8gZhw1o0VIepGtkwcHzraDE7IuOaNciZV26SRxrgl9nz7CkYLZ79JAHwg3FO8SBbCcQcGXobhTGvDA8EDdI0JvCotO7LoUiLikdCigxVpzshJeMTdFpRUgbMxPpz2ps16owqLeKGO+hploCq73fu+k5
+  template:
+    metadata:
+      name: swiftmed-ngrok
+      namespace: swiftmed

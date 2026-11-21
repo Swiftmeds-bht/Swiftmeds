@@ -12,7 +12,7 @@ and run the same commands).
 | SwiftMed (patients) | http://localhost:9000 |
 | Pharmacy portal | http://localhost:9000/pharmacy-portal (same app; staff sign in at `/login`) |
 | API gateway | http://localhost:9080 (`/healthz`) |
-| Public HTTPS URLs | Cloudflare quick tunnels, see [Public access](#public-access); `deploy/k8s/overlays/prod/tunnel-urls.sh` prints them |
+| Public HTTPS URLs | Cloudflare quick tunnels, see [Public access](#public-access); `deploy/k8s/overlays/prod/tunnel-urls.sh` prints them. Fixed API address on ngrok for demos (SCRUM-156) |
 
 **Demo accounts** (seeded by the seed job, password `swiftmeds-demo` for all):
 
@@ -293,6 +293,47 @@ unreachable and the worker route without its secret answers 401. Both workers
 were deployed with `tunnel-urls.sh --deploy-workers`; Cloudflare's cron then
 called `/api/v1/internal/expiry/sweep` through the tunnel every minute
 (16:15, 16:16, 16:17 UTC), each answered 200.
+
+### Demo setup: fixed API address and the web app on Vercel (SCRUM-156)
+
+For presentations the site is on **Vercel** (a fixed `*.vercel.app` link for the
+report) and talks to this cluster through a **fixed API address** on ngrok's free
+static domain: `https://entrench-surging-backtrack.ngrok-free.dev`. The cluster still runs on the
+laptop, so the site works whenever the cluster is up.
+
+Once:
+
+1. ngrok: a free account, the static domain above (Domains), pooling allowed.
+   Seal its authtoken (hidden prompt; commit the result):
+   ```bash
+   deploy/k8s/overlays/prod/seal-ngrok.sh
+   ```
+   and keep `sealed-ngrok.yaml` in the prod kustomization. The `api-fixed`
+   container in `public-tunnel` then connects on every start.
+2. Workers: `tunnel-urls.sh --deploy-workers` now deploys them with the fixed
+   address, so they keep working across restarts.
+3. Vercel: import the repository, Root Directory `web/swiftmed`, framework
+   Next.js. Environment variable `GATEWAY_URL=https://entrench-surging-backtrack.ngrok-free.dev`
+   (Production). `web/swiftmed/vercel.json` runs the functions in Singapore
+   (`sin1`), close to the cluster.
+
+Before each demo:
+
+```bash
+k3d cluster start swiftmed                                  # ~2 minutes
+kubectl -n swiftmed wait --for=condition=Available deploy --all --timeout=600s
+curl -s https://entrench-surging-backtrack.ngrok-free.dev/healthz        # {"status":"ok"}
+```
+
+Then open the Vercel site, search once (the first search warms the services up)
+and log in with the demo accounts. Afterwards: `k3d cluster stop swiftmed`.
+
+Limits: ngrok's free plan caps requests and bandwidth (enough for a demo) and
+shows a warning page to browsers that open the API address directly; the web app
+calls it from its server, so visitors never see it. On Vercel, several function
+instances can refresh the same session at once (`lib/refresh.ts` shares
+refreshes only within one process), so a user may occasionally be asked to log
+in again.
 
 ## Monitoring
 
