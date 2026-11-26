@@ -4,8 +4,11 @@ import { formatDistance } from "@/lib/format";
 import { MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from "@/lib/rules";
 import type { GeoPoint } from "@/lib/types";
 
+import { mapPins } from "@/lib/map-points";
+
 import { InfoIcon } from "./Icons";
 import { ResultsList } from "./ResultsList";
+import { ResultsMap } from "./ResultsMap";
 import { SearchProblem } from "./SearchProblem";
 
 interface Props {
@@ -35,6 +38,7 @@ export async function ResultsSection({ query, point, label, radiusM, retryHref }
   }
 
   const { source, data, degraded } = outcome;
+  const pins = mapPins(data.results);
   return (
     <>
       {source === "demo" && (
@@ -52,6 +56,8 @@ export async function ResultsSection({ query, point, label, radiusM, retryHref }
       <h2 className="results-heading">
         Pharmacies within {formatDistance(radiusM)} of {label}
       </h2>
+      {/* The map adds to the list (SCRUM-158); without pharmacies there is nothing to show. */}
+      {pins.length > 0 && <ResultsMap center={point} label={label} pins={pins} />}
       <ResultsList
         query={query}
         results={data.results}

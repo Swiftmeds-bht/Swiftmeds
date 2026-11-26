@@ -877,3 +877,30 @@ input::placeholder { color: var(--muted); opacity: 1; }
 }
 .review-reason textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
 .review-reason .button { justify-self: start; }
+
+/* ---------- Results map and directions (SCRUM-158) ---------- */
+.results-map { margin: 0 0 1.25rem; }
+.results-map-canvas {
+  height: clamp(15rem, 38vh, 22rem); border: 1px solid var(--border); border-radius: var(--r-panel);
+  overflow: hidden; background: var(--surface); z-index: 0;
+}
+.results-map-legend { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
+/* Leaflet moves .map-pin with its own transform: only the inner shape is rotated. */
+.map-pin { background: none; border: 0; }
+.map-pin-shape {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg); background: var(--primary); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(11, 59, 55, 0.35);
+}
+.map-pin-shape > span { transform: rotate(45deg); color: #fff; font: 700 0.8125rem/1 var(--font-sans), system-ui, sans-serif; }
+.map-legend-pin {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 999px;
+  background: var(--primary); color: #fff; font: 700 0.6875rem/1 var(--font-sans), system-ui, sans-serif;
+}
+.map-here { border-radius: 999px; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25); }
+.results-map .leaflet-popup-content { margin: 0.75rem 0.9rem; font: 0.9375rem/1.45 var(--font-sans), system-ui, sans-serif; }
+.results-map .leaflet-popup-content a { color: var(--primary); font-weight: 600; }
+.map-popup-muted { color: var(--muted); font-size: 0.875rem; }
+.map-popup-list { margin: 0.4rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.25rem; }
+.map-popup-list li { display: flex; justify-content: space-between; gap: 0.75rem; }
+.getting-there { display: grid; gap: 0.6rem; justify-items: start; margin-top: 1rem; padding: 1.1rem 1.25rem; }
+.getting-there h2 { margin: 0; font-size: 1.0625rem; }
