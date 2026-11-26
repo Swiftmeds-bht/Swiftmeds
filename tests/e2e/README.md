@@ -46,7 +46,7 @@ Traefik, so the browser sees the same addresses as on a developer machine.
 
 ## Test data
 
-- The seeded **Demo Pharmacy Thimphu 01** and **Demo Paracetamol 500**
+- The seeded **Norzin Pharmacy** and **Paracetamol Tablets**
   (`deploy/seed`), and the pharmacist linked to that pharmacy,
   `demo-tim-001@demo.swiftmeds.test` (seeded by `make seed`).
 - Every test signs up a new patient (`e2e-<time>@e2e.swiftmeds.test`), so tests

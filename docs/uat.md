@@ -105,7 +105,7 @@ participants. Replace no participant code with a real name.
 - **Role:** Patient
 - **Precondition:** Patient is on `http://localhost:3000`; use demo location
   Thimphu.
-- **Seed:** Search `Demo Paracetamol 500`, `500mg`, or generic `Paracetamol`.
+- **Seed:** Search `Paracetamol Tablets`, `500mg`, or generic `Paracetamol`.
 
 1. Open the patient app and enter the medicine name.
 2. Select Thimphu and search within the default 5000 m radius.
@@ -164,9 +164,9 @@ from another therapeutic class may be suggested.
 - **Requirements / TCs:** FR-07, NFR-02 / TC-010, TC-012
 - **Role:** Patient
 - **Precondition:** Search and sign in as the demo patient.
-- **Seed:** `Demo Ibuprofen 400`, Thimphu 02, 24 units.
+- **Seed:** `Ibuprofen Tablets`, Thimphu 02, 24 units.
 
-1. Press Reserve for Demo Pharmacy Thimphu 02.
+1. Press Reserve for Changlam Pharmacy.
 2. Reserve one unit and confirm.
 3. Open My holds and wait until the hold becomes active.
 
