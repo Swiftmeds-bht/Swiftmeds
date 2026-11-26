@@ -992,12 +992,55 @@ paths:
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/pharmacies/{pharmacyId}/prices:
+    get:
+      tags: [Stock]
+      operationId: getPrices
+      summary: The pharmacy's current prices of some medicines
+      description: |
+        For the portal's Stock page (SCRUM-154). Medicines without a price are
+        left out. The pharmacy's own staff and admins only.
+      x-status: implemented
+      x-grpc: swiftmed.pricing.v1.PricingService/BatchGetPrices
+      x-roles: [ROLE_PHARMACY_STAFF, ROLE_ADMIN]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+        - name: productId
+          in: query
+          required: true
+          description: 1 to 100 medicines; repeat the parameter.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: true
+      responses:
+        "200":
+          description: The prices that exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetPricesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/ServerError"
     put:
       tags: [Stock]
       operationId: setPrices
       summary: Set the prices of one or more medicines
-      description: Prices are per pack, in chhertum, and must be greater than 0.
-      x-status: planned
+      description: |
+        Prices are per pack, in chhertum, and must be greater than 0 and at most
+        100000000 (Nu. 1,000,000). 1 to 100 updates, each medicine once. Only the
+        pharmacy's own staff (SCRUM-154). The portal's Stock page uses it.
+      x-status: implemented
       x-grpc: swiftmed.pricing.v1.PricingService/SetPrices
       x-roles: [ROLE_PHARMACY_STAFF]
       parameters:
