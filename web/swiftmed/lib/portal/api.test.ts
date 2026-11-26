@@ -5,6 +5,8 @@ import {
   DashboardApiError,
   getSyncJob,
   getUnmetDemand,
+  listPrices,
+  setPrice,
   setStock,
   uploadStockCsv,
 } from "./api";
@@ -113,5 +115,36 @@ describe("collectHold", () => {
     expect(url).toMatch(/\/api\/v1\/holds\/h-1\/collect$/);
     expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
     expect(JSON.parse(init.body as string)).toEqual({ pickupCode: "482913" });
+  });
+});
+
+describe("prices (SCRUM-154)", () => {
+  it("reads the pharmacy's prices for the listed medicines", async () => {
+    const fetchMock = mockFetch(200, { prices: [{ pharmacyId: "ph-1", productId: "p-1", priceChhertum: "4500" }, { productId: "p-9", priceChhertum: "0" }] });
+    const prices = await listPrices(session, ["p-1", "p-2", "p-1"]);
+    expect([...prices]).toEqual([["p-1", 4500]]);
+    const { url, init } = lastCall(fetchMock);
+    expect(url).toMatch(/\/api\/v1\/pharmacies\/ph-1\/prices\?productId=p-1&productId=p-2$/);
+    expect(init.method).toBe("GET");
+  });
+
+  it("asks in batches of 100", async () => {
+    const fetchMock = mockFetch(200, { prices: [] });
+    await listPrices(session, Array.from({ length: 150 }, (_, i) => `p-${i}`));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("sets one price as a string of chhertum", async () => {
+    const fetchMock = mockFetch(200, { prices: [] });
+    await setPrice(session, "p-1", 4550);
+    const { url, init } = lastCall(fetchMock);
+    expect(url).toMatch(/\/api\/v1\/pharmacies\/ph-1\/prices$/);
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(String(init.body))).toEqual({ updates: [{ productId: "p-1", priceChhertum: "4550" }] });
+  });
+
+  it("passes the gateway's message on a refusal", async () => {
+    mockFetch(400, { error: "priceChhertum must be a whole number of chhertum from 1 to 100000000" });
+    await expect(setPrice(session, "p-1", 0)).rejects.toBeInstanceOf(DashboardApiError);
   });
 });

@@ -26,6 +26,7 @@ import (
 	inventoryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/inventory/v1"
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	pharmacyregistryv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pharmacy-registry/v1"
+	pricingv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/pricing/v1"
 	searchv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/search/v1"
 	stocksyncv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/stock-sync/v1"
 	substitutionv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/substitution/v1"
@@ -138,6 +139,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("stock sync client: %w", err)
 	}
+	pricingConn, err := conns.Connection(context.Background(), "pricing")
+	if err != nil {
+		return fmt.Errorf("pricing client: %w", err)
+	}
 
 	server := &http.Server{
 		Addr: cfg.HTTPAddress(),
@@ -163,6 +168,7 @@ func run() error {
 			app.WithProfile(clients.NewProfileClient(userprofilev1.NewUserProfileServiceClient(profileConn))),
 			app.WithInventory(clients.NewInventoryClient(inventoryv1.NewInventoryServiceClient(inventoryConn))),
 			app.WithStockSync(clients.NewStockSyncClient(stocksyncv1.NewStockSyncServiceClient(stockSyncConn))),
+			app.WithPricing(clients.NewPricingClient(pricingv1.NewPricingServiceClient(pricingConn))),
 		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

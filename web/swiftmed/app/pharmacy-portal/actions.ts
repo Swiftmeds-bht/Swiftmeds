@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 
 // The pharmacy portal's form actions (SCRUM-139: moved from the former
 // pharmacy-dashboard app). Signing in and out is the app's (app/actions.ts).
-import { collectHold, DashboardApiError, setStock, uploadStockCsv } from "@/lib/portal/api";
+import { collectHold, DashboardApiError, setPrice, setStock, uploadStockCsv } from "@/lib/portal/api";
 import { portalSession } from "@/lib/portal/data";
 import { collectErrorMessage as collectError } from "@/lib/portal/messages";
+import { parsePriceNu } from "@/lib/portal/prices";
 import { csvFileProblem } from "@/lib/portal/stock-csv";
 
 function formText(form: FormData, name: string): string {
@@ -51,6 +52,26 @@ export async function setStockAction(form: FormData): Promise<void> {
 
   if (message) redirectWith("/pharmacy-portal/stock", "error", message);
   redirectWith("/pharmacy-portal/stock", "notice", "Stock quantity updated.");
+}
+
+/** Sets one medicine's price from the Stock page (SCRUM-154). */
+export async function setPriceAction(form: FormData): Promise<void> {
+  const productId = formText(form, "productId");
+  if (!productId) redirectWith("/pharmacy-portal/stock", "error", "The product ID is missing.");
+  const parsed = parsePriceNu(formText(form, "priceNu"));
+  if ("error" in parsed) redirectWith("/pharmacy-portal/stock", "error", parsed.error);
+
+  const session = await portalSession();
+  if (!session) redirect("/login?next=%2Fpharmacy-portal");
+
+  let message: string | undefined;
+  try {
+    await setPrice(session, productId, parsed.chhertum);
+  } catch (error) {
+    message = actionError(error, "Could not update the price. Please try again.");
+  }
+  if (message) redirectWith("/pharmacy-portal/stock", "error", message);
+  redirectWith("/pharmacy-portal/stock", "notice", "Price updated. Patients see it in search now.");
 }
 
 export async function collectHoldAction(form: FormData): Promise<void> {

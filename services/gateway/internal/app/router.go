@@ -33,6 +33,7 @@ type routes struct {
 	onboarding       ports.PharmacyOnboarding
 	linker           ports.PharmacyLinker
 	locations        ports.PharmacyLocations
+	pricing          ports.PricingClient
 }
 
 // WithFreshness adds the internal freshness-decay endpoint (SCRUM-74). Without
@@ -117,6 +118,12 @@ func WithPharmacyOnboarding(registry ports.PharmacyOnboarding, linker ports.Phar
 	return func(r *routes) { r.onboarding, r.linker, r.locations = registry, linker, locations }
 }
 
+// WithPricing adds the portal's price routes, setPrices and getPrices
+// (SCRUM-154).
+func WithPricing(client ports.PricingClient) RouterOption {
+	return func(r *routes) { r.pricing = client }
+}
+
 // WithProducts adds the public medicine lookup, getProduct (SCRUM-138).
 func WithProducts(client ports.ProductLookup) RouterOption {
 	return func(r *routes) { r.products = client }
@@ -166,6 +173,10 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 	if wired.inventory != nil {
 		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/stock", stockHandler(wired.inventory, logger))
 		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/stock/{productId}", stockHandler(wired.inventory, logger))
+	}
+	if wired.pricing != nil {
+		mux.Handle("GET /api/v1/pharmacies/{pharmacyId}/prices", pricesHandler(wired.pricing, logger))
+		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/prices", pricesHandler(wired.pricing, logger))
 	}
 	if wired.stockSync != nil {
 		mux.Handle("POST /api/v1/pharmacies/{pharmacyId}/stock-sync/jobs", stockSyncHandler(wired.stockSync, logger))
