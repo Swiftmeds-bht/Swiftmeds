@@ -4,16 +4,25 @@ import Link from "next/link";
 
 import { AccountNav, SignedInAlerts } from "@/components/AccountNav";
 import { BrandMark } from "@/components/Icons";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, siteUrl } from "@/lib/site";
 
 import "./globals.css";
 
 // Downloaded at build time and served with the app, so pages never call Google.
 const figtree = Figtree({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 
-export const metadata: Metadata = {
-  title: { default: "SwiftMed: find your medicine nearby", template: "%s · SwiftMed" },
-  description: "See which nearby pharmacies in Bhutan have your medicine in stock.",
-};
+// Link previews (SCRUM-157): absolute URLs need the site's address; the image
+// is app/opengraph-image.tsx. Pages inherit all of this and set their own title.
+export function generateMetadata(): Metadata {
+  return {
+    metadataBase: new URL(siteUrl()),
+    title: { default: SITE_TITLE, template: `%s · ${SITE_NAME}` },
+    description: SITE_DESCRIPTION,
+    applicationName: SITE_NAME,
+    openGraph: { type: "website", siteName: SITE_NAME, title: SITE_TITLE, description: SITE_DESCRIPTION, url: "/", locale: "en_GB" },
+    twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
