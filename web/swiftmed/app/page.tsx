@@ -78,10 +78,10 @@ export default function HomePage() {
           <figure className="home-example">
             <div className="example-hold" aria-hidden="true">
               <div className="hold-head">
-                <p className="hold-title example-title">Demo Paracetamol 500 500mg</p>
+                <p className="hold-title example-title">Paracetamol Tablets 500mg</p>
                 <div className="hold-meta">
                   <span className="badge badge-high">Ready to collect</span>
-                  <p className="muted">2 units · Demo Pharmacy Thimphu 03</p>
+                  <p className="muted">2 units · Motithang Medical Store</p>
                 </div>
               </div>
               <PickupTicket code="482913" small>

@@ -10,11 +10,11 @@ $port = if ($env:GATEWAY_HTTP_PORT) { $env:GATEWAY_HTTP_PORT } else { "8080" }
 $Gateway = if ($env:GATEWAY) { $env:GATEWAY } else { "http://localhost:$port" }
 $Password = "swiftmeds-demo"
 $Patient = "patient@demo.swiftmeds.test"
-# Demo Pharmacy Thimphu 02 stocks Demo Ibuprofen 400 in deploy/seed/stock.csv.
+# Changlam Pharmacy (Thimphu) stocks Ibuprofen Tablets in deploy/seed/stock.csv.
 $Pharmacist = "demo-tim-002@demo.swiftmeds.test"
 $PharmacyId = "40000000-0000-4000-8000-000000000002"
 $ProductId = "10000000-0000-4000-8000-000000000003"
-$Query = "Demo Ibuprofen 400"
+$Query = "Ibuprofen Tablets"
 
 function Step($text) { Write-Host "`n==> $text" }
 function Fail($text) { Write-Host "FAIL: $text" -ForegroundColor Red; exit 1 }

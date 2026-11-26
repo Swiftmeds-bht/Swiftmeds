@@ -19,7 +19,7 @@ and run the same commands).
 | Account | Role | Use it for |
 |---|---|---|
 | `patient@demo.swiftmeds.test` | patient | search, reserve, holds, watchlist |
-| `demo-tim-001@demo.swiftmeds.test` | pharmacist of Demo Pharmacy Thimphu 01 | the dashboard: stock, collecting holds, CSV upload |
+| `demo-tim-001@demo.swiftmeds.test` | pharmacist of Norzin Pharmacy | the dashboard: stock, collecting holds, CSV upload |
 | `demo-<licence>@demo.swiftmeds.test` | pharmacist of each other demo pharmacy (`deploy/seed/pharmacies.csv`) | the same, for that pharmacy |
 | `admin@demo.swiftmeds.test` | admin | admin routes (and the pharmacy routes) |
 

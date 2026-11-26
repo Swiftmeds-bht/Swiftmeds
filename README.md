@@ -87,7 +87,7 @@ Demo accounts (development only; the password for all of them is `swiftmeds-demo
 | Account | Sign in as |
 |---|---|
 | Patient | `patient@demo.swiftmeds.test` |
-| Pharmacist of each seeded pharmacy | its license number, for example `demo-tim-001@demo.swiftmeds.test` for Demo Pharmacy Thimphu 01 |
+| Pharmacist of each seeded pharmacy | its license number, for example `demo-tim-001@demo.swiftmeds.test` for Norzin Pharmacy |
 
 A pharmacist registered through the API is not linked to any pharmacy, so it
 cannot collect holds; use a seeded pharmacist for that.

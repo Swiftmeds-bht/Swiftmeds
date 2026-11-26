@@ -8,7 +8,7 @@ export const BASE_URL = (__ENV.BASE_URL || "http://localhost:8080").replace(/\/+
 export const SEED = {
   pharmacyId: "40000000-0000-4000-8000-000000000001",
   lastUnitProductId: "10000000-0000-4000-8000-000000000002",
-  lastUnitQuery: "Demo Paracetamol Syrup",
+  lastUnitQuery: "Paracetamol Syrup",
   // Thimphu, next to pharmacy 01.
   lat: 27.4728,
   lng: 89.639,

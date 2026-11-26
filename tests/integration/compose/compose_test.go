@@ -52,7 +52,7 @@ func TestCrossServiceIntegration(t *testing.T) {
 			} `json:"results"`
 		}
 		api.json(t, http.MethodGet,
-			"/api/v1/search?q=Demo%20Ibuprofen%20400&lat=27.4728&lng=89.6393&radius_m=5000",
+			"/api/v1/search?q=Ibuprofen%20Tablets&lat=27.4728&lng=89.6393&radius_m=5000",
 			"", nil, http.StatusOK, &response)
 		if len(response.Results) == 0 || response.Results[0].ProductID != ibuprofenProduct {
 			t.Fatalf("results = %+v, want seeded ibuprofen", response.Results)
@@ -161,7 +161,7 @@ func TestCrossServiceIntegration(t *testing.T) {
 		deadline := time.Now().Add(10 * time.Second)
 		for time.Now().Before(deadline) {
 			api.json(t, http.MethodGet,
-				"/api/v1/search?q=Demo%20Ibuprofen%20400&lat=27.4728&lng=89.6393&radius_m=5000",
+				"/api/v1/search?q=Ibuprofen%20Tablets&lat=27.4728&lng=89.6393&radius_m=5000",
 				"", nil, http.StatusOK, &search)
 			for _, result := range search.Results {
 				for _, offer := range result.Offers {
