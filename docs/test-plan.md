@@ -194,7 +194,7 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | SRS-F-11 | Stock freshness decays on schedule and stale stock is clearly excluded or labelled according to the product rule. | TC-019, TC-020 | UT, IT, E2E | P0 |
 | SRS-F-12 | When requested stock is unavailable, the system suggests products with the same molecule and strength. | TC-021, TC-022 | UT, E2E, UAT | P1 |
 | SRS-F-13 | A patient can watch a medicine and is notified when matching stock returns. | TC-023, TC-024 | IT, E2E, UAT | P1 |
-| SRS-F-14 | Only registered and verified pharmacies contribute eligible listings, and pharmacy users can manage their stock through the dashboard. | TC-025, TC-026 | IT, E2E, UAT | P0 |
+| SRS-F-14 | Only registered and verified pharmacies contribute eligible listings, and pharmacy users can manage their stock through the dashboard. | TC-025, TC-026, TC-041, TC-042 | IT, E2E, UAT | P0 |
 | SRS-F-15 | Authentication, token expiry, roles, and authorization prevent patients and pharmacy users from accessing each other's protected operations. | TC-027, TC-028 | UT, IT, E2E | P0 |
 | SRS-F-16 | Gateway REST requests are validated and translated to the correct gRPC operation and documented error response. | TC-029, TC-030 | IT, Contract | P0 |
 | SRS-F-17 | Services exchange reservation and stock events through RabbitMQ with correlation, retry, duplicate, and failure handling. | TC-031, TC-032 | IT, Failure injection | P0 |
@@ -250,6 +250,8 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | TC-038 | Pharmacy accessibility | Dashboard critical paths pass the same accessibility checks |
 | TC-039 | Contract compatibility | Existing clients tolerate additive changes and migrations are safe |
 | TC-040 | Test-data hygiene | No real secrets/patient data enter fixtures, logs, or artifacts |
+| TC-041 | Pharmacy sign-up and approval | A new pharmacy is pending and off the map; after an admin approves it, it is on the map and its portal opens (SCRUM-155) |
+| TC-042 | Pharmacy rejection | A rejected pharmacy sees the admin's reason and stays off the map; a rejected pharmacy cannot be approved (SCRUM-155) |
 
 ### 7.2 Automation status at the end of Sprint 1
 

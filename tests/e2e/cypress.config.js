@@ -30,6 +30,8 @@ module.exports = {
     productName: "Demo Paracetamol 500",
     place: "thimphu",
     pharmacistEmail: "demo-tim-001@demo.swiftmeds.test",
+    // The seeded administrator (pharmacy onboarding, SCRUM-155); same demo password.
+    adminEmail: fromEnv("E2E_ADMIN_EMAIL", "admin@demo.swiftmeds.test"),
     // The expiry test needs the stack started with a short hold time (run.sh does this).
     holdSeconds: Number(fromEnv("E2E_HOLD_SECONDS", "7200")),
   },
