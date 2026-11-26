@@ -82,9 +82,14 @@ The app swaps the refresh token for a new pair (`POST /api/v1/auth/refresh`,
 - **Concurrent requests**: refresh tokens work once, and a browser often sends
   several requests with the same cookie (a page, the alert stream, prefetches).
   `refreshOnce` shares one gateway call between them and gives requests that arrive
-  up to 30 s later with the old cookie the same new tokens. This lives in the
-  server's memory, so with several app instances use sticky sessions (or move it to
-  a shared store).
+  up to 30 s later with the old cookie the same new tokens. Within one server this
+  is in memory. Between instances (Vercel), set `KV_REST_API_URL` and
+  `KV_REST_API_TOKEN` (an Upstash Redis store; `UPSTASH_REDIS_REST_URL`/`_TOKEN`
+  work too): `lib/refresh-store.ts` then lets one instance refresh under a 10 s
+  lock while the others wait for its result. The store holds only a hash of the
+  refresh token and the new session encrypted with a key derived from the old
+  token, so its contents are useless without the cookie. If the store is down,
+  each instance refreshes on its own, as before.
 - The cookie lasts 7 days when there is a refresh token (the gateway's own limit is
   `JWT_REFRESH_TTL`, 30 days). Signing out also revokes the refresh token
   (`POST /api/v1/auth/logout`, best effort).
