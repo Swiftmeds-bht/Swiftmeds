@@ -21,7 +21,7 @@ Tutors: Mr. Pema Namgay and Mr. Nima
 
 ## Architecture
 
-- **20 Go microservices** planned, each with its own Postgres database (except Gateway, Search, Ranking and Substitution, which own no data) and a hexagonal (ports and adapters) layout. 18 are built and run in Docker Compose; `services/analytics` and `services/notification` are still empty scaffolds and are not in `go.work` or the Compose file yet.
+- **20 Go microservices** planned, each with its own Postgres database (except Gateway, Search, Ranking and Substitution, which own no data) and a hexagonal (ports and adapters) layout. 18 are built and run in Docker Compose; `services/analytics` remains a scaffold. Notifications are stored and listed in-app; email and SMS delivery are out of scope.
 - **REST in, gRPC out:** clients call the API gateway over REST, and services talk to each other over gRPC.
 - **RabbitMQ** carries events. The reservation saga (Holds and Inventory) runs on choreographed events.
 - **Traefik** handles service discovery and round-robin load balancing.

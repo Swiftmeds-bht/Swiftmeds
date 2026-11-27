@@ -5,9 +5,9 @@ stream for `hold.confirmed`, `hold.expired`, `hold.rejected`, and
 `watchlist.alert`. The shared RabbitMQ consumer claims each `event_id` in
 PostgreSQL before handling it, so each event creates at most one notification.
 
-`GET /api/v1/notifications` is exposed by the gateway for the authenticated
-patient. Email and SMS are represented by the `ports.Delivery` interface and
-use a no-op adapter until a provider is configured.
+`GET /api/v1/notifications` is exposed by the gateway for authenticated users.
+Notifications are in-app only: email and SMS delivery are not supported, and
+the notification service does not read profile contact details.
 
 ## Configuration
 

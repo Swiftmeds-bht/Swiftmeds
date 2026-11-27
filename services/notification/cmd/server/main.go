@@ -20,7 +20,6 @@ import (
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/migrate"
 	notificationv1 "github.com/Swiftmeds-bht/Swiftmeds/proto/gen/go/notification/v1"
 	grpcadapter "github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/grpc"
-	"github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/noop"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/postgres"
 	rabbitmqadapter "github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/adapters/rabbitmq"
 	"github.com/Swiftmeds-bht/Swiftmeds/services/notification/internal/app"
@@ -88,7 +87,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("event deduper: %w", err)
 	}
-	svc := app.NewService(postgres.NewRepository(db), noop.Delivery{}, time.Now)
+	svc := app.NewService(postgres.NewRepository(db), time.Now)
 	consumer, err := rabbitmqadapter.NewConsumer(ch, deduper, svc, log)
 	if err != nil {
 		return err

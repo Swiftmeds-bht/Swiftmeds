@@ -24,6 +24,10 @@ updated before release. No requirement may be marked covered by inference:
 each formal SRS requirement must have at least one matrix row and one executable
 or reviewable test case.
 
+For notifications in this release, the delivery requirement is limited to
+in-app notifications. Email and SMS delivery, including use of profile contact
+details, are out of scope.
+
 ### 1.2 Out of scope
 
 Excluded by the project proposal (Section 2A), so not tested:
@@ -193,7 +197,7 @@ tests, `AT` accessibility tests, and `UAT` acceptance tests.
 | SRS-F-10 | Stock updates are persisted, synchronized, and reflected in search results. | TC-017, TC-018 | IT, E2E | P0 |
 | SRS-F-11 | Stock freshness decays on schedule and stale stock is clearly excluded or labelled according to the product rule. | TC-019, TC-020 | UT, IT, E2E | P0 |
 | SRS-F-12 | When requested stock is unavailable, the system suggests products with the same molecule and strength. | TC-021, TC-022 | UT, E2E, UAT | P1 |
-| SRS-F-13 | A patient can watch a medicine and is notified when matching stock returns. | TC-023, TC-024 | IT, E2E, UAT | P1 |
+| SRS-F-13 | A patient can watch a medicine and receives an in-app notification when matching stock returns. Email and SMS delivery are out of scope. | TC-023, TC-024 | IT, E2E, UAT | P1 |
 | SRS-F-14 | Only registered and verified pharmacies contribute eligible listings, and pharmacy users can manage their stock through the dashboard. | TC-025, TC-026, TC-041, TC-042 | IT, E2E, UAT | P0 |
 | SRS-F-15 | Authentication, token expiry, roles, and authorization prevent patients and pharmacy users from accessing each other's protected operations. | TC-027, TC-028 | UT, IT, E2E | P0 |
 | SRS-F-16 | Gateway REST requests are validated and translated to the correct gRPC operation and documented error response. | TC-029, TC-030 | IT, Contract | P0 |
