@@ -12,12 +12,11 @@ import (
 
 type Service struct {
 	repo     ports.NotificationRepository
-	delivery ports.Delivery
 	now      ports.Clock
 }
 
-func NewService(repo ports.NotificationRepository, delivery ports.Delivery, now ports.Clock) *Service {
-	return &Service{repo: repo, delivery: delivery, now: now}
+func NewService(repo ports.NotificationRepository, now ports.Clock) *Service {
+	return &Service{repo: repo, now: now}
 }
 
 func (s *Service) Send(ctx context.Context, eventID, userID string, channel, template int32, params map[string]string) (domain.Notification, error) {
@@ -31,18 +30,6 @@ func (s *Service) Send(ctx context.Context, eventID, userID string, channel, tem
 	}
 	if !created {
 		return n, nil
-	}
-	if s.delivery != nil {
-		switch channel {
-		case 2:
-			if err := s.delivery.SendEmail(ctx, n); err != nil {
-				return domain.Notification{}, fmt.Errorf("send email notification: %w", err)
-			}
-		case 3:
-			if err := s.delivery.SendSMS(ctx, n); err != nil {
-				return domain.Notification{}, fmt.Errorf("send SMS notification: %w", err)
-			}
-		}
 	}
 	return n, nil
 }

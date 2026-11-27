@@ -1645,7 +1645,7 @@ paths:
       tags: [Notifications]
       operationId: listNotifications
       summary: List the signed-in user's notifications
-      x-status: planned
+      x-status: implemented
       x-grpc: swiftmed.notification.v1.NotificationService/ListNotifications
       x-roles: [ROLE_PATIENT, ROLE_PHARMACY_STAFF]
       parameters:

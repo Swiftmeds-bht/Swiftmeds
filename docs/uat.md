@@ -28,6 +28,11 @@ remains the executable traceability baseline.
 | US-14 | Admin pharmacy approval | NOT READY | No confirmed admin approval flow |
 | US-15 | Admin suspicious-price review | NOT READY | No confirmed admin suspicious-price flow |
 
+Notifications are in-app only. Email and SMS delivery, including delivery to
+the email address or phone number in a user's profile, are out of scope for
+this release. UAT may verify an alert in the app's notification list, but must
+not report that an email or text message was sent.
+
 ## 2. Environment
 
 - Demo start:

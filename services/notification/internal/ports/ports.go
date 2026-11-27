@@ -12,11 +12,4 @@ type NotificationRepository interface {
 	ListByUser(context.Context, string, int, string) ([]domain.Notification, string, error)
 }
 
-// Delivery is the boundary for external channels. The current adapter is a
-// deliberate no-op; providers can be added without changing the use cases.
-type Delivery interface {
-	SendEmail(context.Context, domain.Notification) error
-	SendSMS(context.Context, domain.Notification) error
-}
-
 type Clock func() time.Time
