@@ -49,10 +49,13 @@ describe("sharedRefresh (SCRUM-160)", () => {
       await gate;
       return { kind: "refreshed", session: fresh };
     });
-    // Two instances with the same refresh token at the same time.
-    const first = sharedRefresh("old-refresh", store, refresh, { sleep: noSleep, pollMs: 1 });
-    const second = sharedRefresh("old-refresh", store, refresh, { sleep: () => new Promise((r) => setTimeout(r, 5)), pollMs: 5 });
-    await new Promise((r) => setTimeout(r, 10));
+    // Two instances with the same refresh token at the same time. Either may win
+    // the lock, so both wait in real time: the loser must still be polling when
+    // the winner finishes (an instant sleep would use up its wait at once).
+    const options = { sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)), pollMs: 5, waitMs: 2000 };
+    const first = sharedRefresh("old-refresh", store, refresh, options);
+    const second = sharedRefresh("old-refresh", store, refresh, options);
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
     release();
     expect(await first).toEqual({ kind: "refreshed", session: fresh });
     expect(await second).toEqual({ kind: "refreshed", session: fresh });
