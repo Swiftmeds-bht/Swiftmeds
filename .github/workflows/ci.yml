@@ -68,25 +68,26 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
+      # The release archive straight from GitHub, checked against the release's
+      # checksums (SCRUM-163). The install.sh script first looks the version up
+      # on a github.com web page, which can answer 504 while downloads work.
       - name: Install golangci-lint
         shell: bash
+        env:
+          GOLANGCI_LINT_VERSION: 2.12.2
         run: |
           set -euo pipefail
-          for attempt in 1 2 3; do
-            if curl -sSfL https://golangci-lint.run/install.sh \
-              | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2; then
-              break
-            fi
-
-            if [[ "${attempt}" -eq 3 ]]; then
-              echo "Failed to install golangci-lint after ${attempt} attempts."
-              exit 1
-            fi
-
-            echo "Retrying golangci-lint install (${attempt}/3)..."
-            sleep 5
-          done
+          v="${GOLANGCI_LINT_VERSION}"
+          name="golangci-lint-${v}-linux-amd64"
+          base="https://github.com/golangci/golangci-lint/releases/download/v${v}"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO --retry 5 --retry-all-errors "${base}/${name}.tar.gz"
+          curl -fsSL --retry 5 --retry-all-errors "${base}/golangci-lint-${v}-checksums.txt" \
+            | grep " ${name}.tar.gz\$" | sha256sum -c -
+          tar -xzf "${name}.tar.gz" "${name}/golangci-lint"
+          install -m 755 "${name}/golangci-lint" "$(go env GOPATH)/bin/golangci-lint"
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          "$(go env GOPATH)/bin/golangci-lint" version
 
       - name: Prepare coverage output
         run: mkdir -p coverage
