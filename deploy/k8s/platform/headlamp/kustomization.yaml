@@ -1,0 +1,13 @@
+# Headlamp (SCRUM-161): a web dashboard for the cluster (deployments, pods,
+# logs, events, CPU and memory). Installed once per cluster, like the Sealed
+# Secrets controller. Only reachable through kubectl port-forward, and logins
+# use a read-only account, so the dashboard cannot change anything.
+#   kubectl apply -k deploy/k8s/platform/headlamp
+#   deploy/k8s/platform/headlamp/open.sh     # http://localhost:4466 and a token
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: headlamp
+resources:
+  - namespace.yaml
+  - headlamp.yaml
+  - viewer.yaml
