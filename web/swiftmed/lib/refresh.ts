@@ -9,6 +9,7 @@
 // requests with the same cookie share one gateway call instead of racing to use
 // a refresh token that only works once.
 import { HoldError } from "./holds-core";
+import { sharedRefresh, storeFromEnv, type RefreshStore } from "./refresh-store";
 import { claimsFromToken } from "./roles";
 import { DEFAULT_SESSION_SECONDS } from "./session";
 import type { Session } from "./types";
@@ -18,6 +19,11 @@ export interface RefreshOptions {
   fetchFn?: typeof fetch;
   timeoutMs?: number;
   now?: () => number;
+  /**
+   * Shares refreshes between server instances (SCRUM-160). Undefined: from the
+   * environment (KV_REST_API_URL and KV_REST_API_TOKEN); null: none.
+   */
+  store?: RefreshStore | null;
 }
 
 export type RefreshOutcome =
@@ -106,12 +112,20 @@ interface Entry {
 }
 
 // On globalThis so proxy.ts and server actions (bundled separately) share it
-// within one server process. Several app instances do not share it; see README.
-const store = globalThis as typeof globalThis & { __swiftmedRefreshes?: Map<string, Entry> };
+// within one server process. Between instances (Vercel), the shared store in
+// lib/refresh-store.ts does the same, when it is configured (SCRUM-160).
+const memory = globalThis as typeof globalThis & { __swiftmedRefreshes?: Map<string, Entry> };
 
 function entries(): Map<string, Entry> {
-  store.__swiftmedRefreshes ??= new Map();
-  return store.__swiftmedRefreshes;
+  memory.__swiftmedRefreshes ??= new Map();
+  return memory.__swiftmedRefreshes;
+}
+
+/** One refresh across all instances when a shared store is set up, else this process's own. */
+function refreshAcrossInstances(session: Session, options: RefreshOptions): Promise<RefreshOutcome> {
+  const shared = options.store === undefined ? storeFromEnv() : (options.store ?? undefined);
+  if (!shared || !session.refreshToken) return refreshSession(session, options);
+  return sharedRefresh(session.refreshToken, shared, () => refreshSession(session, options));
 }
 
 /** refreshSession, shared by every caller holding the same refresh token. Only successes are remembered. */
@@ -128,7 +142,7 @@ export function refreshOnce(session: Session, options: RefreshOptions): Promise<
   if (existing) return existing.outcome;
 
   const entry: Entry = {
-    outcome: refreshSession(session, options).then((outcome) => {
+    outcome: refreshAcrossInstances(session, options).then((outcome) => {
       if (outcome.kind === "refreshed") entry.settledAt = now();
       // A refusal or a failure is not kept: the next request may try again.
       else map.delete(key);

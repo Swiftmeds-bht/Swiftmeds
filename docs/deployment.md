@@ -316,6 +316,11 @@ Once:
    Next.js. Environment variable `GATEWAY_URL=https://entrench-surging-backtrack.ngrok-free.dev`
    (Production). `web/swiftmed/vercel.json` runs the functions in Singapore
    (`sin1`), close to the cluster.
+4. Vercel → Storage → **Upstash for Redis** (free plan) → create, region
+   Singapore, and connect it to the project. This sets `KV_REST_API_URL` and
+   `KV_REST_API_TOKEN`; redeploy afterwards. The app then shares token refreshes
+   between function instances (SCRUM-160), so users are not logged out when two
+   instances refresh the same session at once. Without it the app still works.
 
 Before each demo:
 
@@ -354,10 +359,9 @@ cluster without the fixed address, delete its secret:
 
 Limits: ngrok's free plan caps requests and bandwidth (enough for a demo) and
 shows a warning page to browsers that open the API address directly; the web app
-calls it from its server, so visitors never see it. On Vercel, several function
-instances can refresh the same session at once (`lib/refresh.ts` shares
-refreshes only within one process), so a user may occasionally be asked to log
-in again.
+calls it from its server, so visitors never see it. Without the Upstash store
+(step 4), several Vercel function instances can refresh the same session at
+once, and a user may occasionally be asked to log in again.
 
 ## Monitoring
 
