@@ -36,6 +36,7 @@ deploy/k8s/
   overlays/local/       a development cluster: images built here (:dev), 1 replica,
                         the Secret from a local secrets.env (gitignored)
   platform/sealed-secrets/   the Sealed Secrets controller, once per cluster
+  platform/headlamp/    a web dashboard for the cluster, read-only (namespace headlamp)
   monitoring/           Prometheus, Grafana, Loki, Alloy, kube-state-metrics (namespace monitoring)
   tools/backup-shell.yaml    a helper pod for listing and restoring backups
 ```
@@ -414,6 +415,34 @@ pharmacy-registry (one search's fan-out); the dashboard's queries returned data
 for 10 services, 31 pods and both HPAs; Loki held the logs of 26 apps, and
 `| json | status >= 400` found the 404 sent on purpose; both data sources
 healthy; anonymous requests refused.
+
+## Cluster dashboard (Headlamp)
+
+`deploy/k8s/platform/headlamp` (SCRUM-161) is a web page for the cluster:
+deployments and their rollouts, pods with status, restarts and logs, events,
+services, HPAs, and CPU and memory per pod (from k3s's metrics-server). It is
+[Headlamp](https://headlamp.dev) v0.46.0, the Kubernetes SIG UI dashboard (the
+older Kubernetes Dashboard project is archived). Grafana (above) is for metrics
+over time and log search; Headlamp shows what is running right now.
+
+```bash
+kubectl apply -k deploy/k8s/platform/headlamp     # once per cluster
+deploy/k8s/platform/headlamp/open.sh              # http://localhost:4466, prints a token
+```
+
+Paste the printed token on the login page and pick the `swiftmed` namespace.
+The token belongs to `headlamp-viewer`, a **read-only** account (the built-in
+`view` role plus nodes, storage, CRDs and metrics): it can read pods, logs and
+deployments but not Secrets, and Kubernetes refuses any edit, scale, delete or
+exec made from the dashboard. Tokens last 8 hours (`HEADLAMP_TOKEN_HOURS`).
+The dashboard is reached only through `kubectl port-forward` on 127.0.0.1, never
+through the public tunnels. To change things, use `kubectl` as before.
+
+The image is about 370 MB. On a slow connection the cluster's own pull can time
+out; pull it on the laptop and load it instead:
+`docker pull ghcr.io/headlamp-k8s/headlamp:v0.46.0 && k3d image import -c swiftmed ghcr.io/headlamp-k8s/headlamp:v0.46.0`.
+
+Remove it with `kubectl delete -k deploy/k8s/platform/headlamp`.
 
 ## Show in the report
 

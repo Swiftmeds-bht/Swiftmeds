@@ -1,0 +1,62 @@
+# The Headlamp server. With -in-cluster it talks to the API server with the
+# token the user logs in with, so its own service account has no permissions;
+# it is mounted only for the API server address and CA certificate.
+# Pinned to a release (not :latest), without the upstream manifest's tracing
+# (there is no OpenTelemetry collector here).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: headlamp
+  labels: {app.kubernetes.io/name: headlamp}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: headlamp
+  labels: {app.kubernetes.io/name: headlamp}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: headlamp}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: headlamp}
+    spec:
+      serviceAccountName: headlamp
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: headlamp
+          image: ghcr.io/headlamp-k8s/headlamp:v0.46.0
+          args: ["-in-cluster", "-plugins-dir=/headlamp/plugins"]
+          ports:
+            - {name: http, containerPort: 4466}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+      nodeSelector:
+        kubernetes.io/os: linux
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: headlamp
+  labels: {app.kubernetes.io/name: headlamp}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: headlamp}
+  ports:
+    - {name: http, port: 80, targetPort: http}
