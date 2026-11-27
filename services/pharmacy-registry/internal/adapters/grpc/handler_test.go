@@ -56,6 +56,37 @@ func TestRegisterVerifyAndVerifiedOnlyList(t *testing.T) {
 	if len(listed.GetPharmacies()) != 1 {
 		t.Fatalf("verified list has %d pharmacies, want 1", len(listed.GetPharmacies()))
 	}
+	if listed.GetPage() == nil || listed.GetPage().GetNextPageToken() != "" {
+		t.Fatalf("unexpected page response: %v", listed.GetPage())
+	}
+}
+
+func TestListPharmaciesUsesPageToken(t *testing.T) {
+	h := newHandler()
+	ctx := context.Background()
+	for _, id := range []string{"one", "two", "three"} {
+		if _, err := h.RegisterPharmacy(ctx, &registryv1.RegisterPharmacyRequest{OwnerUserId: "owner-" + id, Name: id, LicenseNumber: "LIC-" + id, Location: &commonv1.GeoPoint{Latitude: 27, Longitude: 89}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := h.ListPharmacies(ctx, &registryv1.ListPharmaciesRequest{Page: &commonv1.PageRequest{PageSize: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.GetPharmacies()) != 2 || first.GetPage().GetNextPageToken() == "" {
+		t.Fatalf("first page=%v", first)
+	}
+	second, err := h.ListPharmacies(ctx, &registryv1.ListPharmaciesRequest{Page: &commonv1.PageRequest{PageSize: 2, PageToken: first.GetPage().GetNextPageToken()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.GetPharmacies()) != 1 || second.GetPage().GetNextPageToken() != "" {
+		t.Fatalf("second page=%v", second)
+	}
+	_, err = h.ListPharmacies(ctx, &registryv1.ListPharmaciesRequest{Page: &commonv1.PageRequest{PageToken: "bad"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("invalid token code=%v err=%v", status.Code(err), err)
+	}
 }
 
 func TestInvalidVerificationStatusIsInvalidArgument(t *testing.T) {

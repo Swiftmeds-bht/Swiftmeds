@@ -10,10 +10,12 @@ import (
 type PharmacyRepository interface {
 	Create(context.Context, domain.Pharmacy) error
 	Get(context.Context, string) (domain.Pharmacy, error)
+	GetMany(context.Context, []string) ([]domain.Pharmacy, error)
 	// FindByOwner returns the owner's pharmacy (the oldest, if several), or
 	// domain.ErrNotFound.
 	FindByOwner(context.Context, string) (domain.Pharmacy, error)
 	List(context.Context, bool) ([]domain.Pharmacy, error)
+	ListPage(context.Context, domain.Status, int, string) ([]domain.Pharmacy, string, error)
 	SetStatus(context.Context, string, domain.Status, string, time.Time) (domain.Pharmacy, error)
 	Update(context.Context, string, string, domain.Pharmacy) (domain.Pharmacy, error)
 }

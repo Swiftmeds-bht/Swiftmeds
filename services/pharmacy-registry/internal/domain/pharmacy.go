@@ -29,7 +29,8 @@ var (
 	ErrNotFound          = errors.New("pharmacy not found")
 	ErrOwnerMismatch     = errors.New("pharmacy does not belong to owner")
 	// ErrLicenseTaken: another pharmacy is registered with this licence number.
-	ErrLicenseTaken = errors.New("a pharmacy with this licence number is already registered")
+	ErrLicenseTaken     = errors.New("a pharmacy with this licence number is already registered")
+	ErrInvalidPageToken = errors.New("invalid page token")
 )
 
 type GeoPoint struct {
