@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCoordinates, parseRadius, placeById, resolveLocation, roundCoordinate } from "./places";
+import { DZONGKHAGS } from "./pharmacy-form";
+import { PLACES, REGIONS, parseCoordinates, parseRadius, placeById, placesByRegion, resolveLocation, roundCoordinate } from "./places";
 
 describe("parseCoordinates", () => {
   it("reads valid coordinates, including zero and negatives", () => {
@@ -64,5 +65,47 @@ describe("town and radius helpers", () => {
     expect(parseRadius("2000")).toBe(2000);
     expect(parseRadius("123")).toBe(5000);
     expect(parseRadius(undefined)).toBe(5000);
+  });
+});
+
+describe("the place list (SCRUM-153)", () => {
+  it("has one place per dzongkhag, all 20, with unique ids", () => {
+    expect(PLACES).toHaveLength(20);
+    expect(new Set(PLACES.map((p) => p.dzongkhag)).size).toBe(20);
+    expect(new Set(PLACES.map((p) => p.id)).size).toBe(20);
+  });
+
+  it("keeps the original ids, so old search links still work, and Thimphu first as the default", () => {
+    expect(PLACES[0].id).toBe("thimphu");
+    expect(placeById("paro").label).toBe("Paro");
+    expect(placeById("phuentsholing")).toMatchObject({ dzongkhag: "Chukha", label: "Phuentsholing (Chukha)" });
+    expect(placeById("mongar").location).toEqual({ latitude: 27.2747, longitude: 91.2396 });
+    expect(placeById("nowhere").id).toBe("thimphu");
+  });
+
+  it("puts every place in Bhutan and in exactly one region", () => {
+    for (const p of PLACES) {
+      expect(p.location.latitude).toBeGreaterThan(26.6);
+      expect(p.location.latitude).toBeLessThan(28.4);
+      expect(p.location.longitude).toBeGreaterThan(88.7);
+      expect(p.location.longitude).toBeLessThan(92.2);
+    }
+    const grouped = placesByRegion();
+    expect(grouped.map((g) => g.region)).toEqual([...REGIONS]);
+    expect(grouped.flatMap((g) => g.places)).toHaveLength(20);
+    expect(grouped[0].places.map((p) => p.label)).toEqual(["Gasa", "Haa", "Paro", "Punakha", "Thimphu", "Wangdue Phodrang"]);
+  });
+
+  it("is the same list the pharmacy form registers in", () => {
+    expect(DZONGKHAGS.map((d) => d.name).sort()).toEqual(PLACES.map((p) => p.dzongkhag).sort());
+    expect(DZONGKHAGS.find((d) => d.name === "Chukha")?.centre).toEqual(placeById("phuentsholing").location);
+  });
+
+  it("resolves a new place for the results page", () => {
+    expect(resolveLocation(undefined, undefined, "trashigang")).toEqual({
+      point: { latitude: 27.3333, longitude: 91.5539 },
+      label: "Trashigang",
+      fromDevice: false,
+    });
   });
 });

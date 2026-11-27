@@ -12,11 +12,11 @@ set -euo pipefail
 GATEWAY="${GATEWAY:-http://localhost:${GATEWAY_HTTP_PORT:-8080}}"
 PASSWORD="${DEMO_PASSWORD:-swiftmeds-demo}"
 PATIENT="${DEMO_PATIENT:-patient@demo.swiftmeds.test}"
-# Demo Pharmacy Thimphu 02 stocks Demo Ibuprofen 400 in deploy/seed/stock.csv.
+# Changlam Pharmacy (Thimphu) stocks Ibuprofen Tablets in deploy/seed/stock.csv.
 PHARMACIST="${DEMO_PHARMACIST:-demo-tim-002@demo.swiftmeds.test}"
 PHARMACY_ID="${DEMO_PHARMACY_ID:-40000000-0000-4000-8000-000000000002}"
 PRODUCT_ID="${DEMO_PRODUCT_ID:-10000000-0000-4000-8000-000000000003}"
-QUERY="${DEMO_QUERY:-Demo Ibuprofen 400}"
+QUERY="${DEMO_QUERY:-Ibuprofen Tablets}"
 LAT=27.4728
 LNG=89.6390
 

@@ -25,11 +25,13 @@ module.exports = {
     // Seeded by `make seed` (deploy/seed): a verified pharmacy, a medicine,
     // and the pharmacist linked to that pharmacy.
     pharmacyId: "40000000-0000-4000-8000-000000000001",
-    pharmacyName: "Demo Pharmacy Thimphu 01",
+    pharmacyName: "Norzin Pharmacy",
     productId: "10000000-0000-4000-8000-000000000001",
-    productName: "Demo Paracetamol 500",
+    productName: "Paracetamol Tablets",
     place: "thimphu",
     pharmacistEmail: "demo-tim-001@demo.swiftmeds.test",
+    // The seeded administrator (pharmacy onboarding, SCRUM-155); same demo password.
+    adminEmail: fromEnv("E2E_ADMIN_EMAIL", "admin@demo.swiftmeds.test"),
     // The expiry test needs the stack started with a short hold time (run.sh does this).
     holdSeconds: Number(fromEnv("E2E_HOLD_SECONDS", "7200")),
   },

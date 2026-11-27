@@ -2,7 +2,7 @@
 
 import { useId, useState, useSyncExternalStore } from "react";
 
-import { PLACES, roundCoordinate } from "@/lib/places";
+import { placesByRegion, roundCoordinate } from "@/lib/places";
 import type { GeoPoint } from "@/lib/types";
 
 import { LocateIcon, MapPinIcon } from "./Icons";
@@ -68,10 +68,15 @@ export function LocationPicker({ placeId, deviceLocation }: Props) {
     <div className="field">
       <label htmlFor={selectId}>Near</label>
       <select id={selectId} name="place" defaultValue={placeId} disabled={Boolean(device)} aria-describedby={statusId}>
-        {PLACES.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.label}
-          </option>
+        {/* All 20 dzongkhags, grouped by region so the list stays short to scan on a phone (SCRUM-153). */}
+        {placesByRegion().map((group) => (
+          <optgroup key={group.region} label={group.region}>
+            {group.places.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
       {device && (

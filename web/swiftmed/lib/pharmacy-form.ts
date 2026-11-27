@@ -1,36 +1,18 @@
 // Checks the pharmacy sign-up form (SCRUM-142) before anything is sent, so the
 // pharmacist sees what to fix next to the field. The gateway checks again.
 import type { PharmacyDetails } from "./pharmacies";
+import { PLACES } from "./places";
 import type { GeoPoint } from "./types";
 
 /**
- * Bhutan's 20 dzongkhags, each with the rough centre of its main town. The
- * centre is the pharmacy's location unless the pharmacist uses their device's
- * location instead. Spelled as in the seed data ("Chukha"), so Analytics groups
- * them the same way.
+ * Bhutan's 20 dzongkhags, each with the rough centre of its main town: the
+ * same list patients search from (lib/places.ts, SCRUM-153), sorted by name.
+ * The centre is the pharmacy's location unless the pharmacist uses their
+ * device's location instead.
  */
-export const DZONGKHAGS: { name: string; centre: GeoPoint }[] = [
-  { name: "Bumthang", centre: { latitude: 27.5492, longitude: 90.7525 } },
-  { name: "Chukha", centre: { latitude: 26.8516, longitude: 89.3884 } },
-  { name: "Dagana", centre: { latitude: 27.0697, longitude: 89.8771 } },
-  { name: "Gasa", centre: { latitude: 27.9061, longitude: 89.7269 } },
-  { name: "Haa", centre: { latitude: 27.3685, longitude: 89.2918 } },
-  { name: "Lhuentse", centre: { latitude: 27.6679, longitude: 91.1839 } },
-  { name: "Mongar", centre: { latitude: 27.2747, longitude: 91.2396 } },
-  { name: "Paro", centre: { latitude: 27.4305, longitude: 89.4133 } },
-  { name: "Pemagatshel", centre: { latitude: 27.0379, longitude: 91.4031 } },
-  { name: "Punakha", centre: { latitude: 27.5914, longitude: 89.8774 } },
-  { name: "Samdrup Jongkhar", centre: { latitude: 26.8007, longitude: 91.5051 } },
-  { name: "Samtse", centre: { latitude: 26.8993, longitude: 89.0995 } },
-  { name: "Sarpang", centre: { latitude: 26.8639, longitude: 90.2674 } },
-  { name: "Thimphu", centre: { latitude: 27.4728, longitude: 89.639 } },
-  { name: "Trashigang", centre: { latitude: 27.3333, longitude: 91.5539 } },
-  { name: "Trashiyangtse", centre: { latitude: 27.6116, longitude: 91.498 } },
-  { name: "Trongsa", centre: { latitude: 27.5026, longitude: 90.5071 } },
-  { name: "Tsirang", centre: { latitude: 27.0219, longitude: 90.1229 } },
-  { name: "Wangdue Phodrang", centre: { latitude: 27.4863, longitude: 89.8993 } },
-  { name: "Zhemgang", centre: { latitude: 27.2169, longitude: 90.6579 } },
-];
+export const DZONGKHAGS: { name: string; centre: GeoPoint }[] = PLACES.map((p) => ({ name: p.dzongkhag, centre: p.location })).sort(
+  (a, b) => a.name.localeCompare(b.name),
+);
 
 export interface PharmacyFormValues {
   name: string;

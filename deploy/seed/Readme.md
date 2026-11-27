@@ -2,14 +2,22 @@
 
 These CSV files are development fixtures for SwiftMeds:
 
-- `medicines.csv`: 50 product records.
-- `pharmacies.csv`: 15 pharmacy records, five each in Chukha, Paro, and Thimphu.
-- `stock.csv`: 30 pharmacy/product stock records.
-- `prices.demo.csv`: deterministic synthetic prices for the 30 seeded pharmacy/product pairs.
+- `medicines.csv`: 50 product records, named as on an essential-medicines list
+  ("Paracetamol Tablets", "Salbutamol Inhaler"; SCRUM-159). Catalog loads them from
+  its migrations; `003_realistic_medicine_names` renames the original "Demo ..." names.
+- `pharmacies.csv`: 22 fictional pharmacies (realistic names, real street and town
+  names, phone numbers in the unused `+975 2 000 1xx` range): five each in Thimphu,
+  Paro and Chukha (Phuentsholing), and one each in Punakha, Wangdue Phodrang,
+  Bumthang, Mongar, Trashigang, Sarpang and Samdrup Jongkhar.
+- `stock.csv`: 220 pharmacy/product stock records. The first 30 are the original
+  edge cases the tests rely on (out of stock, one unit left); the rest give every
+  pharmacy about nine common medicines.
+- `prices.demo.csv`: a price for every stock record (typical prices per pack, a
+  little different at each pharmacy).
 
 `stock.csv` references IDs from the other two files. Quantities are nonnegative integers; `0` represents no stock and `1` represents one unit remaining.
 
-These are demo records. Pharmacy contact and license fields, demo brand labels, and stock quantities do not represent real registrations, contact details, or current inventory. Use only for development and testing.
+These are demo records. The pharmacies are fictional: their names, licence numbers, phone numbers and stock do not represent real businesses, registrations or inventory. Use only for development and testing.
 
 `make up` loads them automatically once every service is healthy; `make seed`
 loads them again. Both run the one-shot `seed` container from

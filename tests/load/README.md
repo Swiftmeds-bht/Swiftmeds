@@ -29,7 +29,7 @@ k6 run reservation-burst.js
 | `PATIENT_TOKENS` | registers new patients | comma-separated patient access tokens to reuse |
 | `STAFF_TOKEN` | unset | staff token for pharmacy 01: resets the item to exactly 1 available unit first and also checks `quantityReserved <= quantityOnHand` afterwards |
 | `CLEANUP` | `true` | cancel the winning hold afterwards so the test can be rerun |
-| `PHARMACY_ID`, `PRODUCT_ID`, `PRODUCT_QUERY` | seed pharmacy 01 / product `…0002` / `Demo Paracetamol Syrup` | the item to burst on |
+| `PHARMACY_ID`, `PRODUCT_ID`, `PRODUCT_QUERY` | seed pharmacy 01 / product `…0002` / `Paracetamol Syrup` | the item to burst on |
 
 The burst uses the seed row in `deploy/seed/stock.csv` where pharmacy 01 has exactly one pack of
 product `10000000-0000-4000-8000-000000000002`. Without `STAFF_TOKEN`, a second run needs that unit

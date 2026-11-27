@@ -235,6 +235,43 @@ export function setStock(
   );
 }
 
+interface PriceJSON {
+  productId?: string;
+  priceChhertum?: string | number;
+}
+
+/**
+ * The pharmacy's current prices of these medicines, in chhertum, by product ID
+ * (getPrices, SCRUM-154). Medicines without a price are not in the map.
+ */
+export async function listPrices(session: PortalSession, productIds: string[]): Promise<Map<string, number>> {
+  const prices = new Map<string, number>();
+  const ids = [...new Set(productIds.filter(Boolean))];
+  // The gateway takes at most 100 at a time.
+  for (let i = 0; i < ids.length; i += 100) {
+    const query = new URLSearchParams();
+    for (const id of ids.slice(i, i + 100)) query.append("productId", id);
+    const result = await requestJSON<{ prices?: PriceJSON[] }>(
+      "GET",
+      `/api/v1/pharmacies/${encodeURIComponent(session.pharmacyId)}/prices?${query.toString()}`,
+      { session },
+    );
+    for (const p of result.prices ?? []) {
+      const amount = Number(p.priceChhertum);
+      if (p.productId && Number.isFinite(amount) && amount > 0) prices.set(p.productId, amount);
+    }
+  }
+  return prices;
+}
+
+/** Sets one medicine's price, in chhertum (setPrices, SCRUM-154). */
+export async function setPrice(session: PortalSession, productId: string, chhertum: number): Promise<void> {
+  await requestJSON<unknown>("PUT", `/api/v1/pharmacies/${encodeURIComponent(session.pharmacyId)}/prices`, {
+    session,
+    body: { updates: [{ productId, priceChhertum: String(chhertum) }] },
+  });
+}
+
 export async function listActiveHolds(session: PortalSession): Promise<Hold[]> {
   const query = new URLSearchParams({
     status: "HOLD_STATUS_ACTIVE",

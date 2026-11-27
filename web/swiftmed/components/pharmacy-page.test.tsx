@@ -39,7 +39,9 @@ describe("pharmacy page", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Druk Pharmacy" })).toBeTruthy();
     expect(screen.getByText("Norzin Lam")).toBeTruthy();
     expect(screen.getByRole("link", { name: "+975 2 322 000" }).getAttribute("href")).toBe("tel:+9752322000");
-    expect(screen.getByRole("link", { name: /Open in map/ })).toBeTruthy();
+    // Directions first (SCRUM-158); OpenStreetMap as a plain link.
+    expect(screen.getByRole("link", { name: /Get directions/ }).getAttribute("href")).toMatch(/^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=/);
+    expect(screen.getByRole("link", { name: /OpenStreetMap/ })).toBeTruthy();
     expect(screen.queryByText(/demo pharmacy/i)).toBeNull();
     await expectNoSeriousViolations(container);
   });
@@ -55,7 +57,8 @@ describe("pharmacy page", () => {
   it("works without a location or address", async () => {
     lookup.mockResolvedValue({ status: "found", source: "gateway", pharmacy: { pharmacyId: "p-1", name: "Druk Pharmacy" } });
     await show();
-    expect(screen.queryByRole("link", { name: /Open in map/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Get directions/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /OpenStreetMap/ })).toBeNull();
     expect(screen.queryByText("Address")).toBeNull();
   });
 

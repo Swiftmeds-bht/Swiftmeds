@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { ArrowLeftIcon, InfoIcon, MapPinIcon, SearchIcon, StoreIcon } from "@/components/Icons";
 import { lookupPharmacy } from "@/lib/api";
+import { directionsUrl, openStreetMapUrl } from "@/lib/directions";
 
 type Params = Promise<{ id: string }>;
 
@@ -45,10 +46,8 @@ export default async function PharmacyPage({ params }: { params: Params }) {
   }
 
   const { pharmacy, source } = result;
-  const loc = pharmacy.location;
-  const mapUrl = loc
-    ? `https://www.openstreetmap.org/?mlat=${loc.latitude}&mlon=${loc.longitude}#map=17/${loc.latitude}/${loc.longitude}`
-    : undefined;
+  const directions = directionsUrl(pharmacy.location);
+  const mapUrl = openStreetMapUrl(pharmacy.location);
 
   return (
     <div className="page narrow pharmacy-page">
@@ -94,15 +93,22 @@ export default async function PharmacyPage({ params }: { params: Params }) {
           )}
         </dl>
         <div className="detail-actions">
-          {mapUrl && (
-            <a href={mapUrl} rel="noopener noreferrer" target="_blank" className="button">
-              <MapPinIcon size={16} /> Open in map<span className="sr-only"> (opens in a new tab)</span>
+          {directions && (
+            <a href={directions} rel="noopener noreferrer" target="_blank" className="button">
+              <MapPinIcon size={16} /> Get directions<span className="sr-only"> (opens your maps app or a new tab)</span>
             </a>
           )}
-          <Link href="/" className={mapUrl ? "button button-outline" : "button"}>
+          <Link href="/" className={directions ? "button button-outline" : "button"}>
             <SearchIcon size={16} /> Find a medicine
           </Link>
         </div>
+        {mapUrl && (
+          <p className="hint">
+            <a href={mapUrl} rel="noopener noreferrer" target="_blank">
+              See it on OpenStreetMap<span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </p>
+        )}
       </article>
       <p className="notice" role="note">
         <InfoIcon />

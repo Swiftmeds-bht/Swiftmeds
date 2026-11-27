@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { cancelHoldAction } from "@/app/actions";
 import { HoldCard } from "@/components/HoldCard";
+import { GettingThere } from "@/components/GettingThere";
 import { ArrowLeftIcon } from "@/components/Icons";
 import { requirePatient } from "@/lib/auth";
 import { errorMessage, justActivated } from "@/lib/hold-format";
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: "Your hold" };
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ id: string }>;
+
 
 export default async function HoldPage({ params }: { params: Params }) {
   const { id } = await params;
@@ -39,7 +41,10 @@ export default async function HoldPage({ params }: { params: Params }) {
         <ArrowLeftIcon size={16} /> My holds
       </Link>
       {hold ? (
-        <HoldCard hold={hold} cancelAction={cancelHoldAction} justActivated={settle} book={await nameBook([hold])} />
+        <>
+          <HoldCard hold={hold} cancelAction={cancelHoldAction} justActivated={settle} book={await nameBook([hold])} />
+          {(hold.status === "HOLD_STATUS_ACTIVE" || hold.status === "HOLD_STATUS_PENDING") && <GettingThere pharmacyId={hold.pharmacyId} />}
+        </>
       ) : (
         <div className="problem" role="alert">
           <h2>{failed ? "We could not load this hold" : "We could not find this hold"}</h2>

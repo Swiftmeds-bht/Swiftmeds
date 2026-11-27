@@ -19,7 +19,7 @@ and run the same commands).
 | Account | Role | Use it for |
 |---|---|---|
 | `patient@demo.swiftmeds.test` | patient | search, reserve, holds, watchlist |
-| `demo-tim-001@demo.swiftmeds.test` | pharmacist of Demo Pharmacy Thimphu 01 | the dashboard: stock, collecting holds, CSV upload |
+| `demo-tim-001@demo.swiftmeds.test` | pharmacist of Norzin Pharmacy | the dashboard: stock, collecting holds, CSV upload |
 | `demo-<licence>@demo.swiftmeds.test` | pharmacist of each other demo pharmacy (`deploy/seed/pharmacies.csv`) | the same, for that pharmacy |
 | `admin@demo.swiftmeds.test` | admin | admin routes (and the pharmacy routes) |
 
@@ -316,6 +316,11 @@ Once:
    Next.js. Environment variable `GATEWAY_URL=https://entrench-surging-backtrack.ngrok-free.dev`
    (Production). `web/swiftmed/vercel.json` runs the functions in Singapore
    (`sin1`), close to the cluster.
+4. Vercel → Storage → **Upstash for Redis** (free plan) → create, region
+   Singapore, and connect it to the project. This sets `KV_REST_API_URL` and
+   `KV_REST_API_TOKEN`; redeploy afterwards. The app then shares token refreshes
+   between function instances (SCRUM-160), so users are not logged out when two
+   instances refresh the same session at once. Without it the app still works.
 
 Before each demo:
 
@@ -328,12 +333,35 @@ curl -s https://entrench-surging-backtrack.ngrok-free.dev/healthz        # {"sta
 Then open the Vercel site, search once (the first search warms the services up)
 and log in with the demo accounts. Afterwards: `k3d cluster stop swiftmed`.
 
+**Running the demo on another laptop.** Every secret is committed in encrypted
+form (`sealed-secrets.yaml`, `sealed-ngrok.yaml`), so a teammate needs only the
+**controller key backup** (`sealed-secrets-key.yaml`, see [Secrets](#secrets)).
+Share it like a password, never through Git or a chat: a Bitwarden Send link
+(expiring, one view), or an encrypted file (`age -p` or a password-protected
+zip) with the passphrase given separately. Anyone with it can read every
+secret; if it leaks, make a new key, re-seal both files and change the secrets.
+
+```bash
+k3d cluster create --config deploy/k8s/overlays/prod/cluster.yaml
+kubectl apply -f sealed-secrets-key.yaml                 # before the controller
+kubectl apply -k deploy/k8s/platform/sealed-secrets
+scripts/k8s-images.sh --tag v1.0.0 --import swiftmed     # or pull from GHCR
+kubectl apply -k deploy/k8s/overlays/prod
+kubectl -n swiftmed create job seed-$(date +%s) --from=cronjob/seed
+```
+
+**Only one cluster online at a time.** Every cluster connects to the same fixed
+address with pooling on, so if two laptops run at once, ngrok splits the requests
+between them: two different databases, and logins and holds fail at random. Stop
+yours before a teammate starts theirs (`k3d cluster stop swiftmed`). To run a
+cluster without the fixed address, delete its secret:
+`kubectl -n swiftmed delete sealedsecret swiftmed-ngrok` (the quick tunnels still work).
+
 Limits: ngrok's free plan caps requests and bandwidth (enough for a demo) and
 shows a warning page to browsers that open the API address directly; the web app
-calls it from its server, so visitors never see it. On Vercel, several function
-instances can refresh the same session at once (`lib/refresh.ts` shares
-refreshes only within one process), so a user may occasionally be asked to log
-in again.
+calls it from its server, so visitors never see it. Without the Upstash store
+(step 4), several Vercel function instances can refresh the same session at
+once, and a user may occasionally be asked to log in again.
 
 ## Monitoring
 
