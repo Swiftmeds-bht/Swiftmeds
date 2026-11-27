@@ -31,7 +31,7 @@ All data is synthetic. New patients can also sign up in the app.
 deploy/k8s/
   base/                 every cluster: services, Traefik, Postgres, RabbitMQ, probes, limits,
                         HPAs, PodDisruptionBudgets, NetworkPolicies, nightly backup, seed
-  overlays/prod/        the deployment: ghcr.io images at v1.0.0, 2 replicas of the busy
+  overlays/prod/        the deployment: ghcr.io images at v1.1.0, 2 replicas of the busy
                         paths, bigger volumes, the Secret as a SealedSecret (committed, encrypted)
   overlays/local/       a development cluster: images built here (:dev), 1 replica,
                         the Secret from a local secrets.env (gitignored)
@@ -118,11 +118,11 @@ kubectl -n swiftmed get pods                                         # all Runni
 kubectl -n swiftmed create job seed-$(date +%s) --from=cronjob/seed  # demo data, safe to repeat
 ```
 
-The images come from `ghcr.io/swiftmeds-bht/<name>:v1.0.0`, pushed by CI. If the
+The images come from `ghcr.io/swiftmeds-bht/<name>:v1.1.0`, pushed by CI. If the
 packages are private, add a pull secret first:
 `kubectl -n swiftmed create secret docker-registry ghcr-pull --docker-server=ghcr.io --docker-username=<user> --docker-password=<token with read:packages>`
 and `imagePullSecrets: [{name: ghcr-pull}]` (or make the packages public).
-Without GHCR access, `scripts/k8s-images.sh --tag v1.0.0 --import swiftmed`
+Without GHCR access, `scripts/k8s-images.sh --tag v1.1.0 --import swiftmed`
 builds the same images on the laptop and loads them into the cluster.
 
 **Moving a cluster made with the first layout** (one `deploy/k8s` folder): the
@@ -345,7 +345,7 @@ secret; if it leaks, make a new key, re-seal both files and change the secrets.
 k3d cluster create --config deploy/k8s/overlays/prod/cluster.yaml
 kubectl apply -f sealed-secrets-key.yaml                 # before the controller
 kubectl apply -k deploy/k8s/platform/sealed-secrets
-scripts/k8s-images.sh --tag v1.0.0 --import swiftmed     # or pull from GHCR
+scripts/k8s-images.sh --tag v1.1.0 --import swiftmed     # or pull from GHCR
 kubectl apply -k deploy/k8s/overlays/prod
 kubectl -n swiftmed create job seed-$(date +%s) --from=cronjob/seed
 ```
