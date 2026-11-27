@@ -70,17 +70,32 @@ spec:
             - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}
             - {name: GF_ANALYTICS_CHECK_FOR_UPDATES, value: "false"}
             - {name: GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES, value: "false"}
+            # No plugin downloads or version lookups on grafana.com at start-up;
+            # they hang without fast internet (SCRUM-162). Prometheus and Loki
+            # are built in; the extra pre-installed apps (Pyroscope, Explore
+            # drilldowns) are not used here.
+            - {name: GF_PLUGINS_PREINSTALL_DISABLED, value: "true"}
+            - {name: GF_PLUGINS_PREINSTALL_AUTO_UPDATE, value: "false"}
             - {name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH, value: /var/lib/grafana/dashboards/swiftmed-overview.json}
+          # Start-up (a fresh database, provisioning) can take minutes on a busy
+          # laptop. The startup probe allows 5 minutes; liveness counts only after
+          # it, so a slow start is no longer killed and restarted in a loop.
+          startupProbe:
+            httpGet: {path: /api/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /api/health, port: http}
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet: {path: /api/health, port: http}
-            initialDelaySeconds: 30
             periodSeconds: 20
+            timeoutSeconds: 5
           resources:
-            requests: {cpu: 20m, memory: 96Mi}
-            limits: {cpu: "1", memory: 384Mi}
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
