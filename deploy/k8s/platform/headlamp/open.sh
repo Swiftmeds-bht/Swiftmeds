@@ -8,6 +8,16 @@ set -euo pipefail
 PORT="${1:-4466}"
 HOURS="${HEADLAMP_TOKEN_HOURS:-8}"
 
+if ! command -v kubectl >/dev/null 2>&1; then
+  echo "kubectl not found. Install it, or add the tools folder to PATH:" >&2
+  echo "  export PATH=\"\$HOME/.cache/swiftmed-tools/bin:\$PATH\"" >&2
+  exit 1
+fi
+if ! kubectl version --request-timeout=5s >/dev/null 2>&1; then
+  echo "Cannot reach the cluster (context: $(kubectl config current-context 2>/dev/null || echo none))." >&2
+  echo "Start it: k3d cluster start swiftmed" >&2
+  exit 1
+fi
 if ! kubectl get namespace headlamp >/dev/null 2>&1; then
   echo "Headlamp is not installed: kubectl apply -k deploy/k8s/platform/headlamp" >&2
   exit 1
