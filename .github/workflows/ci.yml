@@ -79,8 +79,9 @@ jobs:
             fi
 
             if [[ "${attempt}" -eq 3 ]]; then
-              echo "Failed to install golangci-lint after ${attempt} attempts."
-              exit 1
+              echo "Release download failed after ${attempt} attempts; installing the pinned version from Go modules."
+              GOBIN="$(go env GOPATH)/bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+              break
             fi
 
             echo "Retrying golangci-lint install (${attempt}/3)..."
