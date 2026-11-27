@@ -26,6 +26,12 @@ type RegisterInput struct {
 	Hours         []domain.OpeningHours
 }
 
+type UpdateInput struct {
+	Name, Phone, Address, Dzongkhag string
+	Location                        domain.GeoPoint
+	Hours                           []domain.OpeningHours
+}
+
 type Service struct {
 	repo  ports.PharmacyRepository
 	now   func() time.Time
@@ -84,6 +90,34 @@ func (s *Service) SetVerificationStatus(ctx context.Context, id string, status d
 	p, err := s.repo.SetStatus(ctx, id, status, reason, s.now())
 	if err != nil {
 		return domain.Pharmacy{}, fmt.Errorf("set verification status: %w", err)
+	}
+	return p, nil
+}
+
+// Update changes editable pharmacy details for the authenticated owner. A
+// rejected pharmacy is automatically returned to pending for review.
+func (s *Service) Update(ctx context.Context, id, ownerID string, in UpdateInput) (domain.Pharmacy, error) {
+	if id == "" {
+		return domain.Pharmacy{}, domain.ErrMissingPharmacyID
+	}
+	if ownerID == "" {
+		return domain.Pharmacy{}, domain.ErrMissingOwnerID
+	}
+	if strings.TrimSpace(in.Name) == "" {
+		return domain.Pharmacy{}, domain.ErrMissingName
+	}
+	if err := in.Location.Validate(); err != nil {
+		return domain.Pharmacy{}, err
+	}
+	for _, h := range in.Hours {
+		if err := h.Validate(); err != nil {
+			return domain.Pharmacy{}, fmt.Errorf("invalid hours: %w", err)
+		}
+	}
+	changes := domain.Pharmacy{Name: strings.TrimSpace(in.Name), Phone: strings.TrimSpace(in.Phone), Address: strings.TrimSpace(in.Address), Dzongkhag: strings.TrimSpace(in.Dzongkhag), Location: in.Location, Hours: append([]domain.OpeningHours(nil), in.Hours...)}
+	p, err := s.repo.Update(ctx, id, ownerID, changes)
+	if err != nil {
+		return domain.Pharmacy{}, fmt.Errorf("update pharmacy: %w", err)
 	}
 	return p, nil
 }

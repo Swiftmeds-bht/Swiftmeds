@@ -45,3 +45,7 @@ func (c *PharmacyRegistryClient) SetVerificationStatus(
 ) (*pharmacyregistryv1.SetVerificationStatusResponse, error) {
 	return c.client.SetVerificationStatus(ctx, req)
 }
+
+func (c *PharmacyRegistryClient) UpdatePharmacy(ctx context.Context, req *pharmacyregistryv1.UpdatePharmacyRequest) (*pharmacyregistryv1.UpdatePharmacyResponse, error) {
+	return c.client.UpdatePharmacy(ctx, req)
+}

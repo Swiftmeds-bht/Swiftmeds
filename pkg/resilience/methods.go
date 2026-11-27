@@ -111,6 +111,7 @@ var nonRetryableMethods = map[string]struct{}{
 
 	"/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/RegisterPharmacy":      {},
 	"/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus": {},
+	"/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/UpdatePharmacy":        {}, // changes pharmacy details and may resubmit it for review
 
 	"/swiftmed.pricing.v1.PricingService/SetPrices": {},
 

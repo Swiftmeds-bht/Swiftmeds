@@ -151,6 +151,32 @@ func Run(t *testing.T, factory Factory) {
 			t.Fatalf("reason=%v", err)
 		}
 	})
+	t.Run("owner updates details and a rejected pharmacy returns to pending", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		p := pharmacy("ph-update", "LIC-UPD")
+		if err := r.Create(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.SetStatus(ctx, p.ID, domain.StatusRejected, "fix the address", t0); err != nil {
+			t.Fatal(err)
+		}
+		changes := domain.Pharmacy{Name: "Updated", Phone: "+975 17 111 222", Address: "New address", Dzongkhag: "Paro", Location: domain.GeoPoint{Latitude: 28, Longitude: 90}, Hours: []domain.OpeningHours{{Day: 2, OpensAt: "08:30", ClosesAt: "17:15"}}}
+		if _, err := r.Update(ctx, p.ID, "other-owner", changes); !errors.Is(err, domain.ErrOwnerMismatch) {
+			t.Fatalf("wrong owner update=%v", err)
+		}
+		got, err := r.Update(ctx, p.ID, "owner-1", changes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != domain.StatusPending || got.StatusReason != "" || got.Name != changes.Name || got.Location != changes.Location || !reflect.DeepEqual(got.Hours, changes.Hours) {
+			t.Fatalf("updated=%+v", got)
+		}
+		stored, err := r.Get(ctx, p.ID)
+		if err != nil || !same(stored, got) {
+			t.Fatalf("stored=%+v err=%v", stored, err)
+		}
+	})
 }
 
 var t0 = time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)

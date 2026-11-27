@@ -31,11 +31,45 @@ func (h *Handler) RegisterPharmacy(ctx context.Context, req *registryv1.Register
 	p, err := h.svc.Register(ctx, app.RegisterInput{
 		OwnerID: req.GetOwnerUserId(), Name: req.GetName(), LicenseNumber: req.GetLicenseNumber(),
 		Phone: req.GetPhone(), Address: req.GetAddress(), Dzongkhag: req.GetDzongkhag(), Location: point,
+		Hours: hoursFromProto(req.GetHours()),
 	})
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	return &registryv1.RegisterPharmacyResponse{Pharmacy: toProto(p)}, nil
+}
+
+func (h *Handler) UpdatePharmacy(ctx context.Context, req *registryv1.UpdatePharmacyRequest) (*registryv1.UpdatePharmacyResponse, error) {
+	loc := req.GetLocation()
+	var point domain.GeoPoint
+	if loc != nil {
+		point = domain.GeoPoint{Latitude: loc.GetLatitude(), Longitude: loc.GetLongitude()}
+	}
+	p, err := h.svc.Update(ctx, req.GetPharmacyId(), req.GetOwnerUserId(), app.UpdateInput{
+		Name: req.GetName(), Phone: req.GetPhone(), Address: req.GetAddress(), Dzongkhag: req.GetDzongkhag(), Location: point, Hours: hoursFromProto(req.GetHours()),
+	})
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &registryv1.UpdatePharmacyResponse{Pharmacy: toProto(p)}, nil
+}
+
+func hoursFromProto(hours []*registryv1.OpeningHours) []domain.OpeningHours {
+	out := make([]domain.OpeningHours, 0, len(hours))
+	for _, h := range hours {
+		if h != nil {
+			out = append(out, domain.OpeningHours{Day: h.GetDay(), OpensAt: h.GetOpensAt(), ClosesAt: h.GetClosesAt()})
+		}
+	}
+	return out
+}
+
+func hoursToProto(hours []domain.OpeningHours) []*registryv1.OpeningHours {
+	out := make([]*registryv1.OpeningHours, 0, len(hours))
+	for _, h := range hours {
+		out = append(out, &registryv1.OpeningHours{Day: h.Day, OpensAt: h.OpensAt, ClosesAt: h.ClosesAt})
+	}
+	return out
 }
 
 func (h *Handler) GetPharmacy(ctx context.Context, req *registryv1.GetPharmacyRequest) (*registryv1.GetPharmacyResponse, error) {
@@ -92,7 +126,7 @@ func toProto(p domain.Pharmacy) *registryv1.Pharmacy {
 		Phone: p.Phone, Address: p.Address, Dzongkhag: p.Dzongkhag,
 		Location: &commonv1.GeoPoint{Latitude: p.Location.Latitude, Longitude: p.Location.Longitude},
 		Status:   statusFromProto(p.Status), StatusReason: p.StatusReason, CreatedAt: timestamppb.New(p.CreatedAt),
-		VerifiedAt: timestampOrNil(p.VerifiedAt)}
+		VerifiedAt: timestampOrNil(p.VerifiedAt), Hours: hoursToProto(p.Hours)}
 }
 
 func timestampOrNil(t *time.Time) *timestamppb.Timestamp {
@@ -139,6 +173,8 @@ func toStatus(err error) error {
 		errors.Is(err, domain.ErrInvalidLocation), errors.Is(err, domain.ErrInvalidTransition),
 		errors.Is(err, domain.ErrMissingReason):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrOwnerMismatch):
+		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, app.ErrNotFound):
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, domain.ErrLicenseTaken):

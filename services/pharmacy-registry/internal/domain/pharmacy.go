@@ -27,6 +27,7 @@ var (
 	ErrInvalidTransition = errors.New("invalid verification status transition")
 	ErrMissingReason     = errors.New("reason is required for rejection or suspension")
 	ErrNotFound          = errors.New("pharmacy not found")
+	ErrOwnerMismatch     = errors.New("pharmacy does not belong to owner")
 	// ErrLicenseTaken: another pharmacy is registered with this licence number.
 	ErrLicenseTaken = errors.New("a pharmacy with this licence number is already registered")
 )
@@ -51,10 +52,23 @@ type OpeningHours struct {
 }
 
 func (h OpeningHours) Validate() error {
-	if h.Day < 0 || h.Day > 6 || len(h.OpensAt) != 5 || len(h.ClosesAt) != 5 {
+	if h.Day < 0 || h.Day > 6 {
+		return errors.New("hours must use day 0..6 and HH:MM times")
+	}
+	if !isHHMM(h.OpensAt) || !isHHMM(h.ClosesAt) {
+		return errors.New("hours must use day 0..6 and HH:MM times")
+	}
+	if _, err := time.Parse("15:04", h.OpensAt); err != nil {
+		return errors.New("hours must use day 0..6 and HH:MM times")
+	}
+	if _, err := time.Parse("15:04", h.ClosesAt); err != nil {
 		return errors.New("hours must use day 0..6 and HH:MM times")
 	}
 	return nil
+}
+
+func isHHMM(value string) bool {
+	return len(value) == 5 && value[2] == ':'
 }
 
 type Pharmacy struct {
@@ -103,6 +117,8 @@ func NewPharmacy(id, ownerID, name, licenseNumber, dzongkhag string, location Ge
 func ValidateTransition(from, to Status) error {
 	allowed := from == StatusPending && (to == StatusVerified || to == StatusRejected)
 	allowed = allowed || from == StatusVerified && to == StatusSuspended
+	allowed = allowed || from == StatusSuspended && to == StatusVerified
+	allowed = allowed || from == StatusRejected && to == StatusPending
 	if !allowed {
 		return fmt.Errorf("%w: %s to %s", ErrInvalidTransition, from, to)
 	}

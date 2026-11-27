@@ -793,6 +793,45 @@ paths:
           $ref: "#/components/responses/NotFound"
         default:
           $ref: "#/components/responses/ServerError"
+    put:
+      tags: [Pharmacies]
+      operationId: updatePharmacy
+      summary: Update your pharmacy details and opening hours
+      description: Pharmacy staff may update only their own pharmacy. Editing a rejected pharmacy resubmits it as pending. Moving a verified pharmacy updates Geo.
+      x-status: implemented
+      x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/UpdatePharmacy
+      x-roles: [ROLE_PHARMACY_STAFF]
+      parameters:
+        - $ref: "#/components/parameters/PharmacyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePharmacyRequest"
+      responses:
+        "200":
+          description: Updated pharmacy details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pharmacy"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          description: Details were saved but Geo could not be updated; send the same request again.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        default:
+          $ref: "#/components/responses/ServerError"
   /api/v1/pharmacies/{pharmacyId}/verification:
     put:
       tags: [Pharmacies]
@@ -807,7 +846,9 @@ paths:
         Sending the status the pharmacy already has changes nothing in the registry
         and only updates the map again, so a 502 can be retried as is (SCRUM-141).
 
-        Allowed changes: pending to verified or rejected, verified to suspended.
+        Allowed changes: pending to verified or rejected, verified to suspended,
+        and suspended to verified (reinstate). Rejected pharmacies are resubmitted
+        as pending when staff update their details.
         Any other change is a 400.
       x-status: implemented
       x-grpc: swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus
@@ -2325,6 +2366,10 @@ components:
         verifiedAt:
           type: string
           format: date-time
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningHours"
     RegisterPharmacyRequest:
       type: object
       required: [name, licenseNumber, phone, address, dzongkhag, location]
@@ -2341,6 +2386,27 @@ components:
           type: string
         location:
           $ref: "#/components/schemas/GeoPoint"
+    UpdatePharmacyRequest:
+      type: object
+      required: [name, phone, address, dzongkhag, location, hours]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        dzongkhag: { type: string }
+        location:
+          $ref: "#/components/schemas/GeoPoint"
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningHours"
+    OpeningHours:
+      type: object
+      required: [day, opensAt, closesAt]
+      properties:
+        day: { type: integer, minimum: 0, maximum: 6 }
+        opensAt: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
+        closesAt: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }
     PharmacyList:
       type: object
       properties:

@@ -89,3 +89,22 @@ func (r *Repository) SetStatus(_ context.Context, id string, status domain.Statu
 	r.pharmacies[id] = next
 	return next, nil
 }
+
+func (r *Repository) Update(_ context.Context, id, ownerID string, changes domain.Pharmacy) (domain.Pharmacy, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p, ok := r.pharmacies[id]
+	if !ok {
+		return domain.Pharmacy{}, domain.ErrNotFound
+	}
+	if p.OwnerID != ownerID {
+		return domain.Pharmacy{}, domain.ErrOwnerMismatch
+	}
+	p.Name, p.Phone, p.Address, p.Dzongkhag = changes.Name, changes.Phone, changes.Address, changes.Dzongkhag
+	p.Location, p.Hours = changes.Location, append([]domain.OpeningHours(nil), changes.Hours...)
+	if p.Status == domain.StatusRejected {
+		p.Status, p.StatusReason = domain.StatusPending, ""
+	}
+	r.pharmacies[id] = p
+	return p, nil
+}

@@ -15,6 +15,7 @@ type PharmacyOnboarding interface {
 	GetPharmacy(context.Context, *pharmacyregistryv1.GetPharmacyRequest) (*pharmacyregistryv1.GetPharmacyResponse, error)
 	ListPharmacies(context.Context, *pharmacyregistryv1.ListPharmaciesRequest) (*pharmacyregistryv1.ListPharmaciesResponse, error)
 	SetVerificationStatus(context.Context, *pharmacyregistryv1.SetVerificationStatusRequest) (*pharmacyregistryv1.SetVerificationStatusResponse, error)
+	UpdatePharmacy(context.Context, *pharmacyregistryv1.UpdatePharmacyRequest) (*pharmacyregistryv1.UpdatePharmacyResponse, error)
 }
 
 // PharmacyLinker makes an account the staff account of the pharmacy it

@@ -20,7 +20,8 @@ func TestVerificationTransitions(t *testing.T) {
 		{"verified to rejected", StatusVerified, StatusRejected, false},
 		{"rejected to verified", StatusRejected, StatusVerified, false},
 		{"rejected to rejected", StatusRejected, StatusRejected, false},
-		{"suspended to verified", StatusSuspended, StatusVerified, false},
+		{"suspended to verified", StatusSuspended, StatusVerified, true},
+		{"rejected to pending", StatusRejected, StatusPending, true},
 	}
 
 	for _, tt := range tests {
@@ -61,5 +62,27 @@ func TestNewPharmacyRejectsInvalidInput(t *testing.T) {
 	_, err = NewPharmacy("ph-1", "owner-1", "Name", "LIC-1", "", GeoPoint{Latitude: 91}, nil, time.Now())
 	if !errors.Is(err, ErrInvalidLocation) {
 		t.Fatalf("err = %v, want %v", err, ErrInvalidLocation)
+	}
+}
+
+func TestOpeningHoursValidation(t *testing.T) {
+	tests := []struct {
+		name  string
+		hours OpeningHours
+		valid bool
+	}{
+		{"valid", OpeningHours{Day: 0, OpensAt: "00:00", ClosesAt: "23:59"}, true},
+		{"negative day", OpeningHours{Day: -1, OpensAt: "09:00", ClosesAt: "17:00"}, false},
+		{"day too high", OpeningHours{Day: 7, OpensAt: "09:00", ClosesAt: "17:00"}, false},
+		{"invalid open time", OpeningHours{Day: 1, OpensAt: "9:00", ClosesAt: "17:00"}, false},
+		{"invalid close time", OpeningHours{Day: 1, OpensAt: "09:00", ClosesAt: "24:00"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.hours.Validate()
+			if (err == nil) != tt.valid {
+				t.Fatalf("Validate() = %v, want valid=%v", err, tt.valid)
+			}
+		})
 	}
 }

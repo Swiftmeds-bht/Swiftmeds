@@ -28,6 +28,7 @@ const (
 	PharmacyRegistryService_BatchGetPharmacies_FullMethodName    = "/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/BatchGetPharmacies"
 	PharmacyRegistryService_ListPharmacies_FullMethodName        = "/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/ListPharmacies"
 	PharmacyRegistryService_SetVerificationStatus_FullMethodName = "/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/SetVerificationStatus"
+	PharmacyRegistryService_UpdatePharmacy_FullMethodName        = "/swiftmed.pharmacyregistry.v1.PharmacyRegistryService/UpdatePharmacy"
 )
 
 // PharmacyRegistryServiceClient is the client API for PharmacyRegistryService service.
@@ -40,6 +41,8 @@ type PharmacyRegistryServiceClient interface {
 	ListPharmacies(ctx context.Context, in *ListPharmaciesRequest, opts ...grpc.CallOption) (*ListPharmaciesResponse, error)
 	// Admin only: approve, reject or suspend a pharmacy.
 	SetVerificationStatus(ctx context.Context, in *SetVerificationStatusRequest, opts ...grpc.CallOption) (*SetVerificationStatusResponse, error)
+	// Pharmacy staff only: update their pharmacy details and opening hours.
+	UpdatePharmacy(ctx context.Context, in *UpdatePharmacyRequest, opts ...grpc.CallOption) (*UpdatePharmacyResponse, error)
 }
 
 type pharmacyRegistryServiceClient struct {
@@ -100,6 +103,16 @@ func (c *pharmacyRegistryServiceClient) SetVerificationStatus(ctx context.Contex
 	return out, nil
 }
 
+func (c *pharmacyRegistryServiceClient) UpdatePharmacy(ctx context.Context, in *UpdatePharmacyRequest, opts ...grpc.CallOption) (*UpdatePharmacyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdatePharmacyResponse)
+	err := c.cc.Invoke(ctx, PharmacyRegistryService_UpdatePharmacy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PharmacyRegistryServiceServer is the server API for PharmacyRegistryService service.
 // All implementations must embed UnimplementedPharmacyRegistryServiceServer
 // for forward compatibility.
@@ -110,6 +123,8 @@ type PharmacyRegistryServiceServer interface {
 	ListPharmacies(context.Context, *ListPharmaciesRequest) (*ListPharmaciesResponse, error)
 	// Admin only: approve, reject or suspend a pharmacy.
 	SetVerificationStatus(context.Context, *SetVerificationStatusRequest) (*SetVerificationStatusResponse, error)
+	// Pharmacy staff only: update their pharmacy details and opening hours.
+	UpdatePharmacy(context.Context, *UpdatePharmacyRequest) (*UpdatePharmacyResponse, error)
 	mustEmbedUnimplementedPharmacyRegistryServiceServer()
 }
 
@@ -134,6 +149,9 @@ func (UnimplementedPharmacyRegistryServiceServer) ListPharmacies(context.Context
 }
 func (UnimplementedPharmacyRegistryServiceServer) SetVerificationStatus(context.Context, *SetVerificationStatusRequest) (*SetVerificationStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetVerificationStatus not implemented")
+}
+func (UnimplementedPharmacyRegistryServiceServer) UpdatePharmacy(context.Context, *UpdatePharmacyRequest) (*UpdatePharmacyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdatePharmacy not implemented")
 }
 func (UnimplementedPharmacyRegistryServiceServer) mustEmbedUnimplementedPharmacyRegistryServiceServer() {
 }
@@ -247,6 +265,24 @@ func _PharmacyRegistryService_SetVerificationStatus_Handler(srv interface{}, ctx
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PharmacyRegistryService_UpdatePharmacy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePharmacyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PharmacyRegistryServiceServer).UpdatePharmacy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PharmacyRegistryService_UpdatePharmacy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PharmacyRegistryServiceServer).UpdatePharmacy(ctx, req.(*UpdatePharmacyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PharmacyRegistryService_ServiceDesc is the grpc.ServiceDesc for PharmacyRegistryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -273,6 +309,10 @@ var PharmacyRegistryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetVerificationStatus",
 			Handler:    _PharmacyRegistryService_SetVerificationStatus_Handler,
+		},
+		{
+			MethodName: "UpdatePharmacy",
+			Handler:    _PharmacyRegistryService_UpdatePharmacy_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
