@@ -30,25 +30,25 @@ patches:
 
 # The release. CI pushes these tags when a v* tag is pushed (release-images.yml).
 images:
-  - {name: ghcr.io/swiftmeds-bht/analytics, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/auth, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/catalog, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/expiry, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/feedback, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/freshness, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/gateway, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/geo, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/holds, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/inventory, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/notification, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/pharmacy-registry, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/pricing, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/ranking, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/search, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/stock-sync, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/substitution, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/trust, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/web, newTag: v1.0.0}
-  - {name: ghcr.io/swiftmeds-bht/seed, newTag: v1.0.0}
+  - {name: ghcr.io/swiftmeds-bht/analytics, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/auth, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/catalog, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/expiry, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/feedback, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/freshness, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/gateway, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/geo, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/holds, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/inventory, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/notification, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/pharmacy-registry, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/pricing, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/ranking, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/search, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/stock-sync, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/substitution, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/trust, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/user-profile, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/watchlist, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/web, newTag: v1.1.0}
+  - {name: ghcr.io/swiftmeds-bht/seed, newTag: v1.1.0}

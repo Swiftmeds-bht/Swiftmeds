@@ -185,7 +185,7 @@ the team laptop through k3d ([ADR 0005](docs/adr/0005-docker-compose-main-stack-
 Manifests are in [`deploy/k8s/`](deploy/k8s): a shared `base` and two overlays.
 
 ```bash
-kubectl apply -k deploy/k8s/overlays/prod   # the deployment: GHCR images v1.0.0, 2 replicas, sealed secret
+kubectl apply -k deploy/k8s/overlays/prod   # the deployment: GHCR images v1.1.0, 2 replicas, sealed secret
 deploy/k8s/overlays/local/up.sh             # a development cluster from scratch: images built here, seeded
 ```
 
