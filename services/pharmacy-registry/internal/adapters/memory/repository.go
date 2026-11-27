@@ -94,7 +94,7 @@ func (r *Repository) ListPage(_ context.Context, status domain.Status, pageSize 
 		if status != "" && p.Status != status {
 			continue
 		}
-		if pageToken != "" && !(p.CreatedAt.After(createdAt) || (p.CreatedAt.Equal(createdAt) && p.ID > id)) {
+		if pageToken != "" && (p.CreatedAt.Before(createdAt) || (p.CreatedAt.Equal(createdAt) && p.ID <= id)) {
 			continue
 		}
 		all = append(all, p)
