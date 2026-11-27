@@ -27,7 +27,7 @@ type authRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-func authHandler(client ports.AuthRoutes, logger *slog.Logger) http.HandlerFunc {
+func authHandler(client ports.AuthRoutes, logger *slog.Logger, limiter *authRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body authRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -49,11 +49,17 @@ func authHandler(client ports.AuthRoutes, logger *slog.Logger) http.HandlerFunc 
 				writeError(w, http.StatusBadRequest, "invalid registration request")
 				return
 			}
+			if limiter != nil && !limiter.check(w, r, "") {
+				return
+			}
 			response, err = client.Register(ctx, &authv1.RegisterRequest{Email: body.Email, Password: body.Password, Role: role})
 			code = http.StatusCreated
 		case "/api/v1/auth/login":
 			if body.Email == "" || body.Password == "" {
 				writeError(w, http.StatusBadRequest, "email and password are required")
+				return
+			}
+			if limiter != nil && !limiter.check(w, r, body.Email) {
 				return
 			}
 			response, err = client.Login(ctx, &authv1.LoginRequest{Email: body.Email, Password: body.Password})

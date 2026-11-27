@@ -27,6 +27,8 @@ export interface GatewayOptions {
 
 export function errorForStatus(status: number, action: "login" | "register" | "hold"): HoldError {
   switch (status) {
+    case 429:
+      return new HoldError("rate_limited", "Too many authentication attempts");
     case 400:
       return new HoldError("bad_request", `The gateway rejected the request (HTTP ${status})`);
     case 401:

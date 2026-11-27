@@ -113,10 +113,50 @@ func TestAuthRoutesRejectInvalidBodies(t *testing.T) {
 	for _, tc := range tests {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
-		authHandler(&fakeAuthRoutes{}, slog.Default())(rec, req)
+		authHandler(&fakeAuthRoutes{}, slog.Default(), nil)(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("%s body %q: status=%d, want 400", tc.path, tc.body, rec.Code)
 		}
+	}
+}
+
+func TestAuthRouteRateLimitsLoginByEmailAndResets(t *testing.T) {
+	cfg := Config{CORSOrigins: defaultCORSOrigins, AuthRateLimit: 1, AuthRateWindow: time.Minute}
+	h := NewRouter(cfg, slog.Default(), WithAuth(&fakeAuthRoutes{}))
+	request := func(ip, email string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"`+email+`","password":"password"}`))
+		req.RemoteAddr = ip + ":1234"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if got := request("192.0.2.1", "Person@example.com"); got.Code != http.StatusOK {
+		t.Fatalf("first login: %d", got.Code)
+	}
+	blocked := request("192.0.2.2", "person@example.com")
+	if blocked.Code != http.StatusTooManyRequests || blocked.Header().Get("Retry-After") == "" {
+		t.Fatalf("same email not limited: %d %v", blocked.Code, blocked.Header())
+	}
+	if got := request("192.0.2.3", "different@example.com"); got.Code != http.StatusOK {
+		t.Fatalf("different email from new IP affected: %d", got.Code)
+	}
+}
+
+func TestAuthRouteRateLimitsRegistrationByIP(t *testing.T) {
+	cfg := Config{CORSOrigins: defaultCORSOrigins, AuthRateLimit: 1, AuthRateWindow: time.Minute}
+	h := NewRouter(cfg, slog.Default(), WithAuth(&fakeAuthRoutes{}))
+	post := func(email string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"`+email+`","password":"password"}`))
+		req.RemoteAddr = "192.0.2.3:1234"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if got := post("one@example.com"); got.Code != http.StatusCreated {
+		t.Fatalf("first registration: %d", got.Code)
+	}
+	if got := post("two@example.com"); got.Code != http.StatusTooManyRequests {
+		t.Fatalf("second registration status=%d", got.Code)
 	}
 }
 

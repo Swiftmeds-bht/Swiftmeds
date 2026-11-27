@@ -188,7 +188,7 @@ paths:
       tags: [Auth]
       operationId: register
       summary: Create a patient or pharmacy-staff account
-      description: Admins cannot self-register. The password must be 8 to 72 bytes (bcrypt's limit).
+      description: Admins cannot self-register. The password must be 8 to 72 bytes (bcrypt's limit). Registration is limited per client IP; the default is 10 requests per minute and can be changed with `AUTH_RATE_LIMIT` and `AUTH_RATE_WINDOW` on the gateway.
       security: []
       x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Register
@@ -218,6 +218,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/auth/login:
@@ -225,6 +227,7 @@ paths:
       tags: [Auth]
       operationId: login
       summary: Sign in with email and password
+      description: Limited per client IP and normalized email; the default is 10 requests per minute. The gateway settings `AUTH_RATE_LIMIT` and `AUTH_RATE_WINDOW` configure the fixed window. A limited response includes `Retry-After` in seconds.
       security: []
       x-status: implemented
       x-grpc: swiftmed.auth.v1.AuthService/Login
@@ -250,6 +253,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         default:
           $ref: "#/components/responses/ServerError"
   /api/v1/auth/refresh:
@@ -1904,6 +1909,22 @@ components:
         type: string
         format: date-time
   responses:
+    TooManyRequests:
+      description: The client IP (or, for login, email) exceeded the authentication attempt limit.
+      headers:
+        Retry-After:
+          description: Seconds until the limiting window resets.
+          schema:
+            type: integer
+            minimum: 1
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: too many authentication attempts; try again later
     BadRequest:
       description: The request is not valid (gRPC `INVALID_ARGUMENT`). The message says what to fix.
       headers:
