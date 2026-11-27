@@ -38,6 +38,64 @@ func Run(t *testing.T, factory Factory) {
 			t.Fatalf("status=%v", err)
 		}
 	})
+	t.Run("get many returns only matching pharmacies once", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		for _, p := range []domain.Pharmacy{pharmacy("ph-b", "LIC-B"), pharmacy("ph-a", "LIC-A")} {
+			if err := r.Create(ctx, p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := r.GetMany(ctx, []string{"ph-b", "missing", "ph-a", "ph-b"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 2 || got[0].ID != "ph-a" || got[1].ID != "ph-b" {
+			t.Fatalf("get many=%+v", got)
+		}
+		empty, err := r.GetMany(ctx, nil)
+		if err != nil || len(empty) != 0 {
+			t.Fatalf("empty get many=%+v err=%v", empty, err)
+		}
+	})
+	t.Run("status list pages in creation order without duplicates", func(t *testing.T) {
+		r := factory(t)
+		ctx := context.Background()
+		a := pharmacy("ph-a", "LIC-A")
+		b := pharmacy("ph-b", "LIC-B")
+		b.CreatedAt = t0.Add(time.Minute)
+		c := pharmacy("ph-c", "LIC-C")
+		c.CreatedAt = t0.Add(2 * time.Minute)
+		for _, p := range []domain.Pharmacy{c, b, a} {
+			if err := r.Create(ctx, p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := r.SetStatus(ctx, b.ID, domain.StatusVerified, "", t0.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		first, token, err := r.ListPage(ctx, "", 2, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(first) != 2 || first[0].ID != "ph-a" || first[1].ID != "ph-b" || token == "" {
+			t.Fatalf("first=%+v token=%q", first, token)
+		}
+		second, token, err := r.ListPage(ctx, "", 2, token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(second) != 1 || second[0].ID != "ph-c" || token != "" {
+			t.Fatalf("second=%+v token=%q", second, token)
+		}
+		verified, token, err := r.ListPage(ctx, domain.StatusVerified, 2, "")
+		if err != nil || len(verified) != 1 || verified[0].ID != "ph-b" || token != "" {
+			t.Fatalf("verified=%+v token=%q err=%v", verified, token, err)
+		}
+		if _, _, err := r.ListPage(ctx, "", 2, "bad-token"); err == nil {
+			t.Fatal("invalid token accepted")
+		}
+	})
 	t.Run("list is ordered and verified filter excludes pending", func(t *testing.T) {
 		r := factory(t)
 		ctx := context.Background()

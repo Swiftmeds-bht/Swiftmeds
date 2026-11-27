@@ -2,7 +2,9 @@ package memory
 
 import (
 	"context"
+	"encoding/base64"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +62,77 @@ func (r *Repository) Get(_ context.Context, id string) (domain.Pharmacy, error) 
 		return domain.Pharmacy{}, domain.ErrNotFound
 	}
 	return p, nil
+}
+
+func (r *Repository) GetMany(_ context.Context, ids []string) ([]domain.Pharmacy, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.Pharmacy, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if p, ok := r.pharmacies[id]; ok {
+			out = append(out, p)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+
+func (r *Repository) ListPage(_ context.Context, status domain.Status, pageSize int, pageToken string) ([]domain.Pharmacy, string, error) {
+	createdAt, id, err := decodeCursor(pageToken)
+	if err != nil {
+		return nil, "", err
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	all := make([]domain.Pharmacy, 0, len(r.pharmacies))
+	for _, p := range r.pharmacies {
+		if status != "" && p.Status != status {
+			continue
+		}
+		if pageToken != "" && !(p.CreatedAt.After(createdAt) || (p.CreatedAt.Equal(createdAt) && p.ID > id)) {
+			continue
+		}
+		all = append(all, p)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].CreatedAt.Equal(all[j].CreatedAt) {
+			return all[i].ID < all[j].ID
+		}
+		return all[i].CreatedAt.Before(all[j].CreatedAt)
+	})
+	if len(all) <= pageSize {
+		return all, "", nil
+	}
+	all = all[:pageSize]
+	last := all[len(all)-1]
+	return all, encodeCursor(last.CreatedAt, last.ID), nil
+}
+
+func encodeCursor(at time.Time, id string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(at.UTC().Format(time.RFC3339Nano) + "|" + id))
+}
+func decodeCursor(token string) (time.Time, string, error) {
+	if token == "" {
+		return time.Time{}, "", nil
+	}
+	b, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return time.Time{}, "", domain.ErrInvalidPageToken
+	}
+	parts := strings.SplitN(string(b), "|", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return time.Time{}, "", domain.ErrInvalidPageToken
+	}
+	at, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return time.Time{}, "", domain.ErrInvalidPageToken
+	}
+	return at, parts[1], nil
 }
 
 func (r *Repository) List(_ context.Context, verifiedOnly bool) ([]domain.Pharmacy, error) {

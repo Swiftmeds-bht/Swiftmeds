@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -52,6 +54,88 @@ func (r *Repository) FindByOwner(ctx context.Context, ownerID string) (domain.Ph
 
 func (r *Repository) Get(ctx context.Context, id string) (domain.Pharmacy, error) {
 	return r.scanOne(r.db.QueryRow(ctx, pharmacySelect+` WHERE pharmacy_id = $1`, id))
+}
+
+func (r *Repository) GetMany(ctx context.Context, ids []string) ([]domain.Pharmacy, error) {
+	if len(ids) == 0 {
+		return []domain.Pharmacy{}, nil
+	}
+	rows, err := r.db.Query(ctx, pharmacySelect+` WHERE pharmacy_id = ANY($1) ORDER BY pharmacy_id`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("get pharmacies: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Pharmacy
+	for rows.Next() {
+		p, err := scanPharmacy(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("get pharmacies: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) ListPage(ctx context.Context, status domain.Status, pageSize int, pageToken string) ([]domain.Pharmacy, string, error) {
+	var cursorAt *time.Time
+	cursorID := ""
+	if pageToken != "" {
+		b, err := base64.RawURLEncoding.DecodeString(pageToken)
+		if err != nil {
+			return nil, "", domain.ErrInvalidPageToken
+		}
+		parts := strings.SplitN(string(b), "|", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			return nil, "", domain.ErrInvalidPageToken
+		}
+		at, err := time.Parse(time.RFC3339Nano, parts[0])
+		if err != nil {
+			return nil, "", domain.ErrInvalidPageToken
+		}
+		cursorAt, cursorID = &at, parts[1]
+	}
+	conditions := make([]string, 0, 2)
+	args := make([]any, 0, 4)
+	if status != "" {
+		args = append(args, string(status))
+		conditions = append(conditions, fmt.Sprintf("status = $%d", len(args)))
+	}
+	if cursorAt != nil {
+		args = append(args, *cursorAt, cursorID)
+		conditions = append(conditions, fmt.Sprintf("(created_at, pharmacy_id) > ($%d, $%d)", len(args)-1, len(args)))
+	}
+	args = append(args, pageSize+1)
+	query := pharmacySelect
+	if len(conditions) > 0 {
+		query += ` WHERE ` + strings.Join(conditions, ` AND `)
+	}
+	query += fmt.Sprintf(` ORDER BY created_at, pharmacy_id LIMIT $%d`, len(args))
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, "", fmt.Errorf("list pharmacies page: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Pharmacy
+	for rows.Next() {
+		p, err := scanPharmacy(rows)
+		if err != nil {
+			return nil, "", err
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("list pharmacies page: %w", err)
+	}
+	if len(out) <= pageSize {
+		return out, "", nil
+	}
+	out = out[:pageSize]
+	last := out[len(out)-1]
+	token := base64.RawURLEncoding.EncodeToString([]byte(last.CreatedAt.UTC().Format(time.RFC3339Nano) + "|" + last.ID))
+	return out, token, nil
 }
 
 func (r *Repository) List(ctx context.Context, verifiedOnly bool) ([]domain.Pharmacy, error) {

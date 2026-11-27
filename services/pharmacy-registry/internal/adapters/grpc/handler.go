@@ -81,36 +81,27 @@ func (h *Handler) GetPharmacy(ctx context.Context, req *registryv1.GetPharmacyRe
 }
 
 func (h *Handler) BatchGetPharmacies(ctx context.Context, req *registryv1.BatchGetPharmaciesRequest) (*registryv1.BatchGetPharmaciesResponse, error) {
-	all, err := h.svc.List(ctx, false)
-	if err != nil {
-		return nil, toStatus(err)
-	}
-	ids := make(map[string]bool, len(req.GetPharmacyIds()))
-	for _, id := range req.GetPharmacyIds() {
-		ids[id] = true
-	}
-	out := make([]*registryv1.Pharmacy, 0, len(ids))
-	for _, p := range all {
-		if ids[p.ID] {
-			out = append(out, toProto(p))
-		}
-	}
-	return &registryv1.BatchGetPharmaciesResponse{Pharmacies: out}, nil
-}
-
-func (h *Handler) ListPharmacies(ctx context.Context, req *registryv1.ListPharmaciesRequest) (*registryv1.ListPharmaciesResponse, error) {
-	verifiedOnly := req.GetStatus() == registryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED
-	all, err := h.svc.List(ctx, verifiedOnly)
+	all, err := h.svc.GetMany(ctx, req.GetPharmacyIds())
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	out := make([]*registryv1.Pharmacy, 0, len(all))
 	for _, p := range all {
-		if req.GetStatus() == registryv1.VerificationStatus_VERIFICATION_STATUS_UNSPECIFIED || statusFromProto(p.Status) == req.GetStatus() {
-			out = append(out, toProto(p))
-		}
+		out = append(out, toProto(p))
 	}
-	return &registryv1.ListPharmaciesResponse{Pharmacies: out}, nil
+	return &registryv1.BatchGetPharmaciesResponse{Pharmacies: out}, nil
+}
+
+func (h *Handler) ListPharmacies(ctx context.Context, req *registryv1.ListPharmaciesRequest) (*registryv1.ListPharmaciesResponse, error) {
+	all, next, err := h.svc.ListPage(ctx, domainStatus(req.GetStatus()), int(req.GetPage().GetPageSize()), req.GetPage().GetPageToken())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := make([]*registryv1.Pharmacy, 0, len(all))
+	for _, p := range all {
+		out = append(out, toProto(p))
+	}
+	return &registryv1.ListPharmaciesResponse{Pharmacies: out, Page: &commonv1.PageResponse{NextPageToken: next}}, nil
 }
 
 func (h *Handler) SetVerificationStatus(ctx context.Context, req *registryv1.SetVerificationStatusRequest) (*registryv1.SetVerificationStatusResponse, error) {
@@ -171,7 +162,7 @@ func toStatus(err error) error {
 	case errors.Is(err, domain.ErrMissingPharmacyID), errors.Is(err, domain.ErrMissingOwnerID),
 		errors.Is(err, domain.ErrMissingName), errors.Is(err, domain.ErrMissingLicense),
 		errors.Is(err, domain.ErrInvalidLocation), errors.Is(err, domain.ErrInvalidTransition),
-		errors.Is(err, domain.ErrMissingReason):
+		errors.Is(err, domain.ErrMissingReason), errors.Is(err, domain.ErrInvalidPageToken):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrOwnerMismatch):
 		return status.Error(codes.PermissionDenied, err.Error())

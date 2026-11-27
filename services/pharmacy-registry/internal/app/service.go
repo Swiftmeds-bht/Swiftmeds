@@ -83,6 +83,20 @@ func (s *Service) List(ctx context.Context, verifiedOnly bool) ([]domain.Pharmac
 	return pharmacies, nil
 }
 
+func (s *Service) GetMany(ctx context.Context, ids []string) ([]domain.Pharmacy, error) {
+	return s.repo.GetMany(ctx, ids)
+}
+
+func (s *Service) ListPage(ctx context.Context, status domain.Status, pageSize int, pageToken string) ([]domain.Pharmacy, string, error) {
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return s.repo.ListPage(ctx, status, pageSize, pageToken)
+}
+
 func (s *Service) SetVerificationStatus(ctx context.Context, id string, status domain.Status, reason string) (domain.Pharmacy, error) {
 	if id == "" {
 		return domain.Pharmacy{}, domain.ErrMissingPharmacyID
