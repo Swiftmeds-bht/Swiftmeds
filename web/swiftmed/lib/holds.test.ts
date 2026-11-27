@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DemoHolds } from "./demo-holds";
 import { HoldError, errorForStatus, gatewayBackend, holdsBackend } from "./holds";
+import { errorMessage } from "./hold-format";
 
 const session = { userId: "u-1", email: "tashi@example.bt", accessToken: "tok-1" };
 const hold = { holdId: "h-1", status: "HOLD_STATUS_PENDING", quantity: 2 };
@@ -45,6 +46,17 @@ describe("holdsBackend", () => {
 });
 
 describe("gateway backend", () => {
+  it("shows a useful message when sign-in is rate limited", async () => {
+    const { backend } = backendReturning(json(429, { error: "too many authentication attempts; try again later" }));
+    try {
+      await backend.login("tashi@example.bt", "wrong-password");
+      throw new Error("expected sign-in to be rate limited");
+    } catch (err) {
+      expect(err).toBeInstanceOf(HoldError);
+      expect(errorMessage((err as HoldError).kind)).toMatch(/too many sign-in attempts/i);
+    }
+  });
+
   it("registers a patient", async () => {
     const { backend, fetchFn } = backendReturning(json(201, { userId: "u-1" }));
     await backend.register("tashi@example.bt", "correct-horse");

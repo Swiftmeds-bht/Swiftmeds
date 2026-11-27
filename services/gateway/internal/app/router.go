@@ -130,6 +130,12 @@ func WithProducts(client ports.ProductLookup) RouterOption {
 }
 
 func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handler {
+	if cfg.AuthRateLimit < 1 {
+		cfg.AuthRateLimit = DefaultAuthRateLimit
+	}
+	if cfg.AuthRateWindow <= 0 {
+		cfg.AuthRateWindow = DefaultAuthRateWindow
+	}
 	var wired routes
 	for _, opt := range opts {
 		opt(&wired)
@@ -152,10 +158,11 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		mux.Handle("GET /api/v1/search/autocomplete", autocompleteHandler(wired.suggester, logger))
 	}
 	if wired.authRoutes != nil {
-		mux.Handle("POST /api/v1/auth/register", authHandler(wired.authRoutes, logger))
-		mux.Handle("POST /api/v1/auth/login", authHandler(wired.authRoutes, logger))
-		mux.Handle("POST /api/v1/auth/refresh", authHandler(wired.authRoutes, logger))
-		mux.Handle("POST /api/v1/auth/logout", authHandler(wired.authRoutes, logger))
+		limiter := newAuthRateLimiter(cfg.AuthRateLimit, cfg.AuthRateWindow)
+		mux.Handle("POST /api/v1/auth/register", authHandler(wired.authRoutes, logger, limiter))
+		mux.Handle("POST /api/v1/auth/login", authHandler(wired.authRoutes, logger, limiter))
+		mux.Handle("POST /api/v1/auth/refresh", authHandler(wired.authRoutes, logger, nil))
+		mux.Handle("POST /api/v1/auth/logout", authHandler(wired.authRoutes, logger, nil))
 	}
 	if wired.geo != nil {
 		mux.Handle("GET /api/v1/pharmacies/nearby", nearbyHandler(wired.geo, logger))

@@ -8,6 +8,7 @@ export type HoldErrorKind =
   | "not_found"
   | "not_active" // the hold is no longer active (expired, collected, cancelled)
   | "bad_request"
+  | "rate_limited"
   | "not_available" // the gateway has no such route yet
   | "unreachable"
   | "timeout"

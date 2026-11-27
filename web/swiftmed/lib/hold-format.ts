@@ -55,6 +55,7 @@ const ERROR_MESSAGES: Record<HoldErrorKind, string> = {
   not_found: "We could not find that. It may belong to another account.",
   not_active: "This hold is no longer active, so it cannot be changed.",
   bad_request: "Please check what you entered and try again.",
+  rate_limited: "Too many sign-in attempts. Please wait a minute and try again.",
   not_available: "This is not available yet. Please try again later.",
   unreachable: "We could not reach SwiftMed. Check your connection and try again.",
   timeout: "SwiftMed took too long to answer. Please try again.",

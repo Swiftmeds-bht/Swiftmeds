@@ -34,6 +34,10 @@ spec:
               valueFrom: {configMapKeyRef: {name: swiftmed-config, key: TRAEFIK_GRPC_TARGET}}
             - name: CORS_ALLOWED_ORIGINS
               valueFrom: {configMapKeyRef: {name: swiftmed-config, key: CORS_ALLOWED_ORIGINS}}
+            - name: AUTH_RATE_LIMIT
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: AUTH_RATE_LIMIT}}
+            - name: AUTH_RATE_WINDOW
+              valueFrom: {configMapKeyRef: {name: swiftmed-config, key: AUTH_RATE_WINDOW}}
             - name: LOG_LEVEL
               valueFrom: {configMapKeyRef: {name: swiftmed-config, key: LOG_LEVEL}}
             - name: WORKER_SHARED_SECRET

@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Swiftmeds-bht/Swiftmeds/pkg/config"
 )
@@ -14,10 +15,12 @@ func TestLoadConfigDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Config{
-		HTTPPort:      DefaultHTTPPort,
-		CORSOrigins:   defaultCORSOrigins,
-		TraefikTarget: DefaultTraefikTarget,
-		LogLevel:      "info",
+		HTTPPort:       DefaultHTTPPort,
+		CORSOrigins:    defaultCORSOrigins,
+		TraefikTarget:  DefaultTraefikTarget,
+		LogLevel:       "info",
+		AuthRateLimit:  DefaultAuthRateLimit,
+		AuthRateWindow: DefaultAuthRateWindow,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v\nwant %+v", cfg, want)
@@ -33,15 +36,19 @@ func TestLoadConfigFromEnvironment(t *testing.T) {
 		"CORS_ALLOWED_ORIGINS": " https://app.swiftmed.bt , ,https://dash.swiftmed.bt ",
 		"TRAEFIK_GRPC_TARGET":  " traefik:6000 ",
 		"LOG_LEVEL":            "debug",
+		"AUTH_RATE_LIMIT":      "5",
+		"AUTH_RATE_WINDOW":     "30s",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Config{
-		HTTPPort:      9000,
-		CORSOrigins:   []string{"https://app.swiftmed.bt", "https://dash.swiftmed.bt"},
-		TraefikTarget: "traefik:6000",
-		LogLevel:      "debug",
+		HTTPPort:       9000,
+		CORSOrigins:    []string{"https://app.swiftmed.bt", "https://dash.swiftmed.bt"},
+		TraefikTarget:  "traefik:6000",
+		LogLevel:       "debug",
+		AuthRateLimit:  5,
+		AuthRateWindow: 30 * time.Second,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Errorf("cfg = %+v\nwant %+v", cfg, want)
