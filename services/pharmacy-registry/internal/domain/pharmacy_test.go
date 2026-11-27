@@ -64,3 +64,25 @@ func TestNewPharmacyRejectsInvalidInput(t *testing.T) {
 		t.Fatalf("err = %v, want %v", err, ErrInvalidLocation)
 	}
 }
+
+func TestOpeningHoursValidation(t *testing.T) {
+	tests := []struct {
+		name  string
+		hours OpeningHours
+		valid bool
+	}{
+		{"valid", OpeningHours{Day: 0, OpensAt: "00:00", ClosesAt: "23:59"}, true},
+		{"negative day", OpeningHours{Day: -1, OpensAt: "09:00", ClosesAt: "17:00"}, false},
+		{"day too high", OpeningHours{Day: 7, OpensAt: "09:00", ClosesAt: "17:00"}, false},
+		{"invalid open time", OpeningHours{Day: 1, OpensAt: "9:00", ClosesAt: "17:00"}, false},
+		{"invalid close time", OpeningHours{Day: 1, OpensAt: "09:00", ClosesAt: "24:00"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.hours.Validate()
+			if (err == nil) != tt.valid {
+				t.Fatalf("Validate() = %v, want valid=%v", err, tt.valid)
+			}
+		})
+	}
+}

@@ -55,6 +55,9 @@ func (h OpeningHours) Validate() error {
 	if h.Day < 0 || h.Day > 6 {
 		return errors.New("hours must use day 0..6 and HH:MM times")
 	}
+	if !isHHMM(h.OpensAt) || !isHHMM(h.ClosesAt) {
+		return errors.New("hours must use day 0..6 and HH:MM times")
+	}
 	if _, err := time.Parse("15:04", h.OpensAt); err != nil {
 		return errors.New("hours must use day 0..6 and HH:MM times")
 	}
@@ -62,6 +65,10 @@ func (h OpeningHours) Validate() error {
 		return errors.New("hours must use day 0..6 and HH:MM times")
 	}
 	return nil
+}
+
+func isHHMM(value string) bool {
+	return len(value) == 5 && value[2] == ':'
 }
 
 type Pharmacy struct {
