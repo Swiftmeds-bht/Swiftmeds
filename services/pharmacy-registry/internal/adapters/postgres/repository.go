@@ -103,6 +103,38 @@ func (r *Repository) SetStatus(ctx context.Context, id string, status domain.Sta
 	return next, nil
 }
 
+func (r *Repository) Update(ctx context.Context, id, ownerID string, changes domain.Pharmacy) (domain.Pharmacy, error) {
+	hours, err := json.Marshal(changes.Hours)
+	if err != nil {
+		return domain.Pharmacy{}, fmt.Errorf("encode hours: %w", err)
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return domain.Pharmacy{}, fmt.Errorf("begin pharmacy update: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var p domain.Pharmacy
+	if err := scanRow(tx.QueryRow(ctx, pharmacySelect+` WHERE pharmacy_id=$1 FOR UPDATE`, id), &p); err != nil {
+		return domain.Pharmacy{}, err
+	}
+	if p.OwnerID != ownerID {
+		return domain.Pharmacy{}, domain.ErrOwnerMismatch
+	}
+	p.Name, p.Phone, p.Address, p.Dzongkhag = changes.Name, changes.Phone, changes.Address, changes.Dzongkhag
+	p.Location, p.Hours = changes.Location, append([]domain.OpeningHours(nil), changes.Hours...)
+	if p.Status == domain.StatusRejected {
+		p.Status, p.StatusReason = domain.StatusPending, ""
+	}
+	_, err = tx.Exec(ctx, `UPDATE pharmacies SET name=$1,phone=$2,address=$3,dzongkhag=$4,latitude=$5,longitude=$6,hours=$7,status=$8,status_reason=$9 WHERE pharmacy_id=$10`, p.Name, p.Phone, p.Address, p.Dzongkhag, p.Location.Latitude, p.Location.Longitude, hours, string(p.Status), p.StatusReason, id)
+	if err != nil {
+		return domain.Pharmacy{}, fmt.Errorf("update pharmacy: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Pharmacy{}, fmt.Errorf("commit pharmacy update: %w", err)
+	}
+	return p, nil
+}
+
 const pharmacySelect = `SELECT pharmacy_id, owner_user_id, name, license_number, phone, address, dzongkhag, latitude, longitude, hours, status, status_reason, created_at, verified_at FROM pharmacies`
 
 type rowScanner interface{ Scan(...any) error }

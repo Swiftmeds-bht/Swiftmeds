@@ -20,7 +20,8 @@ func TestVerificationTransitions(t *testing.T) {
 		{"verified to rejected", StatusVerified, StatusRejected, false},
 		{"rejected to verified", StatusRejected, StatusVerified, false},
 		{"rejected to rejected", StatusRejected, StatusRejected, false},
-		{"suspended to verified", StatusSuspended, StatusVerified, false},
+		{"suspended to verified", StatusSuspended, StatusVerified, true},
+		{"rejected to pending", StatusRejected, StatusPending, true},
 	}
 
 	for _, tt := range tests {

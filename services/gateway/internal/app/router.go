@@ -213,6 +213,7 @@ func NewRouter(cfg Config, logger *slog.Logger, opts ...RouterOption) http.Handl
 		mux.Handle("POST /api/v1/pharmacies", registerPharmacyHandler(wired.onboarding, wired.linker, logger))
 		mux.Handle("GET /api/v1/pharmacies", listPharmaciesHandler(wired.onboarding, logger))
 		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}/verification", verificationHandler(wired.onboarding, wired.locations, logger))
+		mux.Handle("PUT /api/v1/pharmacies/{pharmacyId}", updatePharmacyHandler(wired.onboarding, wired.locations, logger))
 	}
 	if wired.profile != nil {
 		mux.Handle("GET "+ProfilePath, profileHandler(wired.profile, logger))

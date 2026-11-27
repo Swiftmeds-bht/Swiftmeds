@@ -15,4 +15,5 @@ type PharmacyRepository interface {
 	FindByOwner(context.Context, string) (domain.Pharmacy, error)
 	List(context.Context, bool) ([]domain.Pharmacy, error)
 	SetStatus(context.Context, string, domain.Status, string, time.Time) (domain.Pharmacy, error)
+	Update(context.Context, string, string, domain.Pharmacy) (domain.Pharmacy, error)
 }

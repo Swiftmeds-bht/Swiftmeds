@@ -36,6 +36,107 @@ type registerPharmacyBody struct {
 	Location      *geoPointBody `json:"location"`
 }
 
+type openingHoursBody struct {
+	Day      int32  `json:"day"`
+	OpensAt  string `json:"opensAt"`
+	ClosesAt string `json:"closesAt"`
+}
+
+type updatePharmacyBody struct {
+	Name      string             `json:"name"`
+	Phone     string             `json:"phone"`
+	Address   string             `json:"address"`
+	Dzongkhag string             `json:"dzongkhag"`
+	Location  *geoPointBody      `json:"location"`
+	Hours     []openingHoursBody `json:"hours"`
+}
+
+func updatePharmacyHandler(registry ports.PharmacyOnboarding, locations ports.PharmacyLocations, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity := identityFrom(r)
+		id := r.PathValue("pharmacyId")
+		if identity.Role != authv1.Role_ROLE_PHARMACY_STAFF || identity.PharmacyID == "" || identity.PharmacyID != id {
+			writeError(w, http.StatusForbidden, "you can update only your own pharmacy")
+			return
+		}
+		var body updatePharmacyBody
+		if !decodeBody(w, r, &body) {
+			return
+		}
+		for _, field := range []struct{ name, value string }{{"name", body.Name}, {"phone", body.Phone}, {"address", body.Address}, {"dzongkhag", body.Dzongkhag}} {
+			value := strings.TrimSpace(field.value)
+			if value == "" {
+				writeError(w, http.StatusBadRequest, field.name+" is required")
+				return
+			}
+			if utf8.RuneCountInString(value) > maxFieldLength {
+				writeError(w, http.StatusBadRequest, field.name+" is too long")
+				return
+			}
+		}
+		loc := body.Location
+		if loc == nil || loc.Latitude == nil || loc.Longitude == nil || math.IsNaN(*loc.Latitude) || math.IsNaN(*loc.Longitude) || *loc.Latitude < -90 || *loc.Latitude > 90 || *loc.Longitude < -180 || *loc.Longitude > 180 {
+			writeError(w, http.StatusBadRequest, "location must have a latitude (-90 to 90) and a longitude (-180 to 180)")
+			return
+		}
+		hours := make([]*pharmacyregistryv1.OpeningHours, 0, len(body.Hours))
+		for _, h := range body.Hours {
+			if h.Day < 0 || h.Day > 6 || !validClockTime(h.OpensAt) || !validClockTime(h.ClosesAt) {
+				writeError(w, http.StatusBadRequest, "hours must use day 0..6 and HH:MM times")
+				return
+			}
+			hours = append(hours, &pharmacyregistryv1.OpeningHours{Day: h.Day, OpensAt: h.OpensAt, ClosesAt: h.ClosesAt})
+		}
+		ctx, cancel := callContext(r)
+		defer cancel()
+		current, err := registry.GetPharmacy(ctx, &pharmacyregistryv1.GetPharmacyRequest{PharmacyId: id})
+		if status.Code(err) == codes.NotFound || (err == nil && current.GetPharmacy() == nil) {
+			writeError(w, http.StatusNotFound, "pharmacy not found")
+			return
+		}
+		if err != nil {
+			writeDownstreamError(w, logger, r, err)
+			return
+		}
+		updated, err := registry.UpdatePharmacy(ctx, &pharmacyregistryv1.UpdatePharmacyRequest{PharmacyId: id, OwnerUserId: identity.UserID, Name: strings.TrimSpace(body.Name), Phone: strings.TrimSpace(body.Phone), Address: strings.TrimSpace(body.Address), Dzongkhag: strings.TrimSpace(body.Dzongkhag), Location: &commonv1.GeoPoint{Latitude: *loc.Latitude, Longitude: *loc.Longitude}, Hours: hours})
+		if status.Code(err) == codes.PermissionDenied {
+			writeError(w, http.StatusForbidden, "you can update only your own pharmacy")
+			return
+		}
+		if status.Code(err) == codes.InvalidArgument {
+			writeError(w, http.StatusBadRequest, status.Convert(err).Message())
+			return
+		}
+		if err != nil {
+			writeDownstreamError(w, logger, r, err)
+			return
+		}
+		pharmacy := updated.GetPharmacy()
+		// Upsert even when the coordinates did not change: this makes a retry
+		// complete Geo synchronization after Registry saved but Geo was down.
+		if pharmacy.GetStatus() == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED {
+			if _, err := locations.UpsertPharmacyLocation(ctx, &geov1.UpsertPharmacyLocationRequest{PharmacyId: id, Location: pharmacy.GetLocation()}); err != nil {
+				logRPCError(logger, "pharmacy location sync failed", httpx.RequestIDFromContext(r.Context()), err)
+				writeError(w, http.StatusBadGateway, "details were saved, but the map could not be updated; send the same request again")
+				return
+			}
+		}
+		writeProtoStatus(w, http.StatusOK, pharmacy)
+	}
+}
+
+func validClockTime(value string) bool {
+	if len(value) != 5 || value[2] != ':' {
+		return false
+	}
+	for i, c := range value {
+		if i != 2 && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return value[:2] < "24" && value[3:] < "60"
+}
+
 // registerPharmacyHandler is registerPharmacy (SCRUM-141). Any signed-in
 // account without a pharmacy may register one; it starts pending and stays out
 // of search until an administrator verifies it. The account then becomes the

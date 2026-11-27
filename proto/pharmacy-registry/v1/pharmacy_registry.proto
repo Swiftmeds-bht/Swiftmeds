@@ -17,6 +17,8 @@ service PharmacyRegistryService {
   rpc ListPharmacies(ListPharmaciesRequest) returns (ListPharmaciesResponse);
   // Admin only: approve, reject or suspend a pharmacy.
   rpc SetVerificationStatus(SetVerificationStatusRequest) returns (SetVerificationStatusResponse);
+  // Pharmacy staff only: update their pharmacy details and opening hours.
+  rpc UpdatePharmacy(UpdatePharmacyRequest) returns (UpdatePharmacyResponse);
 }
 
 enum VerificationStatus {
@@ -41,6 +43,13 @@ message Pharmacy {
   string status_reason = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp verified_at = 12;
+  repeated OpeningHours hours = 13;
+}
+
+message OpeningHours {
+  int32 day = 1;
+  string opens_at = 2;
+  string closes_at = 3;
 }
 
 message RegisterPharmacyRequest {
@@ -51,6 +60,7 @@ message RegisterPharmacyRequest {
   string address = 5;
   string dzongkhag = 6;
   swiftmed.common.v1.GeoPoint location = 7;
+  repeated OpeningHours hours = 8;
 }
 
 message RegisterPharmacyResponse {
@@ -94,5 +104,20 @@ message SetVerificationStatusRequest {
 }
 
 message SetVerificationStatusResponse {
+  Pharmacy pharmacy = 1;
+}
+
+message UpdatePharmacyRequest {
+  string pharmacy_id = 1;
+  string owner_user_id = 2;
+  string name = 3;
+  string phone = 4;
+  string address = 5;
+  string dzongkhag = 6;
+  swiftmed.common.v1.GeoPoint location = 7;
+  repeated OpeningHours hours = 8;
+}
+
+message UpdatePharmacyResponse {
   Pharmacy pharmacy = 1;
 }

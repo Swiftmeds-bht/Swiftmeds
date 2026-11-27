@@ -68,15 +68,16 @@ func (f *fakeOnboarding) ListPharmacies(_ context.Context, req *pharmacyregistry
 	return out, nil
 }
 
-// SetVerificationStatus follows Registry's rules: pending → verified or
-// rejected, verified → suspended.
+// SetVerificationStatus follows Registry's supported state transitions.
 func (f *fakeOnboarding) SetVerificationStatus(_ context.Context, req *pharmacyregistryv1.SetVerificationStatusRequest) (*pharmacyregistryv1.SetVerificationStatusResponse, error) {
 	f.set = append(f.set, req)
 	p := f.pharmacies[req.GetPharmacyId()]
 	from, to := p.GetStatus(), req.GetStatus()
 	allowed := from == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_PENDING &&
 		(to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED || to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_REJECTED) ||
-		from == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED && to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_SUSPENDED
+		from == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED && to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_SUSPENDED ||
+		from == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_SUSPENDED && to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED ||
+		from == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_REJECTED && to == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_PENDING
 	if !allowed {
 		return nil, status.Error(codes.InvalidArgument, "invalid verification status transition")
 	}
@@ -86,6 +87,23 @@ func (f *fakeOnboarding) SetVerificationStatus(_ context.Context, req *pharmacyr
 	}
 	f.pharmacies[p.GetPharmacyId()] = next
 	return &pharmacyregistryv1.SetVerificationStatusResponse{Pharmacy: next}, nil
+}
+
+func (f *fakeOnboarding) UpdatePharmacy(_ context.Context, req *pharmacyregistryv1.UpdatePharmacyRequest) (*pharmacyregistryv1.UpdatePharmacyResponse, error) {
+	p := f.pharmacies[req.GetPharmacyId()]
+	if p == nil {
+		return nil, status.Error(codes.NotFound, "pharmacy not found")
+	}
+	if p.GetOwnerUserId() != req.GetOwnerUserId() {
+		return nil, status.Error(codes.PermissionDenied, "owner mismatch")
+	}
+	p.Name, p.Phone, p.Address, p.Dzongkhag = req.GetName(), req.GetPhone(), req.GetAddress(), req.GetDzongkhag()
+	p.Location, p.Hours = req.GetLocation(), req.GetHours()
+	if p.GetStatus() == pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_REJECTED {
+		p.Status = pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_PENDING
+		p.StatusReason = ""
+	}
+	return &pharmacyregistryv1.UpdatePharmacyResponse{Pharmacy: p}, nil
 }
 
 type fakeLinker struct {
@@ -346,4 +364,49 @@ func TestApprovalWhenGeoIsDownSaysToSendItAgain(t *testing.T) {
 	if rec.Code != http.StatusOK || len(deps.locations.upserted) != 1 {
 		t.Fatalf("retry: got %d, upserts %d", rec.Code, len(deps.locations.upserted))
 	}
+}
+
+func TestReinstateSuspendedPharmacySyncsLocationToGeo(t *testing.T) {
+	deps := newDeps(&pharmacyregistryv1.Pharmacy{PharmacyId: "ph-1", Status: pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_SUSPENDED, Location: &commonv1.GeoPoint{Latitude: 27, Longitude: 89}})
+	rec := serve(onboardingRouter(admin, deps), http.MethodPut, "/api/v1/pharmacies/ph-1/verification", `{"status":"VERIFICATION_STATUS_VERIFIED"}`)
+	if rec.Code != http.StatusOK || len(deps.locations.upserted) != 1 {
+		t.Fatalf("got %d, upserts=%d body=%s", rec.Code, len(deps.locations.upserted), rec.Body.String())
+	}
+}
+
+func TestUpdatePharmacyOwnerAndGeoSync(t *testing.T) {
+	t.Run("rejects another pharmacy's staff", func(t *testing.T) {
+		deps := newDeps(&pharmacyregistryv1.Pharmacy{PharmacyId: "ph-1", OwnerUserId: "u-staff", Status: pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED, Location: &commonv1.GeoPoint{Latitude: 27, Longitude: 89}})
+		identity := ports.Identity{UserID: "u-staff", Role: authv1.Role_ROLE_PHARMACY_STAFF, PharmacyID: "ph-other"}
+		rec := serve(onboardingRouter(identity, deps), http.MethodPut, "/api/v1/pharmacies/ph-1", `{"name":"Name","phone":"123","address":"Road","dzongkhag":"Paro","location":{"latitude":28,"longitude":90},"hours":[]}`)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("got %d: %s", rec.Code, rec.Body.String())
+		}
+	})
+	t.Run("updates details and the verified map location", func(t *testing.T) {
+		p := &pharmacyregistryv1.Pharmacy{PharmacyId: "ph-1", OwnerUserId: "u-staff", Name: "Old", Status: pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_VERIFIED, Location: &commonv1.GeoPoint{Latitude: 27, Longitude: 89}}
+		deps := newDeps(p)
+		identity := ports.Identity{UserID: "u-staff", Role: authv1.Role_ROLE_PHARMACY_STAFF, PharmacyID: "ph-1"}
+		body := `{"name":"New name","phone":"+975 2 123 456","address":"New street","dzongkhag":"Paro","location":{"latitude":28,"longitude":90},"hours":[{"day":1,"opensAt":"09:00","closesAt":"17:00"}]}`
+		deps.locations.err = errors.New("geo unavailable")
+		rec := serve(onboardingRouter(identity, deps), http.MethodPut, "/api/v1/pharmacies/ph-1", body)
+		if rec.Code != http.StatusBadGateway || p.GetName() != "New name" || len(p.GetHours()) != 1 {
+			t.Fatalf("got %d upserts=%d body=%s", rec.Code, len(deps.locations.upserted), rec.Body.String())
+		}
+		deps.locations.err = nil
+		rec = serve(onboardingRouter(identity, deps), http.MethodPut, "/api/v1/pharmacies/ph-1", body)
+		if rec.Code != http.StatusOK || len(deps.locations.upserted) != 1 {
+			t.Fatalf("retry got %d upserts=%d body=%s", rec.Code, len(deps.locations.upserted), rec.Body.String())
+		}
+	})
+	t.Run("editing a rejected pharmacy resubmits it", func(t *testing.T) {
+		p := &pharmacyregistryv1.Pharmacy{PharmacyId: "ph-1", OwnerUserId: "u-staff", Status: pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_REJECTED, Location: &commonv1.GeoPoint{Latitude: 27, Longitude: 89}}
+		deps := newDeps(p)
+		identity := ports.Identity{UserID: "u-staff", Role: authv1.Role_ROLE_PHARMACY_STAFF, PharmacyID: "ph-1"}
+		body := `{"name":"Fixed","phone":"123","address":"Road","dzongkhag":"Paro","location":{"latitude":27,"longitude":89},"hours":[]}`
+		rec := serve(onboardingRouter(identity, deps), http.MethodPut, "/api/v1/pharmacies/ph-1", body)
+		if rec.Code != http.StatusOK || p.GetStatus() != pharmacyregistryv1.VerificationStatus_VERIFICATION_STATUS_PENDING {
+			t.Fatalf("got %d status=%v body=%s", rec.Code, p.GetStatus(), rec.Body.String())
+		}
+	})
 }
